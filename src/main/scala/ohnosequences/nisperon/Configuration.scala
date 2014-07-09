@@ -8,18 +8,30 @@ import ohnosequences.nisperon.bundles.NisperonMetadataBuilder
 import org.clapper.avsl.Logger
 import ohnosequences.nisperon.queues.SQSQueue
 
+object NisperonConfiguration {
 
+  val defaultInstanceSpecs = InstanceSpecs(
+    instanceType = InstanceType.T1Micro,
+    amiId = "",
+    securityGroups = List("nispero"),
+    keyName = "nispero",
+    instanceProfile = Some("compota"),
+    deviceMapping = Map("/dev/xvdb" -> "ephemeral0")
+  )
+}
 case class NisperonConfiguration(
                                   metadataBuilder: NisperonMetadataBuilder,
                                   email: String,
-                                  managerGroups: GroupConfiguration = SingleGroup(InstanceType.T1Micro, OnDemand),
+                                  managerGroupConfiguration: GroupConfiguration = SingleGroup(InstanceType.t1_micro, OnDemand),
+                                  metamanagerGroupConfiguration: GroupConfiguration = SingleGroup(InstanceType.m1_medium, OnDemand),
                                   timeout: Int = 3600 * 24,
                                   password: String,
                                   keyName: String = "nispero",
                                   autoTermination: Boolean = true,
                                   removeAllQueues: Boolean = false,
                                   errorThreshold: Int = 10,
-                                  workingDir: String = "/media/ephemeral0") {
+                                  workingDir: String = "/media/ephemeral0",
+                                  defaultInstanceSpecs: InstanceSpecs = NisperonConfiguration.defaultInstanceSpecs) {
 
   def controlTopic: String = Naming.name(this, "controlTopic")
 
@@ -27,15 +39,6 @@ case class NisperonConfiguration(
 
   def notificationTopic: String = Naming.notificationTopic(this)
 
-
-  val defaultSpecs = InstanceSpecs(
-    instanceType = InstanceType.T1Micro,
-    amiId = "",
-    securityGroups = List("nispero"),
-    keyName = keyName,
-    instanceProfile = Some("compota"),
-    deviceMapping = Map("/dev/xvdb" -> "ephemeral0")
-  )
 
   def id = metadataBuilder.id
 

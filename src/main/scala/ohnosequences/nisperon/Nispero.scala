@@ -110,7 +110,7 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
         logger.info("nispero " + nisperoConfiguration.name + ": launching workers group")
         val workers = workersGroup.autoScalingGroup(
           name = nisperoConfiguration.workersGroupName,
-          defaultInstanceSpecs = nisperoConfiguration.nisperonConfiguration.defaultSpecs,
+          defaultInstanceSpecs = nisperoConfiguration.nisperonConfiguration.defaultInstanceSpecs,
           amiId = managerDistribution.ami.id,
           userData = script
         )
@@ -143,7 +143,7 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
     val metadata = nisperoConfiguration.nisperonConfiguration.metadataBuilder.build("manager", nisperoConfiguration.name)
 
     def runManager() {
-      val managerGroup = nisperoConfiguration.nisperonConfiguration.managerGroups
+      val managerGroup = nisperoConfiguration.nisperonConfiguration.managerGroupConfiguration
 
       logger.info("nispero " + nisperoConfiguration.name + ": generating user script")
       val script = userScript(managerDistribution)
@@ -151,7 +151,7 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
       logger.info("nispero " + nisperoConfiguration.name + ": launching manager group")
       val managerASGroup = managerGroup.autoScalingGroup(
         name = nisperoConfiguration.managerGroupName,
-        defaultInstanceSpecs = nisperoConfiguration.nisperonConfiguration.defaultSpecs,
+        defaultInstanceSpecs = nisperoConfiguration.nisperonConfiguration.defaultInstanceSpecs,
         amiId = managerDistribution.ami.id,
         userData = script
       )

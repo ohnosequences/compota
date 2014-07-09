@@ -149,10 +149,12 @@ abstract class Nisperon {
           val bundle = new WhateverBundle(Nisperon.this, "meta", "meta")
           val userdata = bundle.userScript(bundle)
 
-          val metagroup = SingleGroup(instanceType = InstanceType.M1Medium).autoScalingGroup(
+
+
+          val metagroup = nisperonConfiguration.metamanagerGroupConfiguration.autoScalingGroup(
             name = nisperonConfiguration.metamanagerGroup,
             amiId = bundle.ami.id,
-            defaultInstanceSpecs = nisperonConfiguration.defaultSpecs,
+            defaultInstanceSpecs = nisperonConfiguration.defaultInstanceSpecs,
             userData = userdata
           )
 

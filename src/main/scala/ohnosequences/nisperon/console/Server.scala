@@ -170,6 +170,19 @@ with ServerErrorResponse {
       }
     }
 
+    case GET(Path(Seg("ssh" :: id ::  Nil))) => {
+      val ssh: Option[String] = try {
+        aws.ec2.getInstanceById(id).flatMap(_.getSSHCommand())
+      } catch {
+        case t: Throwable => None
+      }
+
+      ssh match {
+        case Some(c) => ResponseString(console.info(c).toString())
+        case None => ResponseString(console.error("couldn't get ssh command").toString())
+      }
+    }
+
     case GET(Path(Seg("nispero" :: nispero :: "workerInstances" ::  Nil))) => {
       ResponseString(console.workersInfo(nispero).toString())
     }
@@ -189,13 +202,13 @@ with ServerErrorResponse {
     }
 
     case GET(Path("/main.css")) => {
-      val main = io.Source.fromInputStream(getClass.getResourceAsStream("/console/main.css")).mkString
+      val main = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/console/main.css")).mkString
       CssContent ~> ResponseString(main)
     }
   }
 
   def main(): String = {
-    io.Source.fromInputStream(getClass.getResourceAsStream("/console/main.html")).mkString
+    scala.io.Source.fromInputStream(getClass.getResourceAsStream("/console/main.html")).mkString
   }
 
 }
@@ -222,7 +235,7 @@ class Server(nisperon: Nisperon) {
   def start() {
 
     import scala.sys.process._
-    val keyConf = io.Source.fromInputStream(getClass.getResourceAsStream("/console/keytoolConf.txt")).mkString.replace("$password$", password)
+    val keyConf = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/console/keytoolConf.txt")).mkString.replace("$password$", password)
    // println(keyConf)
     val is = new ByteArrayInputStream(keyConf.getBytes("UTF-8"))
     try {

@@ -67,6 +67,27 @@
     </div>
 </div>
 
+<div class="modal fade" id="sshInstanceModal" tabindex="-1" role="dialog" aria-labelledby="sshInstanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title" id="sshInstanceModalLabel">Connect to instance</h4>
+            </div>
+
+            <div class="modal-body sshInstanceBody">
+
+            </div>
+
+
+            <div class="modal-footer">
+                <!--<button type="button" class="btn btn-primary sshCopy">Copy</button>-->
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <div class="modal fade" id="showMessagesModal" tabindex="-1" role="dialog" aria-labelledby="showMessagesModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -113,17 +134,34 @@
     console.error = console.error || function(){};
     console.info = console.info || function(){};
 
+    function sshInstance(id) {
+       console.info("sshInstance(" + id + ")");
+        $('.sshInstanceBody').load("/ssh/" + id)
+        $('#sshInstanceModal').modal('show')
+    }
+
     $('#refresh').click(function(){
         console.info("refresh:");
         $('#workerInstances').load("/nispero/$nispero$/workerInstances", function() {
-        $('.terminate').click(function(event){
-        console.info("terminate: " + event.target.id);
-        $('.terminateFinal').attr("id", event.target.id)
-        $('.terminateInstanceBody').html("<p>Do you want to terminate instance " + event.target.id + "?</p>")
-        $('#terminateInstanceModal').modal('show')
-        });
+            $('.sshInstance').click(function(event){
+              var id  = $(event.target).data('id')
+              sshInstance(id)
+            });
+            $('.terminate').click(function(event){
+            console.info("terminate: " + event.target.id);
+            $('.terminateFinal').attr("id", event.target.id)
+            $('.terminateInstanceBody').html("<p>Do you want to terminate instance " + event.target.id + "?</p>")
+            $('#terminateInstanceModal').modal('show')
+            });
         });
     });
+
+
+
+     $('.sshInstance').click(function(event){
+        var id  = $(event.target).data('id')
+        sshInstance(id)
+     });
 
     $('.terminate').click(function(event){
         console.info("terminate: " + event.target.id);

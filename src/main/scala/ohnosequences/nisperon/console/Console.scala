@@ -256,7 +256,7 @@ case class Console(nisperon: Nisperon, server: Server) {
 
 
   //todo do deletedMessage lazy
-  def listMessages(name: String, lastKey: Option[String] = None, limit: Int = 4): NodeSeq = {
+  def listMessages(name: String, lastKey: Option[String] = None, limit: Int = 10): NodeSeq = {
     queues.get(name) match {
       case None => logger.warn("queue " + name + " doesn't exit"); error("queue " + name + " doesn't exit")
       case Some(queue) => {
@@ -306,6 +306,13 @@ case class Console(nisperon: Nisperon, server: Server) {
     <div class="alert alert-danger">
       <button type="button" class="close" data-dismiss="alert">&times;</button>
       <strong>Error!</strong> {message}
+    </div>
+  }
+
+  def info(message: String): NodeSeq = {
+    <div class="alert alert-success">
+      <button type="button" class="close" data-dismiss="alert">&times;</button>
+      {message}
     </div>
   }
 
@@ -363,6 +370,9 @@ case class Console(nisperon: Nisperon, server: Server) {
                 <a class="btn btn-danger terminate" href="#" id={inst.getInstanceId}>
                   <i class="icon-refresh icon-white"></i>
                   Terminate</a>
+                <a class="btn btn-info sshInstance" href="#" data-id={inst.getInstanceId}>
+                  <i class="icon-refresh icon-white"></i>
+                  Connect</a>
               </td>
             </tr>
         }

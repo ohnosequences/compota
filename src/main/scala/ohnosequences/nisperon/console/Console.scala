@@ -379,7 +379,7 @@ case class Console(nisperon: Nisperon, server: Server) {
     }
   }
 
-  def listErrors(lastKey: Option[(String, String)] = None, limit: Int = 4): NodeSeq = {
+  def listErrors(lastKey: Option[(String, String)] = None, limit: Int = 10): NodeSeq = {
     val (newLastKey, failures) = failTable.failsChunk(lastKey, limit)
     logger.info(failures.size + " failures")
     failures.map { failure =>

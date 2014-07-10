@@ -62,11 +62,16 @@ class DynamoDBQueue[T](
           value =>
             c += 1
             val id = Tasks.generateChild(parentId, nispero, c)
-
-            writer.write(id, value)
             ddbWriter.put(id, value)
         }
         ddbWriter.flush()
+        c = 0
+        values.filter(!_.equals(monoid.unit)).map {
+          value =>
+            c += 1
+            val id = Tasks.generateChild(parentId, nispero, c)
+            writer.write(id, value)
+        }
         writer.flush()
       }
       case None => throw new Error("write to a not initialized queue")

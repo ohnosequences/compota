@@ -13,13 +13,14 @@ class DynamoDBWriter[T](aws: AWS, monoid: Monoid[T], queueName: String, serializ
   val bufferSize = batchSize * (threads + 1)
   val buffer = new ArrayBlockingQueue[(String, T)](bufferSize)
 
-  @volatile var stopped = false
+  @volatile var error = false
+  @volatile var errorMessage = ""
   @volatile var launched = false
 
   val logger = Logger(this.getClass)
 
   def put(id: String, value: T) {
-    if(stopped) throw new Error("queue is stopped")
+    if(error) throw new Error(errorMessage)
     buffer.put(id -> value)
   }
 
@@ -32,28 +33,37 @@ class DynamoDBWriter[T](aws: AWS, monoid: Monoid[T], queueName: String, serializ
     }
   }
 
-  def terminate() {
-    stopped = true
+  def reportError(s: String) {
+    error = true
+    errorMessage = s
+    buffer.clear()
   }
 
   def flush() {
-    if(stopped) throw new Error("queue is stopped")
+    if(error) {
+      error = false
+      throw new Error(errorMessage)
+    }
     logger.info("running flush")
     for (i <- 1 to bufferSize * 2) {
       buffer.put("id" -> monoid.unit)
+    }
+    if(error) {
+      error = false
+      throw new Error(errorMessage)
     }
   }
 
   class WriterThread(id: Int) extends Thread("DynamoDB writer " + id + " " + queueName) {
     override def run() {
-      while(!stopped) {
+      while (true) {
         try {
           val writeOperations = new java.util.ArrayList[WriteRequest]()
           for (i <- 1 to 25) {
             val (id, value) = buffer.take()
             if (!value.equals(monoid.unit)) {
 
-              val item = if(writeBodyToTable) {
+              val item = if (writeBodyToTable) {
                 Map(
                   idAttr -> new AttributeValue().withS(id),
                   valueAttr -> new AttributeValue().withS(serializer.toString(value))
@@ -66,7 +76,7 @@ class DynamoDBWriter[T](aws: AWS, monoid: Monoid[T], queueName: String, serializ
               writeOperations.add(new WriteRequest()
                 .withPutRequest(new PutRequest()
                 .withItem(item)
-              ))
+                ))
             }
           }
 
@@ -89,8 +99,9 @@ class DynamoDBWriter[T](aws: AWS, monoid: Monoid[T], queueName: String, serializ
           }
         } catch {
           case t: Throwable => {
-            logger.warn(t.toString + " " + t.getMessage)
-            terminate()
+            val message = t.toString + " " + t.getMessage
+            logger.warn(message)
+            reportError(message)
           }
         }
       }

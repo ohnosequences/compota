@@ -28,7 +28,6 @@ class S3Queue[T](aws: AWS, name: String, monoid: Monoid[T], serializer: Serializ
 
   val s3Writer = new S3Writer(aws, monoid, name, serializer, 1)
 
-  //todo why it's so different form dynamodb???
   def put(parentId: String, nispero: String, values: List[T]) {
     sqsWriter match {
       case Some(writer) => {
@@ -37,7 +36,6 @@ class S3Queue[T](aws: AWS, name: String, monoid: Monoid[T], serializer: Serializ
           value =>
             c += 1
             val id = Tasks.generateChild(parentId, nispero, c)
-
             s3Writer.put(id, value)
         }
         s3Writer.flush()

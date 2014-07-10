@@ -11,13 +11,15 @@ class S3Writer[T](aws: AWS, monoid: Monoid[T], queueName: String, serializer: Se
   val bufferSize = batchSize * (threads + 1)
   val buffer = new ArrayBlockingQueue[(String, T)](bufferSize)
 
-  @volatile var stopped = false
+  @volatile var error = false
   @volatile var launched = false
 
+  @volatile var errorMessage = ""
   val logger = Logger(this.getClass)
 
+
   def put(id: String, value: T) {
-    if(stopped) throw new Error("queue is stopped")
+    if(error) throw new Error(errorMessage)
     buffer.put(id -> value)
   }
 
@@ -30,30 +32,41 @@ class S3Writer[T](aws: AWS, monoid: Monoid[T], queueName: String, serializer: Se
     }
   }
 
-  def terminate() {
-    stopped = true
+  def reportError(errorM: String) {
+    errorMessage = errorM
+    error = true
+    buffer.clear()
   }
 
-  //todo think about flush!
   def flush() {
-    if(stopped) throw new Error("queue is stopped")
+    if(error) {
+      error = false
+      throw new Error(errorMessage)
+    }
     for (i <- 1 to bufferSize * 2) {
       buffer.put("id" -> monoid.unit)
     }
+    if(error) {
+      error = false
+      throw new Error(errorMessage)
+    }
   }
+
 
   class WriterThread(id: Int) extends Thread("S3 writer " + id + " " + queueName) {
     override def run() {
-      while(!stopped) {
+      while(true) {
         try {
-            val (id, value) = buffer.take()
-            if (!value.equals(monoid.unit)) {
-              aws.s3.putWholeObject(ObjectAddress(queueName, id), serializer.toString(value))
-            }
+          val (id, value) = buffer.take()
+          if (!value.equals(monoid.unit)) {
+            aws.s3.putWholeObject(ObjectAddress(queueName, id), serializer.toString(value))
+          }
         } catch {
           case t: Throwable => {
-            logger.warn(t.toString + " " + t.getMessage)
-            terminate()
+            val message = t.toString + " " + t.getMessage
+            logger.warn(message)
+            t.printStackTrace()
+            reportError(message)
           }
         }
       }

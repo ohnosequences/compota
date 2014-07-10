@@ -211,6 +211,8 @@ abstract class Nisperon {
         }
       }
 
+      case "undeploy" :: "actions" :: Nil => undeployActions(false)
+
       case "checks":: Nil => checks()
 
       case "dot" :: "dot" :: Nil => {

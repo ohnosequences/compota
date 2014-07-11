@@ -416,7 +416,7 @@ case class Console(nisperon: Nisperon, server: Server) {
         </tr>
       </thead>
       <tbody id ="errorsTableBody">
-        {listErrors(None, 4)}
+        {listErrors(None)}
       </tbody>
     </table>
     <p><a class="btn btn-info loadMoreErrors" href="#">

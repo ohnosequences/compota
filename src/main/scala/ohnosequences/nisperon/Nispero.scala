@@ -1,10 +1,10 @@
 package ohnosequences.nisperon
 
+import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.nisperon.queues.{MonoidQueueAux, MonoidQueue}
 import ohnosequences.nisperon.bundles._
 
 import ohnosequences.awstools.s3.ObjectAddress
-import org.clapper.avsl.Logger
 import ohnosequences.nisperon.logging.FailTable
 
 
@@ -49,7 +49,7 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
  // val addressCreator: AddressCreator,
   val nisperoConfiguration: NisperoConfiguration
 
-) extends NisperoAux {
+) extends NisperoAux with LazyLogging {
 
   type IQ = InputQueue
 
@@ -65,8 +65,6 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
 
   val manager = new Manager(aws,nisperoConfiguration)
 
-  val logger = Logger(this.getClass)
-
   import ohnosequences.statika._
   import ohnosequences.statika.ami.AMI149f7863
 
@@ -81,10 +79,8 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
     }
   }
 
-  object managerDistribution extends ManagerDistribution(workerBundle) {
+  object managerDistribution extends ManagerDistribution(workerBundle) with LazyLogging {
     import ohnosequences.statika.{AnyDistribution, InstallResults, success}
-
-    val logger = Logger(this.getClass)
 
     val metadata = nisperoConfiguration.nisperonConfiguration.metadataBuilder.build("worker", nisperoConfiguration.name, nisperoConfiguration.nisperonConfiguration.workingDir)
 
@@ -135,10 +131,8 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
 
   }
 
-  object nisperoDistribution extends NisperoDistribution(managerDistribution) {
+  object nisperoDistribution extends NisperoDistribution(managerDistribution) with LazyLogging {
     //  import ohnosequences.statika.{success}
-
-    val logger = Logger(this.getClass)
 
     val metadata = nisperoConfiguration.nisperonConfiguration.metadataBuilder.build("manager", nisperoConfiguration.name)
 

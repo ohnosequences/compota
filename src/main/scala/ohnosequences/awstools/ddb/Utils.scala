@@ -2,12 +2,12 @@ package ohnosequences.awstools.ddb
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.dynamodbv2.model._
-import org.clapper.avsl.Logger
+import com.typesafe.scalalogging.{Logger, LazyLogging}
 
 import scala.collection.JavaConversions._
 
 
-object Utils {
+object Utils extends LazyLogging {
 
   def deleteTable(ddb: AmazonDynamoDB, table: String) {
     try {

@@ -9,14 +9,14 @@ import ohnosequences.nisperon.bundles.{WhateverBundle, NisperonMetadataBuilder}
 import com.amazonaws.services.autoscaling.model.UpdateAutoScalingGroupRequest
 import com.amazonaws.AmazonServiceException
 import com.amazonaws.services.sqs.model.DeleteQueueRequest
-import org.clapper.avsl.Logger
 import ohnosequences.awstools.ec2.InstanceType
 import ohnosequences.awstools.ddb.Utils
+import com.typesafe.scalalogging.{Logger, LazyLogging}
 import ohnosequences.nisperon.logging.FailTable
 import ohnosequences.nisperon.logging.InstanceLogging
 
 
-abstract class Nisperon {
+abstract class Nisperon extends LazyLogging {
 
   val nisperos = mutable.HashMap[String, NisperoAux]()
 
@@ -26,7 +26,6 @@ abstract class Nisperon {
 
   val aws: AWS = new AWS()
 
-  val logger = Logger(this.getClass)
 
   def checks()
 
@@ -175,11 +174,11 @@ abstract class Nisperon {
       }
 
       case "check" :: "queues" :: Nil => {
-        logger.info(checkQueues())
+        logger.info(checkQueues().toString)
       }
 
       case "graph" :: Nil => {
-        logger.info(new NisperoGraph(nisperos).graph)
+        logger.info(new NisperoGraph(nisperos).graph.toString)
       }
 
       case "add" :: "tasks" :: Nil => {
@@ -256,9 +255,7 @@ abstract class Nisperon {
 
 }
 
-object Nisperon {
-
-  val logger = Logger(this.getClass)
+object Nisperon extends LazyLogging {
 
   def unsafeAction(name: String, action: => Unit, logger: Logger, limit: Int = 10) {
 

@@ -1,15 +1,12 @@
 package ohnosequences.nisperon
 
-import org.clapper.avsl.Logger
+import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.nisperon.queues.Merger
 import ohnosequences.awstools.s3.ObjectAddress
 import java.io.File
 import ohnosequences.nisperon.logging.FailTable
 
-class TerminationDaemon(nisperon: Nisperon) extends Thread {
-  val logger = Logger(this.getClass)
-
-
+class TerminationDaemon(nisperon: Nisperon) extends Thread with LazyLogging {
 
   val initLaunchTime = {
 

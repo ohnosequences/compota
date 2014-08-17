@@ -1,8 +1,8 @@
 package ohnosequences.nisperon.queues
 
+import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.nisperon._
 import scala.collection.JavaConversions._
-import org.clapper.avsl.Logger
 import ohnosequences.awstools.s3.ObjectAddress
 import com.amazonaws.services.s3.model.ListObjectsRequest
 import com.amazonaws.AmazonClientException
@@ -16,9 +16,7 @@ import ohnosequences.nisperon.Tasks
 //todo flush! workaround 1 thread!
 
 //think about batch stuff latter
-class S3Queue[T](aws: AWS, name: String, monoid: Monoid[T], serializer: Serializer[T], deadLetterQueueName: String) extends MonoidQueue[T](name, monoid, serializer) {
-
-  val logger = Logger(this.getClass)
+class S3Queue[T](aws: AWS, name: String, monoid: Monoid[T], serializer: Serializer[T], deadLetterQueueName: String) extends MonoidQueue[T](name, monoid, serializer) with LazyLogging{
 
   val sqsQueue = new SQSQueue[String](aws.sqs.sqs, name, stringSerializer, deadLetterQueueName = Some(deadLetterQueueName))
 

@@ -1,13 +1,13 @@
 package ohnosequences.nisperon.queues
 
 import java.util.concurrent.ArrayBlockingQueue
+import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.nisperon.{AWS, Serializer, Monoid}
-import org.clapper.avsl.Logger
 import com.amazonaws.services.dynamodbv2.model._
 import scala.collection.JavaConversions._
 
 
-class DynamoDBWriter[T](aws: AWS, monoid: Monoid[T], queueName: String, serializer: Serializer[T], idAttr: String, valueAttr: String, writeBodyToTable: Boolean, threads: Int = 1) {
+class DynamoDBWriter[T](aws: AWS, monoid: Monoid[T], queueName: String, serializer: Serializer[T], idAttr: String, valueAttr: String, writeBodyToTable: Boolean, threads: Int = 1) extends LazyLogging {
 
   val batchSize = 25
   val bufferSize = batchSize * (threads + 1)
@@ -16,8 +16,6 @@ class DynamoDBWriter[T](aws: AWS, monoid: Monoid[T], queueName: String, serializ
   @volatile var error = false
   @volatile var errorMessage = ""
   @volatile var launched = false
-
-  val logger = Logger(this.getClass)
 
   def put(id: String, value: T) {
     if(error) throw new Error(errorMessage)

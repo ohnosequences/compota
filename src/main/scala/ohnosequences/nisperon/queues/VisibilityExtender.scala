@@ -1,12 +1,11 @@
 package ohnosequences.nisperon.queues
 
+import com.typesafe.scalalogging.LazyLogging
+
 import scala.collection.JavaConversions._
-import org.clapper.avsl.Logger
 
 
-class VisibilityExtender[T](sqsQueue: SQSQueue[T]) extends Thread("extender_" + sqsQueue.name) {
-
-  val logger = Logger(this.getClass)
+class VisibilityExtender[T](sqsQueue: SQSQueue[T]) extends Thread("extender_" + sqsQueue.name) with LazyLogging {
 
   val messages = new java.util.concurrent.ConcurrentHashMap[String, SQSMessage[T]]()
 

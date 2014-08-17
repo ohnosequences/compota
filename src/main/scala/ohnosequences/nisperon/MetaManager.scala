@@ -1,15 +1,13 @@
 package ohnosequences.nisperon
 
-import org.clapper.avsl.Logger
+import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.nisperon.queues.{Merger, SQSQueue}
 import ohnosequences.nisperon.logging.FailTable
 import ohnosequences.nisperon.console.Server
 
 
-class MetaManager(nisperon: Nisperon) {
+class MetaManager(nisperon: Nisperon) extends LazyLogging {
   import nisperon._
-
-  val logger = Logger(this.getClass)
 
   def printURL(domain: String, port: Int = 443): String = port match {
     case 443 => "https://" + domain

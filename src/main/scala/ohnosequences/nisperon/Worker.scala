@@ -1,12 +1,12 @@
 package ohnosequences.nisperon
 
+import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.nisperon.queues._
-import org.clapper.avsl.Logger
 import ohnosequences.nisperon.logging.{InstanceLogging, FailTable, S3Logger}
 
 //todo use failed table failed if failed from several machines
 
-abstract class WorkerAux {
+abstract class WorkerAux extends LazyLogging {
 
   type IQ <: MonoidQueueAux
 
@@ -21,9 +21,6 @@ abstract class WorkerAux {
   val nisperoConfiguration: NisperoConfiguration
 
   val aws: AWS
-
-  val logger = Logger(this.getClass)
-
 
 
   //todo add links to instance logs

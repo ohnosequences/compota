@@ -1,5 +1,6 @@
 package ohnosequences.nisperon.console
 
+import com.typesafe.scalalogging.LazyLogging
 import unfiltered.netty.Https
 import unfiltered.response._
 import unfiltered.request.{BasicAuth, Path, Seg, GET}
@@ -12,7 +13,6 @@ import com.amazonaws.services.autoscaling.model.DescribeAutoScalingGroupsRequest
 import collection.JavaConversions._
 import ohnosequences.nisperon.Nisperon
 import ohnosequences.nisperon.queues.S3Queue
-import org.clapper.avsl.Logger
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.nisperon.logging.S3Logger
 import ohnosequences.nisperon.logging.InstanceLogging
@@ -37,10 +37,10 @@ case class Auth(users: Users) {
 class ConsolePlan(name: String, users: Users, console: Console) extends Plan
 with Secured // also catches netty Ssl errors
 with SynchronousExecution
-with ServerErrorResponse {
+with ServerErrorResponse
+with LazyLogging {
   val aws =  console.nisperon.aws
   val as =  console.nisperon.aws.as.as
-  val logger = Logger(this.getClass)
 
   def intent = Auth(users) {
     case GET(Path("/")) => {

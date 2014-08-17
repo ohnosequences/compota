@@ -1,10 +1,10 @@
 package ohnosequences.nisperon.queues
 
+import com.typesafe.scalalogging.{LazyLogging, Logger}
 import ohnosequences.nisperon._
 
 import scala.collection.JavaConversions._
 
-import org.clapper.avsl.Logger
 import java.util.concurrent.ArrayBlockingQueue
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model._
@@ -65,11 +65,9 @@ trait SQSWriter[T]  {
 }
 
 
-class SyncSQSReader[T](sqsQueue: SQSQueue[T], queueURL: String, snsRedirected: Boolean = false) extends SQSReader[T] {
+class SyncSQSReader[T](sqsQueue: SQSQueue[T], queueURL: String, snsRedirected: Boolean = false) extends SQSReader[T] with LazyLogging {
 
   val snsMessageParser = new JsonSerializer[SNSMessage]()
-
-  val logger = Logger(this.getClass)
 
   override def reset() {}
 
@@ -104,13 +102,11 @@ class SyncSQSReader[T](sqsQueue: SQSQueue[T], queueURL: String, snsRedirected: B
 
 
 //todo OverLimitException
-class BufferedSQSReader[T](sqsQueue: SQSQueue[T], queueURL: String, visibilityExtender: VisibilityExtender[T], bufferSize: Int = 1, snsRedirected: Boolean = false) extends Thread("sqs reader " + sqsQueue.name) with SQSReader[T] {
+class BufferedSQSReader[T](sqsQueue: SQSQueue[T], queueURL: String, visibilityExtender: VisibilityExtender[T], bufferSize: Int = 1, snsRedirected: Boolean = false) extends Thread("sqs reader " + sqsQueue.name) with SQSReader[T] with LazyLogging {
 
   val buffer = new ArrayBlockingQueue[SQSMessage[T]](bufferSize)
 
   val snsMessageParser = new JsonSerializer[SNSMessage]()
-
-  val logger = Logger(this.getClass)
 
   @volatile var stopped = false
 
@@ -237,13 +233,11 @@ class BufferedSQSReader[T](sqsQueue: SQSQueue[T], queueURL: String, visibilityEx
 //}
 
 
-class BufferedSQSWriter[T](sqsQueue: SQSQueue[T], queueURL: String, bufferSize: Int = 20, monoid: Monoid[T]) extends Thread("sqs writer " + sqsQueue.name) with SQSWriter[T] {
+class BufferedSQSWriter[T](sqsQueue: SQSQueue[T], queueURL: String, bufferSize: Int = 20, monoid: Monoid[T]) extends Thread("sqs writer " + sqsQueue.name) with SQSWriter[T] with LazyLogging  {
 
   @volatile var stopped = false
 
   val batchSize = 10
-
-  val logger = Logger(this.getClass)
 
   val buffer = new ArrayBlockingQueue[(String, T)](bufferSize)
 
@@ -299,10 +293,7 @@ class BufferedSQSWriter[T](sqsQueue: SQSQueue[T], queueURL: String, bufferSize: 
 
 case class SQSQueueInfo(url: String, approx: String, inFlight: String)
 
-class SQSQueue[T](val sqs: AmazonSQS, val name: String, val serializer: Serializer[T], deadLetterQueueName: Option[String] = None, val visibilityTimeout: Option[Int] = None) {
-
-  val logger = Logger(this.getClass)
-
+class SQSQueue[T](val sqs: AmazonSQS, val name: String, val serializer: Serializer[T], deadLetterQueueName: Option[String] = None, val visibilityTimeout: Option[Int] = None) extends LazyLogging  {
 
   def getReader(snsRedirected: Boolean = false): SQSReader[T] = {
     val queueURL = createQueue()

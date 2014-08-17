@@ -1,6 +1,6 @@
 package ohnosequences.nisperon.queues
 
-import org.clapper.avsl.Logger
+import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.nisperon.{Nisperon, Serializer}
 
@@ -12,9 +12,8 @@ object Merger {
   }
 }
 
-class Merger(queue: MonoidQueueAux, nisperon: Nisperon) {
+class Merger(queue: MonoidQueueAux, nisperon: Nisperon) extends LazyLogging {
 
-  val logger = Logger(this.getClass)
 
   def merge() = {
 

@@ -1,12 +1,12 @@
 package ohnosequences.nisperon.logging
 
+import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.nisperon.AWS
 import com.amazonaws.services.dynamodbv2.model._
 import java.util
 import java.text.SimpleDateFormat
 import java.util.Date
 import ohnosequences.awstools.ddb.Utils
-import org.clapper.avsl.Logger
 
 case class Failure(taskId: String, time: Long, instanceId: String, message: String) {
   val format = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss")
@@ -18,8 +18,7 @@ case class Failure(taskId: String, time: Long, instanceId: String, message: Stri
 
 //todo add sqs queue for this
 //todo add table with all success (or jsut retrive it)
-case class FailTable(aws: AWS, name: String) {
-  val logger = Logger(this.getClass)
+case class FailTable(aws: AWS, name: String) extends LazyLogging{
 
   val hashKeyName = "h"
   val rangeKeyName = "r"

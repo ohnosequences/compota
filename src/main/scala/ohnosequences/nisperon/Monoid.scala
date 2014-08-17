@@ -33,8 +33,6 @@ object stringMonoid extends Monoid[String] {
   def mult(x: String, y: String): String = x + y
 }
 
-
-
 object unitMonoid extends Monoid[Unit] {
   def unit: Unit = ()
   def mult(x: Unit, y: Unit): Unit = ()

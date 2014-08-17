@@ -1,12 +1,12 @@
 package ohnosequences.nisperon.queues
 
 import java.util.concurrent.ArrayBlockingQueue
+import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.nisperon.{AWS, Serializer, Monoid}
-import org.clapper.avsl.Logger
 import ohnosequences.awstools.s3.ObjectAddress
 
 
-class S3Writer[T](aws: AWS, monoid: Monoid[T], queueName: String, serializer: Serializer[T], threads: Int = 1) {
+class S3Writer[T](aws: AWS, monoid: Monoid[T], queueName: String, serializer: Serializer[T], threads: Int = 1)extends LazyLogging {
   val batchSize = 1
   val bufferSize = batchSize * (threads + 1)
   val buffer = new ArrayBlockingQueue[(String, T)](bufferSize)
@@ -15,7 +15,6 @@ class S3Writer[T](aws: AWS, monoid: Monoid[T], queueName: String, serializer: Se
   @volatile var launched = false
 
   @volatile var errorMessage = ""
-  val logger = Logger(this.getClass)
 
 
   def put(id: String, value: T) {

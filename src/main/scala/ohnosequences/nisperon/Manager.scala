@@ -1,20 +1,18 @@
 package ohnosequences.nisperon
 
+import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.nisperon.queues.{SQSQueue}
-import org.clapper.avsl.Logger
 import ohnosequences.nisperon.logging.FailTable
 
 case class SNSMessage(Message: String)
 
 case class ManagerCommand(command: String, arg: String)
 
-  abstract class ManagerAux {
+  abstract class ManagerAux extends LazyLogging {
 
   val nisperoConfiguration: NisperoConfiguration
 
   val aws: AWS
-
-  val logger = Logger(this.getClass)
 
 
   def runControlQueueHandler() {

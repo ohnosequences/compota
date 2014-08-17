@@ -1,24 +1,22 @@
 package ohnosequences.nisperon.console
 
+import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.nisperon.{NisperoGraph, NisperoAux, Nisperon, Tasks}
 import scala.xml.{Node, NodeSeq}
 import com.amazonaws.services.autoscaling.model.AutoScalingGroup
 import collection.JavaConversions._
 import ohnosequences.nisperon.queues.{ProductQueue, MonoidQueueAux}
 import scala.collection.mutable.HashMap
-import org.clapper.avsl.Logger
 import ohnosequences.nisperon.logging.{FailTable, S3Logger}
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException
 
 //todo dynamodb error Warning! com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException: Status Code: 400, AWS Service: AmazonDynamoDBv2, AWS Request ID: UFL5RSPG7NOCUVOST2I3MELKMVVV4KQNSO5AEMVJF66Q9ASUAAJG, AWS Error Code: ResourceNotFoundException, AWS Error Message: Requested resource not found
-case class Console(nisperon: Nisperon, server: Server) {
+case class Console(nisperon: Nisperon, server: Server) extends LazyLogging{
 
   val aws = nisperon.aws
   val as = aws.as.as
 
-
-  val logger = Logger(this.getClass)
 
   val failTable = new FailTable(aws, nisperon.nisperonConfiguration.errorTable)
 

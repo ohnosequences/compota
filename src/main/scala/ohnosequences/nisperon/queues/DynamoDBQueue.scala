@@ -1,9 +1,9 @@
 package ohnosequences.nisperon.queues
 
+import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.nisperon.{Serializer, Monoid, AWS}
 import com.amazonaws.services.dynamodbv2.model._
 import scala.collection.JavaConversions._
-import org.clapper.avsl.Logger
 import ohnosequences.awstools.ddb.Utils
 import scala.collection.mutable.ListBuffer
 import ohnosequences.nisperon.Tasks
@@ -16,7 +16,7 @@ class DynamoDBQueue[T](
                         serializer: Serializer[T],
                         throughputs: (Int, Int),
                         deadLetterQueueName: String
-                        ) extends MonoidQueue[T](name, monoid, serializer) {
+                        ) extends MonoidQueue[T](name, monoid, serializer) with LazyLogging {
 
 
 
@@ -38,8 +38,6 @@ class DynamoDBQueue[T](
 
   val idAttr = "id"
   val valueAttr = "val"
-
-  val logger = Logger(this.getClass)
 
   val sqsQueue = new SQSQueue[T](aws.sqs.sqs, name, serializer, deadLetterQueueName = Some(deadLetterQueueName))
 

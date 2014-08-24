@@ -98,7 +98,6 @@ case class Console(nisperon: Nisperon, server: Server) {
     //      <td>1,001</td>
     //      <td>Lorem</td>
     //    </tr>
-    //todo it's wrong because uses static information
     <table class="table table-striped topMargin20">
       <tbody>
         <tr>
@@ -192,9 +191,6 @@ case class Console(nisperon: Nisperon, server: Server) {
     }
   }
 
-
-  //todo find by name
-  //check existing
 
   def queueStatus(queue: MonoidQueueAux): NodeSeq = {
     val res = ProductQueue.flatQueue(queue).flatMap(queueStatusFlatted)

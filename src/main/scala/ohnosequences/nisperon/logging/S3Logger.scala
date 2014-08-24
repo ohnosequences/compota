@@ -8,7 +8,7 @@ import java.util.Date
 
 //todo add verbose level
 //todo add upload manager here
-class S3Logger(name: String, aws: AWS, prefix: ObjectAddress, workingDir: String) {
+class S3Logger(name: String, aws: AWS, prefix: ObjectAddress, workingDir: String) extends Logger {
   val buffer = new StringBuilder
   def uploadFile(file: File, zeroDir: File = new File(workingDir)) {
     val path = file.getAbsolutePath.replace(zeroDir.getAbsolutePath, "")
@@ -23,11 +23,15 @@ class S3Logger(name: String, aws: AWS, prefix: ObjectAddress, workingDir: String
   val format = new SimpleDateFormat("HH:mm:ss.SSS")
 
   def warn(s: String) {
-    buffer.append(pref() + s + System.lineSeparator())
+    val ss = pref() + s + System.lineSeparator()
+    println(ss)
+    buffer.append(ss)
   }
 
   def error(s: String) {
-    buffer.append(pref() + " ERROR: " + s + System.lineSeparator())
+    val ss = pref() + " ERROR: " + s + System.lineSeparator()
+    println(ss)
+    buffer.append(ss)
   }
 
   def info(s: String) {

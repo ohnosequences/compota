@@ -10,7 +10,8 @@ trait Logger {
 
   def benchExecute[T](description: String)(statement: =>T): T = {
     val t1 = System.currentTimeMillis()
-    val res = statement()
+    val res = statement
+
     val t2 = System.currentTimeMillis()
     info(description + " finished in " + (t2 - t1) + " ms")
     res

@@ -8,7 +8,7 @@ import java.util.Date
 
 //todo add verbose level
 //todo add upload manager here
-class S3Logger(name: String, aws: AWS, prefix: ObjectAddress, workingDir: String) {
+class S3Logger(name: String, aws: AWS, prefix: ObjectAddress, workingDir: String) extends Logger {
   val buffer = new StringBuilder
   def uploadFile(file: File, zeroDir: File = new File(workingDir)) {
     val path = file.getAbsolutePath.replace(zeroDir.getAbsolutePath, "")

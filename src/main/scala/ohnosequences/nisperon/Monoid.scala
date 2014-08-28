@@ -23,6 +23,16 @@ object intMonoid extends Monoid[Int] {
   def mult(x: Int, y: Int): Int = x + y
 }
 
+object longMonoid extends Monoid[Long] {
+  def unit: Long = 0L
+  def mult(x: Long, y: Long): Long = x + y
+}
+
+object maxLongMonoid extends Monoid[Long] {
+  def unit: Long = 0L
+  def mult(x: Long, y: Long): Long = math.max(x, y)
+}
+
 object doubleMonoid extends Monoid[Double] {
   def unit: Double = 0
   def mult(x: Double, y: Double): Double = x + y

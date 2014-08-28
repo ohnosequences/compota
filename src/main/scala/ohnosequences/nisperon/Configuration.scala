@@ -26,7 +26,6 @@ case class NisperonConfiguration(
                                   metamanagerGroupConfiguration: GroupConfiguration = SingleGroup(InstanceType.m1_medium, OnDemand),
                                   timeout: Int = 3600 * 24,
                                   password: String,
-                                  keyName: String = "nispero",
                                   autoTermination: Boolean = true,
                                   removeAllQueues: Boolean = false,
                                   errorThreshold: Int = 10,

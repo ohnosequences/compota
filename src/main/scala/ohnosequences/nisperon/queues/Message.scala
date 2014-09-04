@@ -7,13 +7,15 @@ trait Message[T] {
   def changeMessageVisibility(secs: Int)
 }
 
-//class UnitMessage[T](val id: String, t: T) extends Message[T] {
-//
-//  def value(): T = t
-//
-//  def delete() {}
-//
-//  def changeMessageVisibility(secs: Int) {}
-//
-//}
+
+
+class ConstantMessage[T](val id: String, t: T) extends Message[T] {
+
+  def value(): T = t
+
+  def delete() {}
+
+  def changeMessageVisibility(secs: Int) {}
+
+}
 

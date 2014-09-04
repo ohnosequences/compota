@@ -2,6 +2,7 @@ package ohnosequences.nisperon.queues
 
 import ohnosequences.nisperon.{Monoid, Serializer, ProductMonoid}
 import ohnosequences.nisperon.Tasks
+import ohnosequences.awstools.s3.ObjectAddress
 
 //todo triple
 class ProductSerializer[X, Y](x: Monoid[X], y: Monoid[Y]) extends Serializer[(X, Y)] {
@@ -38,6 +39,11 @@ object ProductQueue {
 
 case class ProductQueue[X, Y](xQueue: MonoidQueue[X], yQueue: MonoidQueue[Y])
   extends MonoidQueue[(X, Y)](xQueue.name + "_" + yQueue.name, new ProductMonoid(xQueue.monoid, yQueue.monoid), new ProductSerializer[X, Y](xQueue.monoid, yQueue.monoid)) {
+
+
+  override val merger: QueueMerger[(X, Y)] = new QueueMerger[(X, Y)] {
+    override def merge(destination: ObjectAddress) {}
+  }
 
   def nisperoX(nispero: String) = nispero + "_1"
 

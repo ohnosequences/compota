@@ -11,11 +11,11 @@ import unfiltered.response.ResponseString
 import com.amazonaws.services.autoscaling.model.DescribeAutoScalingGroupsRequest
 import collection.JavaConversions._
 import ohnosequences.nisperon.Nisperon
-import ohnosequences.nisperon.queues.S3Queue
 import org.clapper.avsl.Logger
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.nisperon.logging.S3Logger
 import ohnosequences.nisperon.logging.InstanceLogging
+import ohnosequences.nisperon.queues.S3QueueAbstract
 
 
 trait Users {
@@ -143,7 +143,7 @@ with ServerErrorResponse {
 
         console.queues.get(queueName) match {
           case None => NotFound
-          case Some(queue) if queue.isInstanceOf[S3Queue[_]] => {
+          case Some(queue) if queue.isInstanceOf[S3QueueAbstract[_]] => {
             Redirect(aws.s3.generateTemporaryURL(ObjectAddress(queueName, id), 60 * 5))
           }
           case Some(queue) => queue.readRaw(id) match {

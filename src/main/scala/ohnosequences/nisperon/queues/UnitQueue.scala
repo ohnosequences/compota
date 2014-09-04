@@ -1,6 +1,7 @@
 package ohnosequences.nisperon.queues
 
 import ohnosequences.nisperon.{unitSerializer, unitMonoid}
+import ohnosequences.awstools.s3.ObjectAddress
 
 
 object unitMessage extends Message[Unit] {
@@ -14,6 +15,10 @@ object unitMessage extends Message[Unit] {
 }
 
 object unitQueue extends MonoidQueue[Unit]("unit", unitMonoid, unitSerializer) {
+
+  override val merger: QueueMerger[Unit] = new QueueMerger[Unit] {
+    override def merge(destination: ObjectAddress) {}
+  }
 
   def initRead() {}
   def initWrite() {}

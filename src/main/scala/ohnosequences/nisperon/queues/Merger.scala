@@ -1,72 +1,40 @@
 package ohnosequences.nisperon.queues
 
-import org.clapper.avsl.Logger
-import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.nisperon.{Nisperon, Serializer}
+import ohnosequences.nisperon.logging.ConsoleLogger
+import ohnosequences.awstools.s3.{S3, ObjectAddress}
+import ohnosequences.nisperon.{MonoidInMemoryMerger, Nisperon, Serializer}
 
-//todo write to other queue!!! ??
-//todo use previous results!!
-object Merger {
-  def mergeDestination(nisperon: Nisperon, queue: MonoidQueueAux): ObjectAddress = {
-    ObjectAddress(nisperon.nisperonConfiguration.bucket, "results/" + queue.name)
-  }
+////todo write to other queue!!! ??
+////todo use previous results!!
+
+
+trait QueueMerger[M] {
+  def merge(destination: ObjectAddress)
 }
 
-class Merger(queue: MonoidQueueAux, nisperon: Nisperon) {
+class DefaultQueueMerger[M](queue: MonoidQueue[M], s3: S3) extends QueueMerger[M] {
 
-  val logger = Logger(this.getClass)
+  val logger = new ConsoleLogger("merger")
 
-  def merge() = {
+//  def mergeDestination(nisperon: Nisperon, queue: MonoidQueueAux): ObjectAddress = {
+//    ObjectAddress(nisperon.nisperonConfiguration.bucket, "results/" + queue.name)
+//  }
 
-   // queue.initRead()
-
+  def merge(destination: ObjectAddress) = {
     logger.info("retrieving messages from the queue " + queue.name)
     val ids = queue.list()
-    var res = queue.monoid.unit
-
-    var left = ids.size
-
-    logger.info("merging " + left + " messages")
-    ids.foreach { id =>
-      left -= 1
-      queue.read(id) match {
-        case None => logger.error("message " + id + " not found")
-        case Some(m) => res = queue.monoid.mult(res, m)
+    val lazyParts = new Traversable[M] {
+      override def foreach[U](f: (M) => U): Unit = {
+        ids.foreach { id =>
+          queue.read(id) match {
+            case None => logger.error("message " + id + " not found")
+            case Some(part) => f(part)
+          }
+        }
       }
-
-      if (left % 100 == 0) {
-         logger.info(left + " messages left")
-      }
-
     }
-
-    logger.info("merged")
-
-    logger.info("writing result")
-
-
-    val result = Merger.mergeDestination(nisperon, queue)
-    nisperon.aws.s3.putWholeObject(result, queue.serializer.toString(res))
-    //queue.put("result", List(res))
-
-//    //todo do it optional
-//    logger.info("deleting messages")
-//
-//
-//    left = ids.size
-//    ids.foreach { id =>
-//      left -= 1
-//      if (left % 100 == 0) {
-//        logger.info(left + " messages left")
-//      }
-//      try {
-//        queue.delete(id)
-//      } catch {
-//        case t: Throwable => logger.error("error during deleting message " + id)
-//      }
-//    }
-   // queue.reset()
-
+    val merger = new MonoidInMemoryMerger(s3, queue.monoid, queue.serializer, logger)
+    merger.merge(destination, lazyParts, Some(ids.size))
   }
 
 

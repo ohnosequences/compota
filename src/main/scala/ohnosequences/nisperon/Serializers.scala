@@ -1,5 +1,7 @@
 package ohnosequences.nisperon
 
+import scala.util.parsing.json.JSONObject
+
 trait Serializer[T] {
   def fromString(s: String): T
 
@@ -35,4 +37,25 @@ object stringSerializer extends Serializer[String] {
   def fromString(s: String): String = s
 
   def toString(t: String): String = t
+}
+
+class MapSerializer[K, V](kSerializer: Serializer[K], vSerializer: Serializer[V]) extends Serializer[Map[K, V]] {
+  override def toString(t: Map[K, V]): String = {
+    val rawMap: Map[String, String] = t.map { case (key, value) =>
+      (kSerializer.toString(key), vSerializer.toString(value))
+    }
+    JSONObject(rawMap).toString()
+  }
+
+
+  override def fromString(s: String): Map[K, V] = {
+    scala.util.parsing.json.JSON.parseFull(s) match {
+      case Some(map: Map[String, String]) => {
+        map.map {
+          case (key, value) =>
+            (kSerializer.fromString(key), vSerializer.fromString(value))
+        }
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 package ohnosequences.nisperon
 
 import org.clapper.avsl.Logger
-import ohnosequences.nisperon.queues.{Merger, SQSQueue}
+import ohnosequences.nisperon.queues.{DefaultQueueMerger, QueueMerger, SQSQueue}
 import ohnosequences.nisperon.logging.FailTable
 import ohnosequences.nisperon.console.Server
 
@@ -140,7 +140,7 @@ class MetaManager(nisperon: Nisperon) {
                   logger.info("merging queues")
                   nisperon.mergingQueues.foreach {
                     queue =>
-                      new Merger(queue, nisperon).merge()
+                      queue.merger.merge(nisperonConfiguration.results)
                   }
                   writer.write("undeployActions", List(UndeployActions(reason, force = false).marshall()))
                   writer.flush()

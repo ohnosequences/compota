@@ -8,8 +8,7 @@ import ohnosequences.awstools.ddb.Utils
 import scala.collection.mutable.ListBuffer
 import ohnosequences.nisperon.Tasks
 
-//think about batch stuff latter
-class DynamoDBQueue[T](
+class DynamoDBQueueAbstract[T](
                         aws: AWS,
                         name: String,
                         monoid: Monoid[T],
@@ -18,6 +17,7 @@ class DynamoDBQueue[T](
                         deadLetterQueueName: String
                         ) extends MonoidQueue[T](name, monoid, serializer) {
 
+  override val merger: QueueMerger[T] = new DefaultQueueMerger(DynamoDBQueueAbstract.this, aws.s3)
 
 
   def createBatchWriteItemRequest(table: String, items: List[Map[String, AttributeValue]]): BatchWriteItemRequest = {

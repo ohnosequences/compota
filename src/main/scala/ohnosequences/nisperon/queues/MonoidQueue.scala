@@ -16,6 +16,8 @@ trait MonoidQueueAux {
 
   val serializer: Serializer[MA]
 
+  val merger: QueueMerger[MA]
+
   val name: String
 
   //todo message class

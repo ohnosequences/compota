@@ -8,15 +8,10 @@ import com.amazonaws.services.s3.model.ListObjectsRequest
 import com.amazonaws.AmazonClientException
 import ohnosequences.nisperon.Tasks
 
-//
-//trait Trackable {
-//  def resultsIds: Set[String]
-//
-//}
-//todo flush! workaround 1 thread!
+
 
 //think about batch stuff latter
-class S3Queue[T](aws: AWS, name: String, monoid: Monoid[T], serializer: Serializer[T], deadLetterQueueName: String) extends MonoidQueue[T](name, monoid, serializer) {
+abstract class S3QueueAbstract[T](aws: AWS, name: String, monoid: Monoid[T], serializer: Serializer[T], deadLetterQueueName: String) extends MonoidQueue[T](name, monoid, serializer) {
 
   val logger = Logger(this.getClass)
 
@@ -27,6 +22,8 @@ class S3Queue[T](aws: AWS, name: String, monoid: Monoid[T], serializer: Serializ
 
 
   val s3Writer = new S3Writer(aws, monoid, name, serializer, 1)
+
+  override val merger: QueueMerger[T] = new DefaultQueueMerger(S3QueueAbstract.this, aws.s3)
 
   def put(parentId: String, nispero: String, values: List[T]) {
     sqsWriter match {

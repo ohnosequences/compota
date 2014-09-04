@@ -19,7 +19,8 @@ libraryDependencies ++= Seq(
   "ohnosequences" %% "amazon-linux-ami" % "0.14.1",
   "net.databinder" %% "unfiltered-filter" % "0.7.1",
   "net.databinder" %% "unfiltered-netty" % "0.7.1",
-  "net.databinder" %% "unfiltered-netty-server" % "0.7.1"
+  "net.databinder" %% "unfiltered-netty-server" % "0.7.1",
+  "com.novocode" % "junit-interface" % "0.10" % "test"
 )
 
 resolvers ++= Seq(

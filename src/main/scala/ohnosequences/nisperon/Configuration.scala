@@ -46,6 +46,8 @@ case class NisperonConfiguration(
 
   def bucket = Naming.s3name(this)
 
+  def results = ObjectAddress(bucket, "results")
+
   def deadLettersQueue = Naming.name(this, "deadletters")
 
   def errorTable = Naming.name(this, "errors")

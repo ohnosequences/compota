@@ -24,28 +24,30 @@ abstract class Nisperon {
 
   val mergingQueues: List[MonoidQueueAux] = List[MonoidQueueAux]()
 
-  val aws: AWS = new AWS()
+  val credentialsFile = new File(System.getProperty("user.home"), "nispero.credentials")
+
+  val aws: AWS = new AWS(credentialsFile)
 
   val logger = Logger(this.getClass)
 
   def checks()
 
- // val addressCreator: AddressCreator = DefaultAddressCreator
+  class S3Queue[T](name: String, monoid: Monoid[T], serializer: Serializer[T]) extends
+     S3QueueAbstract(aws, Naming.s3name(nisperonConfiguration,  name), monoid, serializer,
+       deadLetterQueueName = nisperonConfiguration.deadLettersQueue) {
 
-  class S3QueueLocal[T](name: String, monoid: Monoid[T], serializer: Serializer[T]) extends
-     S3Queue(aws, Naming.s3name(nisperonConfiguration,  name), monoid, serializer,
-       deadLetterQueueName = nisperonConfiguration.deadLettersQueue)
-
-  def s3queue[T](name: String, monoid: Monoid[T], serializer: Serializer[T]) = {
-    new S3QueueLocal(name, monoid, serializer)
   }
 
-  class DynamoDBQueueLocal[T](name: String, monoid: Monoid[T], serializer: Serializer[T], writeBodyToTable: Boolean, throughputs: (Int, Int)) extends
-    DynamoDBQueue(aws, Naming.name(nisperonConfiguration,  name), monoid, serializer, throughputs, deadLetterQueueName = nisperonConfiguration.deadLettersQueue)
+  class DynamoDBQueue[T](name: String, monoid: Monoid[T], serializer: Serializer[T], writeBodyToTable: Boolean, throughputs: (Int, Int)) extends
+    DynamoDBQueueAbstract(aws, Naming.name(nisperonConfiguration,  name), monoid, serializer, throughputs, deadLetterQueueName = nisperonConfiguration.deadLettersQueue)
 
-  def queue[T](name: String, monoid: Monoid[T], serializer: Serializer[T], writeBodyToTable: Boolean = true, throughputs: (Int, Int) = (100, 100)) = {
-    new DynamoDBQueueLocal(name, monoid, serializer, writeBodyToTable, throughputs)
-  }
+
+  class S3MapQueue[K, V](name: String, monoid: Monoid[V],  kSerializer: Serializer[K],
+                         vSerializer: Serializer[V], incrementSerializer: IncrementalSerializer[V])
+    extends S3MapQueueAbstract[K, V](aws, Naming.name(nisperonConfiguration,  name), monoid, kSerializer,
+    vSerializer, incrementSerializer, ObjectAddress(nisperonConfiguration.bucket, name))
+
+
 
   //in secs
   def launchTime: Long = {

@@ -20,11 +20,17 @@ trait Logger {
 
 
 
-class ConsoleLogger(prefix: String) extends Logger {
-  override def info(s: String): Unit = println("[" + "INFO " + prefix + "]: " + s)
+class ConsoleLogger(prefix: String, verbose: Boolean = true) extends Logger {
+  override def info(s: String) = {
+    if (verbose) println("[" + "INFO " + prefix + "]: " + s)
+  }
 
-  override def error(s: String): Unit = println("[" + "ERROR " + prefix + "]: " + s)
+  override def error(s: String) {
+    println("[" + "ERROR " + prefix + "]: " + s)
+  }
 
-  override def warn(s: String): Unit = println("[" + "WARN " + prefix + "]: " + s)
+  override def warn(s: String) = {
+    if (verbose) println("[" + "WARN " + prefix + "]: " + s)
+  }
 }
 

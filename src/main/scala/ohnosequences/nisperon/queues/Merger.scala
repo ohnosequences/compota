@@ -8,7 +8,17 @@ import ohnosequences.nisperon.{MonoidInMemoryMerger, Nisperon, Serializer}
 ////todo use previous results!!
 
 
+object QueueMerger {
+  def destination(results: ObjectAddress, queue: MonoidQueueAux): ObjectAddress = {
+    results / queue.name
+  }
+}
+
 trait QueueMerger[M] {
+
+
+
+
   def merge(destination: ObjectAddress)
 }
 

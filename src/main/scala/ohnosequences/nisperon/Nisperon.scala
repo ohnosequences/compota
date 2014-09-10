@@ -38,7 +38,7 @@ abstract class Nisperon {
 
   }
 
-  class DynamoDBQueue[T](name: String, monoid: Monoid[T], serializer: Serializer[T], writeBodyToTable: Boolean, throughputs: (Int, Int)) extends
+  class DynamoDBQueue[T](name: String, monoid: Monoid[T], serializer: Serializer[T], writeBodyToTable: Boolean = true, throughputs: (Int, Int)) extends
     DynamoDBQueueAbstract(aws, Naming.name(nisperonConfiguration,  name), monoid, serializer, throughputs, deadLetterQueueName = nisperonConfiguration.deadLettersQueue)
 
 

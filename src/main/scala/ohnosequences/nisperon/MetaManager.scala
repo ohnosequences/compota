@@ -140,7 +140,7 @@ class MetaManager(nisperon: Nisperon) {
                   logger.info("merging queues")
                   nisperon.mergingQueues.foreach {
                     queue =>
-                      queue.merger.merge(nisperonConfiguration.results)
+                      queue.merger.merge(QueueMerger.destination(nisperonConfiguration.results, queue))
                   }
                   writer.write("undeployActions", List(UndeployActions(reason, force = false).marshall()))
                   writer.flush()

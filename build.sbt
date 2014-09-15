@@ -13,7 +13,7 @@ libraryDependencies ++= Seq(
   "com.novocode"   % "junit-interface" % "0.10" % "test",
   "org.clapper"   %% "avsl" % "1.0.1",
   "org.json4s"    %% "json4s-native" % "3.2.5",
-  "ohnosequences" %% "aws-scala-tools" % "0.7.1-SNAPSHOT",
+  "ohnosequences" %% "aws-scala-tools" % "0.8.0-SNAPSHOT",
   "ohnosequences" %% "statika" % "1.0.0",
   "ohnosequences" %% "aws-statika" % "1.0.1",
   "ohnosequences" %% "amazon-linux-ami" % "0.14.1",
@@ -35,7 +35,7 @@ resolvers +=  Resolver.url("era7" + " public ivy releases",  url("http://release
 resolvers +=  Resolver.url("era7" + " public ivy snapshots",  url("http://snapshots.era7.com.s3.amazonaws.com"))(Resolver.ivyStylePatterns)
 
 
-dependencyOverrides += "ohnosequences" % "aws-scala-tools_2.10" % "0.7.1-SNAPSHOT"
+dependencyOverrides += "ohnosequences" % "aws-scala-tools_2.10" % "0.8.0-SNAPSHOT"
 
 dependencyOverrides += "ohnosequences" % "aws-statika_2.10" % "1.0.1"
 

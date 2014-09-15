@@ -38,6 +38,11 @@ object doubleMonoid extends Monoid[Double] {
   def mult(x: Double, y: Double): Double = x + y
 }
 
+object maxDoubleMonoid extends Monoid[Double] {
+  def unit: Double = 0D
+  def mult(x: Double, y: Double): Double = math.max(x, y)
+}
+
 object stringMonoid extends Monoid[String] {
   def unit = ""
   def mult(x: String, y: String): String = x + y

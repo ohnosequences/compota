@@ -24,9 +24,9 @@ abstract class Nisperon {
 
   val mergingQueues: List[MonoidQueueAux] = List[MonoidQueueAux]()
 
-  val credentialsFile = new File(System.getProperty("user.home"), "nispero.credentials")
+  //val credentialsFile = new File(System.getProperty("user.home"), "nispero.credentials")
 
-  val aws: AWS = new AWS(credentialsFile)
+  val aws: AWS = new AWS(new File(System.getProperty("user.home"), "nispero.credentials"))
 
   val logger = Logger(this.getClass)
 

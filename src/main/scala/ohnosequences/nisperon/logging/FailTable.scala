@@ -5,8 +5,8 @@ import com.amazonaws.services.dynamodbv2.model._
 import java.util
 import java.text.SimpleDateFormat
 import java.util.Date
-import ohnosequences.awstools.ddb.Utils
-import org.clapper.avsl.Logger
+import ohnosequences.awstools.dynamodb.Utils
+import ohnosequences.logging.Logger
 
 case class Failure(taskId: String, time: Long, instanceId: String, message: String) {
   val format = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss")
@@ -18,8 +18,7 @@ case class Failure(taskId: String, time: Long, instanceId: String, message: Stri
 
 //todo add sqs queue for this
 //todo add table with all success (or jsut retrive it)
-case class FailTable(aws: AWS, name: String) {
-  val logger = Logger(this.getClass)
+case class FailTable(aws: AWS, name: String, logger: Logger) {
 
   val hashKeyName = "h"
   val rangeKeyName = "r"
@@ -79,7 +78,7 @@ case class FailTable(aws: AWS, name: String) {
 
 
   //add link to instance id
-  def failsChunk(lastKey: Option[(String, String)], limit: Int = 20): (Option[(String, String)], List[Failure]) = {
+  def failsChunk(logger: Logger, lastKey: Option[(String, String)], limit: Int = 20): (Option[(String, String)], List[Failure]) = {
     logger.info("failsChunk(" + lastKey + ")")
     var req = new ScanRequest()
       .withTableName(name)

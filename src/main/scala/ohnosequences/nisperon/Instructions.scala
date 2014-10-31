@@ -1,6 +1,6 @@
 package ohnosequences.nisperon
 
-import ohnosequences.nisperon.logging.S3Logger
+import ohnosequences.logging.S3Logger
 
 trait InstructionsAux {
 

@@ -1,6 +1,7 @@
 package ohnosequences.nisperon
 
 
+import ohnosequences.logging._
 import ohnosequences.nisperon.queues._
 import scala.collection.mutable
 import ohnosequences.awstools.s3.ObjectAddress
@@ -9,9 +10,8 @@ import ohnosequences.nisperon.bundles.{WhateverBundle, NisperonMetadataBuilder}
 import com.amazonaws.services.autoscaling.model.UpdateAutoScalingGroupRequest
 import com.amazonaws.AmazonServiceException
 import com.amazonaws.services.sqs.model.DeleteQueueRequest
-import org.clapper.avsl.Logger
 import ohnosequences.awstools.ec2.InstanceType
-import ohnosequences.awstools.ddb.Utils
+import ohnosequences.awstools.dynamodb.Utils
 import ohnosequences.nisperon.logging.FailTable
 import ohnosequences.nisperon.logging.InstanceLogging
 
@@ -24,11 +24,9 @@ abstract class Nisperon {
 
   val mergingQueues: List[MonoidQueueAux] = List[MonoidQueueAux]()
 
-  //val credentialsFile = new File(System.getProperty("user.home"), "nispero.credentials")
-
   val aws: AWS = new AWS(new File(System.getProperty("user.home"), "nispero.credentials"))
 
-  val logger = Logger(this.getClass)
+  val logger = new ConsoleLogger("nisperon")
 
   def checks()
 
@@ -133,7 +131,7 @@ abstract class Nisperon {
           }
 
           logger.info("creating failures table")
-          val failTable =  new FailTable(aws, nisperonConfiguration.errorTable)
+          val failTable =  new FailTable(aws, nisperonConfiguration.errorTable, logger)
           failTable.create()
 
           if(!aws.s3.objectExists(nisperonConfiguration.artifactAddress)) {
@@ -177,11 +175,11 @@ abstract class Nisperon {
       }
 
       case "check" :: "queues" :: Nil => {
-        logger.info(checkQueues())
+        logger.info(checkQueues().toString)
       }
 
       case "graph" :: Nil => {
-        logger.info(new NisperoGraph(nisperos).graph)
+        logger.info(new NisperoGraph(nisperos).graph.toString())
       }
 
       case "add" :: "tasks" :: Nil => {
@@ -260,7 +258,6 @@ abstract class Nisperon {
 
 object Nisperon {
 
-  val logger = Logger(this.getClass)
 
   def unsafeAction(name: String, action: => Unit, logger: Logger, limit: Int = 10) {
 
@@ -284,7 +281,7 @@ object Nisperon {
   }
 
 
-  def reportFailure(aws: AWS, nisperonConfiguration: NisperonConfiguration, taskId: String, t: Throwable,  terminateInstance: Boolean, failTable: FailTable, messagePrefix: String = "", maxAttempts: Int = 10) {
+  def reportFailure(aws: AWS, nisperonConfiguration: NisperonConfiguration, logger: Logger, taskId: String, t: Throwable,  terminateInstance: Boolean, failTable: FailTable, messagePrefix: String = "", maxAttempts: Int = 10) {
 
     logger.error(messagePrefix + " " + t.toString + " " + t.getLocalizedMessage)
     t.printStackTrace()

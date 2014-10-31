@@ -1,15 +1,18 @@
 package ohnosequences.nisperon
 
-import org.clapper.avsl.Logger
+import java.io.File
+
 import ohnosequences.nisperon.queues.{DefaultQueueMerger, QueueMerger, SQSQueue}
 import ohnosequences.nisperon.logging.FailTable
 import ohnosequences.nisperon.console.Server
+import ohnosequences.logging.{S3Logger, Logger}
 
 
 class MetaManager(nisperon: Nisperon) {
   import nisperon._
 
-  val logger = Logger(this.getClass)
+  val logger = new S3Logger(aws.s3, "manager", new File("."))
+
 
   def printURL(domain: String, port: Int = 443): String = port match {
     case 443 => "https://" + domain
@@ -26,7 +29,7 @@ class MetaManager(nisperon: Nisperon) {
  // todo use sync queue reader!!!
   def run() {
 
-    val failTable = new FailTable(nisperon.aws, nisperon.nisperonConfiguration.errorTable)
+    val failTable = new FailTable(nisperon.aws, nisperon.nisperonConfiguration.errorTable, logger)
 
     try {
       logger.info("starting console")
@@ -45,7 +48,7 @@ class MetaManager(nisperon: Nisperon) {
         }
       }.start()
     } catch {
-      case t: Throwable =>   Nisperon.reportFailure(nisperon.aws, nisperon.nisperonConfiguration, "metamanager", t, false, failTable, "console")
+      case t: Throwable =>   Nisperon.reportFailure(nisperon.aws, nisperon.nisperonConfiguration, logger, "metamanager", t, false, failTable, "console")
     }
 
     try {
@@ -160,7 +163,7 @@ class MetaManager(nisperon: Nisperon) {
                   logger.error("message " + m0.id + " failed more than " + nisperonConfiguration.errorThreshold)
                   m0.delete()
                 } else {
-                  Nisperon.reportFailure(nisperon.aws, nisperon.nisperonConfiguration, "metamanager", t, terminateInstance = false, failTable = failTable)
+                  Nisperon.reportFailure(nisperon.aws, nisperon.nisperonConfiguration, logger, "metamanager", t, terminateInstance = false, failTable = failTable)
                 }
               }
             }
@@ -169,7 +172,7 @@ class MetaManager(nisperon: Nisperon) {
     } catch {
       case t: Throwable => {
         logger.error("fatal error")
-        Nisperon.reportFailure(nisperon.aws, nisperon.nisperonConfiguration, "metamanager", t, terminateInstance = true, failTable = failTable)
+        Nisperon.reportFailure(nisperon.aws, nisperon.nisperonConfiguration, logger, "metamanager", t, terminateInstance = true, failTable = failTable)
       }
     }
   }

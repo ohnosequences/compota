@@ -1,8 +1,8 @@
 package ohnosequences.nisperon.queues
 
+import ohnosequences.logging.ConsoleLogger
 import ohnosequences.nisperon._
 import scala.collection.JavaConversions._
-import org.clapper.avsl.Logger
 import ohnosequences.awstools.s3.ObjectAddress
 import com.amazonaws.services.s3.model.ListObjectsRequest
 import com.amazonaws.AmazonClientException
@@ -13,7 +13,7 @@ import ohnosequences.nisperon.Tasks
 //think about batch stuff latter
 abstract class S3QueueAbstract[T](aws: AWS, name: String, monoid: Monoid[T], serializer: Serializer[T], deadLetterQueueName: String) extends MonoidQueue[T](name, monoid, serializer) {
 
-  val logger = Logger(this.getClass)
+  val logger = new ConsoleLogger("s3queue")
 
   val sqsQueue = new SQSQueue[String](aws.sqs.sqs, name, stringSerializer, deadLetterQueueName = Some(deadLetterQueueName))
 

@@ -5,8 +5,6 @@ import ohnosequences.awstools.autoscaling._
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.statika._
 import ohnosequences.nisperon.bundles.NisperonMetadataBuilder
-import org.clapper.avsl.Logger
-import ohnosequences.nisperon.queues.SQSQueue
 
 object NisperonConfiguration {
 

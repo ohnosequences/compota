@@ -1,8 +1,10 @@
 package ohnosequences.nisperon
 
+import java.io.File
+
+import ohnosequences.logging.{Logger, S3Logger, ConsoleLogger}
 import ohnosequences.nisperon.queues._
-import org.clapper.avsl.Logger
-import ohnosequences.nisperon.logging.{InstanceLogging, FailTable, S3Logger}
+import ohnosequences.nisperon.logging.{InstanceLogging, FailTable}
 
 //todo use failed table failed if failed from several machines
 
@@ -22,7 +24,7 @@ abstract class WorkerAux {
 
   val aws: AWS
 
-  val logger = Logger(this.getClass)
+
 
 
 
@@ -31,7 +33,9 @@ abstract class WorkerAux {
 
     var start = true
 
-    val failTable = new FailTable(aws, nisperoConfiguration.nisperonConfiguration.errorTable)
+    val logger = new ConsoleLogger("worker")
+
+    val failTable = new FailTable(aws, nisperoConfiguration.nisperonConfiguration.errorTable, logger)
 
     try {
       logger.info("preparing instructions")
@@ -46,7 +50,7 @@ abstract class WorkerAux {
         case t: Throwable =>
           logger.error("error during initializing queues")
           start = false
-          Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, "worker", t,  true, failTable, "error during initializing queues")
+          Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, logger, "worker", t,  true, failTable, "error during initializing queues")
       }
 
       var startTime = 0L
@@ -68,35 +72,35 @@ abstract class WorkerAux {
           logger.info("executing " + instructions + " instructions on " + message.id)
           //todo add check for empty messages
           //todo fix this check for a productqueue
-          val prefix = S3Logger.prefix(nisperoConfiguration.nisperonConfiguration, message.id)
-          val s3logger = new S3Logger(nisperoConfiguration.name, aws, prefix, nisperoConfiguration.nisperonConfiguration.workingDir)
+          val s3logger = new S3Logger(aws.s3, "worker", new File(nisperoConfiguration.nisperonConfiguration.workingDir))
 
           startTime = System.currentTimeMillis()
           val output = instructions.solve(message.value(), s3logger, context)
           endTime = System.currentTimeMillis()
           logger.info("executed in " + (endTime - startTime))
 
-          s3logger.close()
+          val logDestination = Naming.Logs.prefix(nisperoConfiguration.nisperonConfiguration, message.id)
+          s3logger.uploadLog(logDestination)
 
 
           startTime = System.currentTimeMillis()
           outputQueue.put(message.id, nisperoConfiguration.name, output)
           endTime = System.currentTimeMillis()
           logger.info("message written in " + (endTime - startTime))
-          deleteMessage(message)
+          deleteMessage(logger, message)
 
 
           //todo fix reset
         } catch {
           case t: Throwable => {
             if (message == null) {
-              Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, "worker", t,  true, failTable, "error during reading from queue")
+              Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, logger, "worker", t,  true, failTable, "error during reading from queue")
             } else {
               if (failTable.fails(message.id) > nisperoConfiguration.nisperonConfiguration.errorThreshold) {
                 logger.error("message " + message.id + " failed more than " + nisperoConfiguration.nisperonConfiguration.errorThreshold)
-                deleteMessage(message)
+                deleteMessage(logger, message)
               }
-              Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, message.id, t, false, failTable)
+              Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, logger, message.id, t, false, failTable)
             }
             inputQueue.reset()
           }
@@ -107,14 +111,14 @@ abstract class WorkerAux {
       case t: Throwable =>
         logger.error("error during preparing instructions")
         start = false
-        Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, "worker", t, true, failTable, "error during preparing instructions")
+        Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, logger, "worker", t, true, failTable, "error during preparing instructions")
 
     }
   }
 
 
 
-  def deleteMessage(message: Message[inputQueue.MA]) {
+  def deleteMessage(logger: Logger, message: Message[inputQueue.MA]) {
     var deleted = false
     var attempt = 0
     while (!deleted) {

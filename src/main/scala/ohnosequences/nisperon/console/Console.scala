@@ -1,13 +1,14 @@
 package ohnosequences.nisperon.console
 
+import ohnosequences.logging.ConsoleLogger
 import ohnosequences.nisperon.{NisperoGraph, NisperoAux, Nisperon, Tasks}
 import scala.xml.{Node, NodeSeq}
 import com.amazonaws.services.autoscaling.model.AutoScalingGroup
 import collection.JavaConversions._
 import ohnosequences.nisperon.queues.{ProductQueue, MonoidQueueAux}
 import scala.collection.mutable.HashMap
-import org.clapper.avsl.Logger
-import ohnosequences.nisperon.logging.{FailTable, S3Logger}
+import ohnosequences.nisperon.logging.{FailTable}
+import ohnosequences.logging._
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException
 
@@ -18,9 +19,9 @@ case class Console(nisperon: Nisperon, server: Server) {
   val as = aws.as.as
 
 
-  val logger = Logger(this.getClass)
+  val logger = new ConsoleLogger("console")
 
-  val failTable = new FailTable(aws, nisperon.nisperonConfiguration.errorTable)
+  val failTable = new FailTable(aws, nisperon.nisperonConfiguration.errorTable, logger)
 
   val nisperoGraph = new NisperoGraph(nisperon.nisperos)
 
@@ -376,7 +377,7 @@ case class Console(nisperon: Nisperon, server: Server) {
   }
 
   def listErrors(lastKey: Option[(String, String)] = None, limit: Int = 10): NodeSeq = {
-    val (newLastKey, failures) = failTable.failsChunk(lastKey, limit)
+    val (newLastKey, failures) = failTable.failsChunk(logger, lastKey, limit)
     logger.info(failures.size + " failures")
     failures.map { failure =>
       <tr data-lasthash={newLastKey.getOrElse(("", ""))._1} data-lastrange={newLastKey.getOrElse(("", ""))._2}>

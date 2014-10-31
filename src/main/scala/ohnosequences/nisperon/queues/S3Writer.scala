@@ -1,8 +1,8 @@
 package ohnosequences.nisperon.queues
 
 import java.util.concurrent.ArrayBlockingQueue
+import ohnosequences.logging.ConsoleLogger
 import ohnosequences.nisperon.{AWS, Serializer, Monoid}
-import org.clapper.avsl.Logger
 import ohnosequences.awstools.s3.ObjectAddress
 
 
@@ -15,7 +15,7 @@ class S3Writer[T](aws: AWS, monoid: Monoid[T], queueName: String, serializer: Se
   @volatile var launched = false
 
   @volatile var errorMessage = ""
-  val logger = Logger(this.getClass)
+  val logger = new ConsoleLogger("s3writer")
 
 
   def put(id: String, value: T) {

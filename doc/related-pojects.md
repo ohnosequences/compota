@@ -21,6 +21,9 @@ http://static.usenix.org/legacy/events/hotcloud10/tech/full_papers/Zaharia.pdf
 Have good an article
 http://pages.cs.wisc.edu/~akella/CS838/F12/838-CloudPapers/FlumeJava.pdf
 
+### SynapseGrid
+???
+
 
 ### Log based
 Log is a queue of ordered records. Different application can be subsribed to it and process the records in the same order as they have been pushed to log. A good introduction to it:

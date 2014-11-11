@@ -22,7 +22,7 @@ Have good an article
 http://pages.cs.wisc.edu/~akella/CS838/F12/838-CloudPapers/FlumeJava.pdf
 
 ### SynapseGrid
-???
+Some actor-based local thing not a distributed solution (?)
 
 
 ### Log based

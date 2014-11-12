@@ -1,3 +1,9 @@
+There are a lot of tools for distributed computing. This is an attempt to classify them and find a niche for Compota.
+
+#### Batch or stream based
+Classical tools (like MapReduce) require a ready and finite input that will be processed. Frequently after getting the result the such system will terminate.
+
+In contrast stream based (or real time) systems (like Storm) work with unbonded streams.
 
 ### MapReduce
 MapReduce (and its implementations like Hadoop) work with certain type of computations: on first step *Mappers* for every element from input collection emmit list of key/value pairs, then pairs corresponded to the same key groupped (by *Shuffle*), on final step *Reducer* merge values of each key using associative reducing function.
@@ -5,6 +11,11 @@ MapReduce (and its implementations like Hadoop) work with certain type of comput
 The main problem with MapReduce is a lack of composobility:
 
 > Many computations can be expressed as a MapReduce, but many others require a sequence or graph of MapReduces.
+
+#### MapReduce and monoids
+Key thing in map reduce is associative reducing function, i.e. monoid structure on values. MapReduce computation can be written as:
+
+$$I \to Map[K, V]$$
 
 ### Spark
 Spark is powerful tool that support various backends and data sources. All computation are expressed with collection-like opperation on Spark RDD (Resilient Distributed Datasets) that can be created from HDFS, S3, Cassandra, local file system.
@@ -48,3 +59,10 @@ based on Cascading
 
 #### Storm
 tuples no types
+
+
+
+
+
+
+

@@ -22,6 +22,11 @@ libraryDependencies ++= Seq(
   "com.novocode" % "junit-interface" % "0.10" % "test"
 )
 
+libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.11.0" % "test"
+
+testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-maxSize", "40", "-minSuccessfulTests", "10", "-workers", "1", "-verbosity", "1")
+
+
 resolvers ++= Seq(
   "Era7 Releases"       at "http://releases.era7.com.s3.amazonaws.com",
   "Era7 Snapshots"      at "http://snapshots.era7.com.s3.amazonaws.com"

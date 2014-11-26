@@ -10,7 +10,7 @@ import scala.annotation.tailrec
 
 class UploaderTests {
 
-  @Test
+  //@Test
   def multiPart() {
     val partsDirectory = ObjectAddress("compota", "test") / "multipart"
     val merged = partsDirectory / "merged"

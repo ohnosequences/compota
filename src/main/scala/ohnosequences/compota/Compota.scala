@@ -1,6 +1,6 @@
 package ohnosequences.compota
 
-import ohnosequences.compota.enviroment.ThreadInstance
+import ohnosequences.compota.environment.{ThreadEnvironment}
 import ohnosequences.compota.logging.ConsoleLogger
 
 abstract class Compota(nisperos: List[NisperoAux]) {
@@ -14,7 +14,7 @@ abstract class Compota(nisperos: List[NisperoAux]) {
       case None => {
         //report error
       }
-      case Some(nispero) => nispero.worker.start(new ThreadInstance)
+      case Some(nispero) => nispero.worker.start(new ThreadEnvironment)
     }
   }
 

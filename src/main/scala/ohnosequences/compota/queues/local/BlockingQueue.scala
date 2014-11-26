@@ -10,10 +10,12 @@ import scala.util.{Try, Success}
 
 class BlockingQueue[T](size: Int) extends Queue[T] {
 
-  val rawQueue = new ArrayBlockingQueue[T](size)
+  val rawQueue = new ArrayBlockingQueue[(String, T)](size)
 
-  case class SimpleMessage[EE](body: EE) extends QueueMessage[EE] {
+  case class SimpleMessage[EE](id: String, body: EE) extends QueueMessage[EE] {
     override def getBody = Success(body)
+
+    override def getId: Try[String] = Success(id)
   }
 
   override type Message[EEE] = SimpleMessage[EEE]
@@ -22,7 +24,10 @@ class BlockingQueue[T](size: Int) extends Queue[T] {
 
 
   class BlockingQueueReader extends QueueReader {
-    override def getMessage = Success(SimpleMessage(rawQueue.take()))
+    override def getMessage = Try {
+      val (id, body) = rawQueue.take()
+      SimpleMessage(id, body)
+    }
   }
 
   type QR = BlockingQueueReader
@@ -30,7 +35,8 @@ class BlockingQueue[T](size: Int) extends Queue[T] {
   override def getReader = Success(new BlockingQueueReader)
 
   class BlockingQueueWriter extends QueueWriter {
-    override def write(values: List[T]) = Try {
+    override def write(values: List[(String, T)]) = Try {
+
       values.foreach(rawQueue.put)
     }
   }

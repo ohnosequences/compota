@@ -30,6 +30,8 @@ abstract class MapInstructions[Input, Output] extends Instructions[Input, Output
   //val arity = 1
 
   def solve(logger: Logger, context: Context, input: I): Try[List[Output]] = {
+
+    //println(apply(logger, context, input).map(List(_)))
     apply(logger, context, input).map(List(_))
   }
 

@@ -11,6 +11,7 @@ trait QueueAux {
 
   trait QueueMessage[E] {
     def getBody: Try[E]
+    def getId: Try[String]
   }
 
   def deleteMessage(message: Message[Elements]): Try[Unit]
@@ -23,7 +24,7 @@ trait QueueAux {
   type QW <: QueueWriter
 
   trait QueueWriter {
-    def write(values: List[Elements]): Try[Unit]
+    def write(values: List[(String, Elements)]): Try[Unit]
   }
 
   def getReader: Try[QR]

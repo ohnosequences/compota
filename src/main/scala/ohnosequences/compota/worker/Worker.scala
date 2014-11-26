@@ -6,7 +6,7 @@ import ohnosequences.compota.{Nispero, NisperoAux}
 import ohnosequences.compota.queues.Queue
 import ohnosequences.compota.tasks.Naming
 
-import scala.util.{Success, Failure}
+import scala.util.{Try, Success, Failure}
 
 //instructions executor
 
@@ -40,37 +40,7 @@ class Worker[In, Out, InQueue <: Queue[In], OutQueue <: Queue[Out]](nispero: Nis
 
     nispero.inputQueue.getReader.flatMap { queueReader =>
       nispero.outputQueue.getWriter.flatMap { queueWriter =>
-        val context = nispero.instructions.prepare(logger)
-        while (!env.isTerminated) {
-          queueReader.getMessage.flatMap { message =>
-            message.getId.flatMap { id =>
-              message.getBody.flatMap { input =>
-                logger.info("input: " + input)
-                nispero.instructions.solve(logger, context, input).flatMap { output =>
-                  logger.info("result: " + output)
-                  queueWriter.write(Naming.generateTasks(nispero, id, output)).flatMap { written =>
-                    nispero.inputQueue.deleteMessage(message)
-                  }
-                }
-              } match {
-                case Failure(t) => {
-                  //non fatal task error: instructions error, read error, write error, delete error
-                  env.reportError(id, t)
-                  Success(())
-                }
-                case success => success
-              }
-
-            }
-          } match {
-            case Success(_) => {}
-            case Failure(t) => {
-              logger.error("error during reading from input queue")
-              logger.error(t)
-            }
-          }
-        }
-        Success(())
+        prepared(queueReader, queueWriter, env)
       }
     } match {
       case Success(_) => {
@@ -88,5 +58,38 @@ class Worker[In, Out, InQueue <: Queue[In], OutQueue <: Queue[Out]](nispero: Nis
 
   }
 
-  //def prepared(queueReader: nispero.inputQueue.QR, queueWriter: )
+  def prepared(queueReader: nispero.inputQueue.QR, queueWriter: nispero.outputQueue.QW, env: Environment): Try[Unit] = {
+    val logger  = env.logger
+    val context = nispero.instructions.prepare(logger)
+    while (!env.isTerminated) {
+      queueReader.getMessage.flatMap { message =>
+        message.getId.flatMap { id =>
+          message.getBody.flatMap { input =>
+            logger.info("input: " + input)
+            nispero.instructions.solve(logger, context, input).flatMap { output =>
+              logger.info("result: " + output)
+              queueWriter.write(Naming.generateTasks(nispero, id, output)).flatMap { written =>
+                nispero.inputQueue.deleteMessage(message)
+              }
+            }
+          } match {
+            case Failure(t) => {
+              //non fatal task error: instructions error, read error, write error, delete error
+              env.reportError(id, t)
+              Success(())
+            }
+            case success => success
+          }
+
+        }
+      } match {
+        case Success(_) => {}
+        case Failure(t) => {
+          logger.error("error during reading from input queue")
+          logger.error(t)
+        }
+      }
+    }
+    Success(())
+  }
 }

@@ -45,7 +45,7 @@ class MetaManager(nisperon: Nisperon) {
         }
       }.start()
     } catch {
-      case t: Throwable =>   Nisperon.reportFailure(nisperon.aws, nisperon.nisperonConfiguration, "metamanager", t, false, failTable, "console")
+      case t: Throwable =>   Nisperon.reportFailure(nisperon.aws, nisperon.nisperonConfiguration, "metamanager", t, true, failTable, "console")
     }
 
     try {

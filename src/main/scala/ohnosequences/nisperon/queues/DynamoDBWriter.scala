@@ -55,6 +55,7 @@ class DynamoDBWriter[T](aws: AWS, monoid: Monoid[T], queueName: String, serializ
   }
 
   class WriterThread(id: Int) extends Thread("DynamoDB writer " + id + " " + queueName) {
+    setDaemon(true)
     override def run() {
       while (true) {
         try {
@@ -98,6 +99,7 @@ class DynamoDBWriter[T](aws: AWS, monoid: Monoid[T], queueName: String, serializ
             } while (!operations.isEmpty)
           }
         } catch {
+          case t: InterruptedException => logger.info("terminating");
           case t: Throwable => {
             val message = t.toString + " " + t.getMessage
             logger.warn(message)

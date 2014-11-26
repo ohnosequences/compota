@@ -247,6 +247,8 @@ class BufferedSQSWriter[T](sqsQueue: SQSQueue[T], queueURL: String, bufferSize: 
 
   val buffer = new ArrayBlockingQueue[(String, T)](bufferSize)
 
+  setDaemon(true)
+
   override def run() {
     while(!stopped) {
       try {
@@ -273,6 +275,7 @@ class BufferedSQSWriter[T](sqsQueue: SQSQueue[T], queueURL: String, bufferSize: 
         }
 
       } catch {
+        case t: InterruptedException => logger.info("terminating"); stopped = true
         case t: Throwable =>
           logger.error(t.toString + " " + t.getMessage)
           stopped = true

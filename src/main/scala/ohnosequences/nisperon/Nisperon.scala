@@ -93,7 +93,7 @@ abstract class Nisperon {
 
     val command = JSON.toJSON(List(Undeploy(reason, force).marshall()))
     val wrap2 = JSON.toJSON(ValueWrap("undeploy", command))
-    //send commad to metamanager
+    //send command to metamanager
     aws.sqs.createQueue(nisperonConfiguration.metamanagerQueue).sendMessage(wrap2)
   }
 
@@ -108,6 +108,8 @@ abstract class Nisperon {
   }
 
   def addTasks(): Unit
+
+  def checkTasks(verbose: Boolean): Boolean = true
 
   def main(args: Array[String]) {
 
@@ -172,7 +174,7 @@ abstract class Nisperon {
          // notification(nisperonConfiguration.id + " started", "started")
 
           //todo fix closing
-          System.exit(0)
+         // System.exit(0)
 
       }
 
@@ -215,7 +217,9 @@ abstract class Nisperon {
 
       case "undeploy" :: "actions" :: Nil => undeployActions(false)
 
-      case "checks":: Nil => checks()
+      case "check":: "tasks" :: Nil => {
+        println("tasks are ok: " + checkTasks(verbose = true))
+      }
 
       case "dot" :: "dot" :: Nil => {
         val dotFile = new StringBuilder()

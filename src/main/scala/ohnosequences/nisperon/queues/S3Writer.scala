@@ -54,6 +54,7 @@ class S3Writer[T](aws: AWS, monoid: Monoid[T], queueName: String, serializer: Se
 
 
   class WriterThread(id: Int) extends Thread("S3 writer " + id + " " + queueName) {
+    setDaemon(true)
     override def run() {
       while(true) {
         try {

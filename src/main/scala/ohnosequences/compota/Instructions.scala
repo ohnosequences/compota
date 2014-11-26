@@ -11,7 +11,7 @@ trait InstructionsAux {
   type O
   type Context
 
-  def prepare(logger: Logger): Context
+  def prepare(logger: Logger): Try[Context]
 
   def solve(logger: Logger, context: Context, input: I): Try[List[O]]
 

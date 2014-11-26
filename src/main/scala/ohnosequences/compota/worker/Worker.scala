@@ -35,12 +35,14 @@ class Worker[In, Out, InQueue <: Queue[In], OutQueue <: Queue[Out]](nispero: Nis
    */
   def start(env: Environment): Unit = {
     val logger = env.logger
-
     logger.info("worker " + nispero.name + " started on instance " + env.instanceId)
 
-    nispero.inputQueue.getReader.flatMap { queueReader =>
-      nispero.outputQueue.getWriter.flatMap { queueWriter =>
-        prepared(queueReader, queueWriter, env)
+    //all fail fast
+    nispero.instructions.prepare(logger).flatMap { context =>
+     nispero.inputQueue.getReader.flatMap { queueReader =>
+        nispero.outputQueue.getWriter.flatMap { queueWriter =>
+          messageLoop(queueReader, queueWriter, env, context)
+        }
       }
     } match {
       case Success(_) => {
@@ -51,22 +53,20 @@ class Worker[In, Out, InQueue <: Queue[In], OutQueue <: Queue[Out]](nispero: Nis
         env.fatalError(t)
       }
     }
-
-
-
-
-
   }
 
-  def prepared(queueReader: nispero.inputQueue.QR, queueWriter: nispero.outputQueue.QW, env: Environment): Try[Unit] = {
+
+  def messageLoop(queueReader: nispero.inputQueue.QR, queueWriter: nispero.outputQueue.QW, env: Environment, instructionsContext: nispero.instructions.Context): Try[Unit] = {
     val logger  = env.logger
-    val context = nispero.instructions.prepare(logger)
+
+    //def read
+
     while (!env.isTerminated) {
       queueReader.getMessage.flatMap { message =>
         message.getId.flatMap { id =>
           message.getBody.flatMap { input =>
             logger.info("input: " + input)
-            nispero.instructions.solve(logger, context, input).flatMap { output =>
+            nispero.instructions.solve(logger, instructionsContext, input).flatMap { output =>
               logger.info("result: " + output)
               queueWriter.write(Naming.generateTasks(nispero, id, output)).flatMap { written =>
                 nispero.inputQueue.deleteMessage(message)

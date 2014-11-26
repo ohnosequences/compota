@@ -12,7 +12,7 @@ object q2 extends BlockingQueue[String](10)
 object instr extends MapInstructions[Int, String] {
   override def apply(logger: Logger, context: Int, input: Int) = Success((1000 / input).toString)
 
-  override def prepare(logger: Logger): Context = 0
+  override def prepare(logger: Logger) = Success(0)
 
   override type Context = Int
 }

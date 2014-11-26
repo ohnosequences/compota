@@ -11,7 +11,7 @@ trait QueueAux {
 
   trait QueueMessage[E] {
     def getBody: Try[E]
-    def getId: Try[String]
+    def getId: Try[String] //parse id error?
   }
 
   def deleteMessage(message: Message[Elements]): Try[Unit]

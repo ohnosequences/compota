@@ -7,8 +7,6 @@ import shapeless._
 
 
 import ohnosequences.nisperon._
-import org.clapper.avsl.Logger
-import ohnosequences.nisperon.queues.SQSQueue
 
 
 trait InstructionsBundleAux extends AnyBundle {

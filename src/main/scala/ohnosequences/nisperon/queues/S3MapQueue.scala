@@ -2,7 +2,7 @@ package ohnosequences.nisperon.queues
 
 import ohnosequences.nisperon._
 import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.nisperon.logging.{ConsoleLogger, Logger}
+import ohnosequences.logging.{ConsoleLogger, Logger}
 
 
 class S3MapQueueAbstract[K, V](val aws: AWS, name: String, monoid: Monoid[V], val kSerializer: Serializer[K], vSerializer: Serializer[V],

@@ -3,8 +3,8 @@ package ohnosequences.nisperon.queues
 import ohnosequences.nisperon.{Serializer, Monoid, AWS}
 import com.amazonaws.services.dynamodbv2.model._
 import scala.collection.JavaConversions._
-import org.clapper.avsl.Logger
-import ohnosequences.awstools.ddb.Utils
+import ohnosequences.logging._
+import ohnosequences.awstools.dynamodb.Utils
 import scala.collection.mutable.ListBuffer
 import ohnosequences.nisperon.Tasks
 
@@ -39,7 +39,7 @@ class DynamoDBQueueAbstract[T](
   val idAttr = "id"
   val valueAttr = "val"
 
-  val logger = Logger(this.getClass)
+  val logger = new ConsoleLogger("dynamodb-queue")
 
   val sqsQueue = new SQSQueue[T](aws.sqs.sqs, name, serializer, deadLetterQueueName = Some(deadLetterQueueName))
 

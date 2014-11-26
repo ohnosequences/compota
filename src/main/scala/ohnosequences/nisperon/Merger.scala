@@ -2,7 +2,7 @@ package ohnosequences.nisperon
 
 import ohnosequences.awstools.s3.{ObjectAddress, S3}
 import java.io.{PrintWriter, File}
-import ohnosequences.nisperon.logging.Logger
+import ohnosequences.logging.Logger
 import scala.collection.mutable
 
 

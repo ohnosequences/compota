@@ -1,6 +1,6 @@
 package ohnosequences.nisperon.queues
 
-import ohnosequences.nisperon.logging.ConsoleLogger
+import ohnosequences.logging.ConsoleLogger
 import ohnosequences.awstools.s3.{S3, ObjectAddress}
 import ohnosequences.nisperon.{MonoidInMemoryMerger, Nisperon, Serializer}
 

@@ -3,8 +3,6 @@ package ohnosequences.nisperon.queues
 import ohnosequences.nisperon._
 import java.util.concurrent.ArrayBlockingQueue
 import com.amazonaws.services.sqs.model.{SendMessageBatchRequestEntry, SendMessageBatchRequest}
-import java.util
-import org.clapper.avsl.Logger
 
 import scala.collection.JavaConversions._
 

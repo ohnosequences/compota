@@ -1,5 +1,6 @@
 package ohnosequences.nisperon.console
 
+import ohnosequences.logging.ConsoleLogger
 import unfiltered.netty.Https
 import unfiltered.response._
 import unfiltered.request.{BasicAuth, Path, Seg, GET}
@@ -10,10 +11,9 @@ import unfiltered.Cycle
 import unfiltered.response.ResponseString
 import com.amazonaws.services.autoscaling.model.DescribeAutoScalingGroupsRequest
 import collection.JavaConversions._
-import ohnosequences.nisperon.Nisperon
-import org.clapper.avsl.Logger
+import ohnosequences.nisperon.{Naming, Nisperon}
 import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.nisperon.logging.S3Logger
+import ohnosequences.logging.S3Logger
 import ohnosequences.nisperon.logging.InstanceLogging
 import ohnosequences.nisperon.queues.S3QueueAbstract
 
@@ -40,7 +40,7 @@ with SynchronousExecution
 with ServerErrorResponse {
   val aws =  console.nisperon.aws
   val as =  console.nisperon.aws.as.as
-  val logger = Logger(this.getClass)
+  val logger = new ConsoleLogger("console")
 
   def intent = Auth(users) {
     case GET(Path("/")) => {
@@ -120,8 +120,8 @@ with ServerErrorResponse {
     }
 
     case GET(Path(Seg("log" :: id :: Nil))) => {
-      val prefix = S3Logger.prefix(console.nisperon.nisperonConfiguration, id)
-      Redirect(aws.s3.generateTemporaryURL(S3Logger.log(prefix), 60 * 5))
+      val prefix = Naming.Logs.prefix(console.nisperon.nisperonConfiguration, id)
+      Redirect(aws.s3.generateTemporaryURL(Naming.Logs.log(prefix), 60 * 5))
     }
 
     case GET(Path(Seg("queue" :: queueName ::  "deleteMessage" :: id :: Nil))) => {

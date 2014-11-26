@@ -1,5 +1,7 @@
 package ohnosequences.nisperon
 
+import ohnosequences.awstools.s3.ObjectAddress
+
 
 object Naming {
   def name(nisperon: NisperonConfiguration, nispero: NisperoConfiguration, suffix: String): String = {
@@ -20,6 +22,14 @@ object Naming {
 
   def notificationTopic(nisperon: NisperonConfiguration): String = {
     "nispero_" + nisperon.email.hashCode
+  }
+
+  object Logs {
+    def prefix(nisperonConfiguration: NisperonConfiguration, id: String): ObjectAddress = {
+      ObjectAddress(nisperonConfiguration.bucket, id)
+    }
+
+    def log(prefix: ObjectAddress) = prefix / "log.txt"
   }
 
  }

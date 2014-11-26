@@ -1,23 +1,26 @@
 package ohnosequences.nisperon
 
+import java.io.File
+
+import ohnosequences.logging.S3Logger
 import ohnosequences.nisperon.queues.{SQSQueue}
-import org.clapper.avsl.Logger
 import ohnosequences.nisperon.logging.FailTable
 
 case class SNSMessage(Message: String)
 
 case class ManagerCommand(command: String, arg: String)
 
-  abstract class ManagerAux {
+abstract class ManagerAux {
 
   val nisperoConfiguration: NisperoConfiguration
 
   val aws: AWS
 
-  val logger = Logger(this.getClass)
 
 
   def runControlQueueHandler() {
+
+    val logger = new S3Logger(aws.s3, "manager", new File("."))
     //it is needed for sns redirected messages
     val controlQueue = new SQSQueue[ManagerCommand](aws.sqs.sqs, nisperoConfiguration.controlQueueName, new JsonSerializer[ManagerCommand]())
     val reader = controlQueue.getSyncReader(true)
@@ -29,7 +32,7 @@ case class ManagerCommand(command: String, arg: String)
     var stopped = false
 
 
-    val failTable = new FailTable(aws, nisperoConfiguration.nisperonConfiguration.errorTable)
+    val failTable = new FailTable(aws, nisperoConfiguration.nisperonConfiguration.errorTable, logger)
 
     while(!stopped) {
       val m0 = reader.read
@@ -46,7 +49,6 @@ case class ManagerCommand(command: String, arg: String)
             logger
           )
 
-
           Nisperon.unsafeAction(
             "deleting control queue",
             controlQueueWrap.delete(),
@@ -61,7 +63,7 @@ case class ManagerCommand(command: String, arg: String)
 
         }
         case _ => {
-          Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, "manager", new Error("wrong manager command " +command), terminateInstance = false, failTable = failTable)
+          Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, logger, "manager", new Error("wrong manager command " +command), terminateInstance = false, failTable = failTable)
 
         }
       }

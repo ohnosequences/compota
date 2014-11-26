@@ -1,10 +1,10 @@
 package ohnosequences.nisperon
 
+import ohnosequences.logging.ConsoleLogger
 import ohnosequences.nisperon.queues.{MonoidQueueAux, MonoidQueue}
 import ohnosequences.nisperon.bundles._
 
 import ohnosequences.awstools.s3.ObjectAddress
-import org.clapper.avsl.Logger
 import ohnosequences.nisperon.logging.FailTable
 
 
@@ -65,7 +65,7 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
 
   val manager = new Manager(aws,nisperoConfiguration)
 
-  val logger = Logger(this.getClass)
+  val logger = new ConsoleLogger("nispero")
 
   import ohnosequences.statika._
   import ohnosequences.statika.ami.AMI149f7863
@@ -84,7 +84,6 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
   object managerDistribution extends ManagerDistribution(workerBundle) {
     import ohnosequences.statika.{AnyDistribution, InstallResults, success}
 
-    val logger = Logger(this.getClass)
 
     val metadata = nisperoConfiguration.nisperonConfiguration.metadataBuilder.build("worker", nisperoConfiguration.name, nisperoConfiguration.nisperonConfiguration.workingDir)
 
@@ -98,7 +97,7 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
 
     override def install[Dist <: AnyDistribution](distribution: Dist): InstallResults = {
 
-      val failTable = new FailTable(aws, nisperoConfiguration.nisperonConfiguration.errorTable)
+      val failTable = new FailTable(aws, nisperoConfiguration.nisperonConfiguration.errorTable, logger)
 
 
       try {
@@ -124,11 +123,9 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
         //todo tagging
       } catch {
         case t: Throwable =>
-          Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, "manager", t, true, failTable)
+          Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, logger, "manager", t, true, failTable)
 
       }
-
-
 
       success("manager finished")
     }
@@ -138,7 +135,6 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
   object nisperoDistribution extends NisperoDistribution(managerDistribution) {
     //  import ohnosequences.statika.{success}
 
-    val logger = Logger(this.getClass)
 
     val metadata = nisperoConfiguration.nisperonConfiguration.metadataBuilder.build("manager", nisperoConfiguration.name)
 

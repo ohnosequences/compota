@@ -1,10 +1,10 @@
 package ohnosequences.nisperon.queues
 
+import ohnosequences.logging.{ConsoleLogger, Logger}
 import ohnosequences.nisperon._
 
 import scala.collection.JavaConversions._
 
-import org.clapper.avsl.Logger
 import java.util.concurrent.ArrayBlockingQueue
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model._
@@ -69,7 +69,8 @@ class SyncSQSReader[T](sqsQueue: SQSQueue[T], queueURL: String, snsRedirected: B
 
   val snsMessageParser = new JsonSerializer[SNSMessage]()
 
-  val logger = Logger(this.getClass)
+  val logger = new ConsoleLogger("SyncSQSReader")
+
 
   override def reset() {}
 
@@ -110,7 +111,7 @@ class BufferedSQSReader[T](sqsQueue: SQSQueue[T], queueURL: String, visibilityEx
 
   val snsMessageParser = new JsonSerializer[SNSMessage]()
 
-  val logger = Logger(this.getClass)
+  val logger = new ConsoleLogger("BufferedSQSReader")
 
   @volatile var stopped = false
 
@@ -243,7 +244,7 @@ class BufferedSQSWriter[T](sqsQueue: SQSQueue[T], queueURL: String, bufferSize: 
 
   val batchSize = 10
 
-  val logger = Logger(this.getClass)
+  val logger = new ConsoleLogger("BufferedSQSWriter")
 
   val buffer = new ArrayBlockingQueue[(String, T)](bufferSize)
 
@@ -304,7 +305,7 @@ case class SQSQueueInfo(url: String, approx: String, inFlight: String)
 
 class SQSQueue[T](val sqs: AmazonSQS, val name: String, val serializer: Serializer[T], deadLetterQueueName: Option[String] = None, val visibilityTimeout: Option[Int] = None) {
 
-  val logger = Logger(this.getClass)
+  val logger = new ConsoleLogger("SQSQueueInfo")
 
 
   def getReader(snsRedirected: Boolean = false): SQSReader[T] = {

@@ -1,4 +1,4 @@
-package ohnosequences.compota.metamanager
+package ohnosequences.compota.aws.metamanager
 
 
 import scala.util.{Success, Try}

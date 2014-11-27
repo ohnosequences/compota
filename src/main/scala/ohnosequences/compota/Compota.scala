@@ -1,12 +1,19 @@
 package ohnosequences.compota
 
-import ohnosequences.compota.environment.{ThreadEnvironment}
+import ohnosequences.compota.graphs.NisperoGraph
 import ohnosequences.compota.logging.ConsoleLogger
+import ohnosequences.compota.queues.{MonoidQueueAux, MonoidQueue}
 
-abstract class Compota(nisperos: List[NisperoAux]) {
-  val nisperosNames: Map[String, NisperoAux] =  nisperos.map { nispero =>
+abstract class Compota[NisperoType <: NisperoAux](nisperos: List[NisperoType],  sinks: List[MonoidQueueAux]) {
+
+  val nisperosNames: Map[String, NisperoType] =  nisperos.map { nispero =>
     (nispero.name, nispero)
   }.toMap
+
+  val nisperoGraph = new NisperoGraph(nisperosNames)
+
+
+  def launchWorker(nispero: NisperoType)
 
   def launchWorker(name: String) {
     addTasks()
@@ -14,7 +21,7 @@ abstract class Compota(nisperos: List[NisperoAux]) {
       case None => {
         //report error
       }
-      case Some(nispero) => nispero.worker.start(new ThreadEnvironment)
+      case Some(nispero) => launchWorker(nispero)
     }
   }
 
@@ -26,6 +33,9 @@ abstract class Compota(nisperos: List[NisperoAux]) {
     }
   }
 
+  def launch()
 
   def addTasks()
+
+
 }

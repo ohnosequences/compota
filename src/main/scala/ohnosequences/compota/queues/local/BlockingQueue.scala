@@ -2,47 +2,47 @@ package ohnosequences.compota.queues.local
 
 import java.util.concurrent.ArrayBlockingQueue
 
-import ohnosequences.compota.queues.{QueueAux, Queue}
-import ohnosequences.compota.serialization.Serializer
+import ohnosequences.compota.queues._
 
 import scala.util.{Try, Success}
 
 
-class BlockingQueue[T](size: Int) extends Queue[T] {
+case class SimpleMessage[E](id: String, body: E) extends QueueMessage[E] {
+  override def getBody = Success(body)
+
+  override def getId: Try[String] = Success(id)
+}
+
+class BlockingQueueReader[T](queue: BlockingQueue[T]) extends QueueReader[T, SimpleMessage[T]] {
+  override def getMessage = Try {
+    val (id, body) = queue.rawQueue.take()
+    SimpleMessage(id, body)
+  }
+}
+
+class BlockingQueueWriter[T](queue: BlockingQueue[T]) extends QueueWriter[T, SimpleMessage[T]] {
+  override def writeRaw(values: List[(String, T)]) = Try {
+
+    values.foreach(queue.rawQueue.put)
+  }
+}
+
+class BlockingQueue[T](name: String, size: Int) extends Queue[T](name) {
 
   val rawQueue = new ArrayBlockingQueue[(String, T)](size)
 
-  case class SimpleMessage[EE](id: String, body: EE) extends QueueMessage[EE] {
-    override def getBody = Success(body)
-
-    override def getId: Try[String] = Success(id)
-  }
-
-  override type Message[EEE] = SimpleMessage[EEE]
+  override type Message = SimpleMessage[T]
 
   override def deleteMessage(message: SimpleMessage[T]) = Success(())
 
+  type QR = BlockingQueueReader[T]
 
-  class BlockingQueueReader extends QueueReader {
-    override def getMessage = Try {
-      val (id, body) = rawQueue.take()
-      SimpleMessage(id, body)
-    }
-  }
-
-  type QR = BlockingQueueReader
-
-  override def getReader = Success(new BlockingQueueReader)
-
-  class BlockingQueueWriter extends QueueWriter {
-    override def write(values: List[(String, T)]) = Try {
-
-      values.foreach(rawQueue.put)
-    }
-  }
-
-  type QW = BlockingQueueWriter
+  override def getReader = Success(new BlockingQueueReader(BlockingQueue.this))
 
 
-  override def getWriter = Success(new BlockingQueueWriter)
+  type QW = BlockingQueueWriter[T]
+
+  override def getWriter = Success(new BlockingQueueWriter(BlockingQueue.this))
+
+  override def isEmpty: Boolean = rawQueue.isEmpty
 }

@@ -1,4 +1,4 @@
-package ohnosequences.compota.metamanager
+package ohnosequences.compota.aws.metamanager
 
 import ohnosequences.compota.{NisperoAux, Nispero, Compota}
 

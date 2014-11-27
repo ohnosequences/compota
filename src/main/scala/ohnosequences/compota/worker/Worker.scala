@@ -2,7 +2,7 @@ package ohnosequences.compota.worker
 
 import ohnosequences.compota.environment.Environment
 import ohnosequences.compota.logging.{ConsoleLogger, Logger, S3Logger}
-import ohnosequences.compota.{Nispero, NisperoAux}
+import ohnosequences.compota.{NisperoAux, Nispero}
 import ohnosequences.compota.queues.Queue
 import ohnosequences.compota.tasks.Naming
 
@@ -68,7 +68,7 @@ class Worker[In, Out, InQueue <: Queue[In], OutQueue <: Queue[Out]](nispero: Nis
             logger.info("input: " + input)
             nispero.instructions.solve(logger, instructionsContext, input).flatMap { output =>
               logger.info("result: " + output)
-              queueWriter.write(Naming.generateTasks(nispero, id, output)).flatMap { written =>
+              queueWriter.write(id + "." + nispero, output).flatMap { written =>
                 nispero.inputQueue.deleteMessage(message)
               }
             }

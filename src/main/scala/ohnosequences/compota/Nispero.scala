@@ -23,6 +23,15 @@ trait NisperoAux {
   val worker: W
 }
 
+//object NisperoAux {
+//  type of[In, Out, InQueue <: Queue[In], OutQueue <: Queue[Out]] = NisperoAux {
+//     type InputQueue = InQueue
+//     type OutputQueue = OutQueue
+//     type Instr = Instructions[In, Out]
+//     type W = Worker[In, Out, InQueue, OutQueue]
+//    //
+//  }
+//}
 class Nispero[In, Out, InQueue <: Queue[In], OutQueue <: Queue[Out]](
                                                                       val name: String,
                                                                       val inputQueue: InQueue,

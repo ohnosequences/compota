@@ -1,13 +1,14 @@
-package ohnosequences.compota.metamanager
+package ohnosequences.compota.aws.metamanager
 
 import ohnosequences.compota.Compota
+import ohnosequences.compota.aws.AwsCompota
 import ohnosequences.compota.serialization.{JSON, Serializer}
 
 import scala.util.Try
 
 
 //todo find some ADT to Json library
-class CommandSerializer(compota: Compota) extends Serializer[Command] {
+class CommandSerializer(compota: AwsCompota) extends Serializer[Command] {
   override def fromString(s: String): Try[Command] = Try{
     val commnad0: Command0 = JSON.extract[Command0](s).get
     commnad0 match {

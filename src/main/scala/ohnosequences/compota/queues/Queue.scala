@@ -30,25 +30,53 @@ trait QueueWriter[E, M <: QueueMessage[E]] {
 trait QueueAux {
   type Element
 
-  type Message <: QueueMessage[Element]
+  type Context
 
-  def deleteMessage(message: Message): Try[Unit]
+  val name: String
+
+  type Message <: QueueMessage[Element]
 
   type QR <: QueueReader[Element, Message]
   type QW <: QueueWriter[Element, Message]
 
-  def getReader: Try[QR]
-  def getWriter: Try[QW]
-
-  val name: String
-
-  def isEmpty: Boolean
+  def create(ctx: Context): QueueOp[Element, Message, QR, QW]
 }
 
 
+trait QueueOpAux {
+  type Element
+  type Message <: QueueMessage[Element]
+  type QRR <: QueueReader[Element, Message]
+  type QWW <: QueueWriter[Element, Message]
 
-abstract class Queue[E](val name: String) extends QueueAux {
+  def deleteMessage(message: Message): Try[Unit]
+
+  def getReader: Try[QRR]
+  def getWriter: Try[QWW]
+
+  def isEmpty: Boolean
+
+  def delete(): Try[Unit]
+}
+
+abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: QueueWriter[E, M]] extends QueueOpAux {
+
   type Element = E
+  type Message = M
+  type QRR = QR
+  type QWW = QW
+
+
+}
+
+//class UnitQueueOp[E] extends QueueOp[E] {
+//  override def test(): E = ???
+//}
+
+
+abstract class Queue[E, Ctx](val name: String) extends QueueAux {
+  type Element = E
+  type Context = Ctx
 }
 
 trait MonoidQueueAux extends QueueAux {

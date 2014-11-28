@@ -2,7 +2,7 @@ package ohnosequences.compota.graphs
 
 
 import ohnosequences.compota.NisperoAux
-import ohnosequences.compota.queues.{QueueAux, ProductQueue}
+import ohnosequences.compota.queues.{QueueAux}
 
 import scala.collection.mutable.HashMap
 
@@ -12,29 +12,41 @@ class NisperoGraph(nisperos: Map[String, NisperoAux]) {
   val queues = {
     val r = new HashMap[String, QueueAux]()
 
-    nisperos.values.foreach { nispero =>
-      r ++= ProductQueue.flatQueue(nispero.inputQueue).map{ q=>
-        q.name -> q
-      }
-      r ++= ProductQueue.flatQueue(nispero.outputQueue).map{ q=>
-        q.name -> q
-      }
-    }
+//    nisperos.values.foreach { nispero =>
+//      r ++= ProductQueue.flatQueue(nispero.inputQueue).map{ q=>
+//        q.name -> q
+//      }
+//      r ++= ProductQueue.flatQueue(nispero.outputQueue).map{ q=>
+//        q.name -> q
+//      }
+//    }
     r
   }
 
-  val edges = nisperos.values.toList.flatMap { nispero =>
-    for {
-      i <- ProductQueue.flatQueue(nispero.inputQueue)
-      o <- ProductQueue.flatQueue(nispero.outputQueue)
-    } yield Edge(
-      label = nispero.name,
-      source = Node(i.name),
-      target = Node(o.name)
-    )
-  }
+    val edges = nisperos.values.toList.flatMap { nispero =>
+      for {
+        i <- Seq(nispero.inputQueue)
+        o <- Seq(nispero.outputQueue)
+      } yield Edge(
+        label = nispero.name,
+        source = Node(i.name),
+        target = Node(o.name)
+      )
+    }
+
+//  val edges = nisperos.values.toList.flatMap { nispero =>
+//    for {
+//      i <- ProductQueue.flatQueue(nispero.inputQueue)
+//      o <- ProductQueue.flatQueue(nispero.outputQueue)
+//    } yield Edge(
+//      label = nispero.name,
+//      source = Node(i.name),
+//      target = Node(o.name)
+//    )
+//  }
 
   val graph: Graph[String, String] = new Graph(edges)
+
 
 
   //return either not leafs queues all (to delete them
@@ -48,7 +60,8 @@ class NisperoGraph(nisperos: Map[String, NisperoAux]) {
     }
 
     notLeafsQueues.find { queue =>
-      !queue.isEmpty
+    //  !queue.isEmpty
+      true
     } match {
       case None => println("all queues are empty"); Right(notLeafsQueues)
       case Some(queue) => println("queue " + queue.name + " isn't empty"); Left(queue)

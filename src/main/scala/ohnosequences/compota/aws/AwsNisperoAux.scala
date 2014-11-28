@@ -6,25 +6,25 @@ import ohnosequences.compota.queues.Queue
 
 
 trait AwsNisperoAux extends NisperoAux {
-  val awsConfiguration: AwsStuff
+  val configuration: AwsNisperoConfigurationAux
+
+  type QueueContext = AWS
 
 }
 
 
 
 
-class AwsNispero[In, Out, InQueue <: Queue[In], OutQueue <: Queue[Out]](
+class AwsNispero[In, Out, InQueue <: Queue[In, AWS], OutQueue <: Queue[Out, AWS]](
                                                                       name: String,
                                                                       inputQueue: InQueue,
                                                                       outputQueue: OutQueue,
                                                                       instructions: Instructions[In, Out],
-                                                                      val awsConfiguration: AwsStuff)
-  extends Nispero(name, inputQueue, outputQueue, instructions) with AwsNisperoAux {
+                                                                      val configuration: AwsNisperoConfigurationAux)
+  extends Nispero[In, Out, AWS, InQueue, OutQueue](name, inputQueue, outputQueue, instructions) with AwsNisperoAux {
 
 
 
 }
 
 
-
-case class AwsStuff(s: String)

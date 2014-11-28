@@ -1,10 +1,10 @@
-package ohnosequences.compota.deployment
+package ohnosequences.compota.aws.deployment
 
 
 import ohnosequences.awstools.s3.ObjectAddress
 
 object userScriptGenerator {
-  def generate(nispero: String, component: String, jar: ObjectAddress, workingDir: String): String = {
+  def generate(nispero: String, component: String, jarUrl: String, workingDir: String): String = {
 
 
       val raw = """
@@ -17,13 +17,12 @@ object userScriptGenerator {
                   |alternatives --auto java
                   |
                   |cd $workingDir$
-                  |aws s3 cp s3://$bucket$/$key$ /root/$jarFile$ --region eu-west-1
+                  |aws s3 cp s3://$jarUrl$ /root/$jarFile$ --region eu-west-1
                   |java -jar /root/$jarFile$ $component$ $name$
                   |
                 """.stripMargin
-        .replace("$bucket$", jar.bucket)
-        .replace("$key$", jar.key)
-        .replace("$jarFile$", getFileName(jar.key))
+        .replace("jarUrl", jarUrl)
+        .replace("$jarFile$", getFileName(jarUrl))
         .replace("$component$", component)
         .replace("$name$", nispero)
         .replace("$workingDir$", workingDir)

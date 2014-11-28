@@ -9,9 +9,11 @@ import scala.util.Failure
  */
 case class InstanceId(id: String)
 
-trait Environment {
+trait Environment[QCtx] {
   def instanceId: InstanceId
   val logger: Logger
+
+  def queueCtx: QCtx
 
   def kill()
 

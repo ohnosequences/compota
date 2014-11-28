@@ -3,7 +3,12 @@ package ohnosequences.compota.environment
 import ohnosequences.compota.logging.{ConsoleLogger, Logger}
 
 
-class ThreadEnvironment extends Environment {
+class ThreadEnvironment extends Environment[Unit] {
+
+  //type
+
+  override def queueCtx: Unit = {}
+
   override val instanceId: InstanceId = InstanceId(Thread.currentThread().getName)
 
   //when fatal error occurs

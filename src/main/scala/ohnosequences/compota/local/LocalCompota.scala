@@ -5,8 +5,8 @@ import ohnosequences.compota.{Compota, NisperoAux}
 import ohnosequences.compota.environment.ThreadEnvironment
 import ohnosequences.compota.logging.ConsoleLogger
 
-abstract class LocalCompota(nisperos: List[NisperoAux], sinks: List[MonoidQueueAux]) extends Compota(nisperos, sinks) {
-  override def launchWorker(nispero: NisperoAux): Unit = {
+abstract class LocalCompota(nisperos: List[LocalNisperoAux], sinks: List[MonoidQueueAux]) extends Compota[LocalNisperoAux](nisperos, sinks) {
+  override def launchWorker(nispero: LocalNisperoAux): Unit = {
     nispero.worker.start(new ThreadEnvironment)
   }
 

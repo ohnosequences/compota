@@ -19,7 +19,9 @@ trait NisperoAux {
 
   val name: String
 
-  type W <: WorkerAux
+  type QCtxCtx
+
+  type W <: WorkerAux {type QueueContext = QCtxCtx}
   val worker: W
 }
 
@@ -32,7 +34,7 @@ trait NisperoAux {
 //    //
 //  }
 //}
-class Nispero[In, Out, InQueue <: Queue[In], OutQueue <: Queue[Out]](
+class Nispero[In, Out, QCtx, InQueue <: Queue[In, QCtx], OutQueue <: Queue[Out, QCtx]](
                                                                       val name: String,
                                                                       val inputQueue: InQueue,
                                                                       val outputQueue: OutQueue,
@@ -42,8 +44,12 @@ class Nispero[In, Out, InQueue <: Queue[In], OutQueue <: Queue[Out]](
   type OutputQueue = OutQueue
   type Instr = Instructions[In, Out]
 
-  type W = Worker[In, Out, InQueue, OutQueue]
-  val worker = new Worker[In, Out, InQueue, OutQueue](Nispero.this)
+  type QCtxCtx = QCtx
+
+  type W = Worker[In, Out, QCtx, InQueue, OutQueue]
+  val worker = new Worker[In, Out, QCtx, InQueue, OutQueue](Nispero.this)
+
+
 
 
 }

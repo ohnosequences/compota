@@ -1,4 +1,4 @@
-package ohnosequences.nisperon
+package ohnosequences.compota.aws
 
 import com.amazonaws.internal.StaticCredentialsProvider
 import com.amazonaws.auth.{PropertiesCredentials, InstanceProfileCredentialsProvider, BasicAWSCredentials}
@@ -7,11 +7,9 @@ import ohnosequences.awstools.autoscaling.AutoScaling
 import ohnosequences.awstools.sqs.SQS
 import ohnosequences.awstools.sns.SNS
 import ohnosequences.awstools.s3.S3
-import ohnosequences.awstools.dynamodb.DynamoDB
 import ohnosequences.awstools.regions.Region.Ireland
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient
 import java.io.File
-import com.amazonaws.regions.Regions
 
 class AWS(credentialsFile: File, region: ohnosequences.awstools.regions.Region = Ireland) {
   val AWS_ACCESS_KEY = "AWS_ACCESS_KEY"
@@ -43,9 +41,7 @@ class AWS(credentialsFile: File, region: ohnosequences.awstools.regions.Region =
   val sns = SNS.create(credentialsProvider, region)
   val s3 = S3.create(credentialsProvider, region)
 
- // val ddb = DynamoDB.create(credentialsProvider)
+  // val ddb = DynamoDB.create(credentialsProvider)
   val ddb = new AmazonDynamoDBClient(credentialsProvider)
   ddb.setRegion(region)
 }
-
-

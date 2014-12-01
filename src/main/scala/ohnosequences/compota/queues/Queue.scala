@@ -12,7 +12,7 @@ trait QueueMessage[E] {
 
 
 trait QueueReader[E, M <: QueueMessage[E]] {
-  def getMessage: Try[M]
+  def receiveMessage: Try[M]
 }
 
 trait QueueWriter[E, M <: QueueMessage[E]] {
@@ -39,7 +39,7 @@ trait QueueAux {
   type QR <: QueueReader[Element, Message]
   type QW <: QueueWriter[Element, Message]
 
-  def create(ctx: Context): QueueOp[Element, Message, QR, QW]
+  def create(ctx: Context): Try[QueueOp[Element, Message, QR, QW]]
 }
 
 

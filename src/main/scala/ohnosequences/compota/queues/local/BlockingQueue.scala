@@ -14,7 +14,7 @@ case class SimpleMessage[E](id: String, body: E) extends QueueMessage[E] {
 }
 
 class BlockingQueueReader[T](queue: BlockingQueueOp[T]) extends QueueReader[T, SimpleMessage[T]] {
-  override def getMessage = Try {
+  override def receiveMessage = Try {
     val (id, body) = queue.rawQueue.take()
     SimpleMessage(id, body)
   }
@@ -51,5 +51,5 @@ class BlockingQueue[T](name: String, size: Int) extends Queue[T, Unit](name) {
   override type QR = BlockingQueueReader[T]
   override type QW = BlockingQueueWriter[T]
 
-  override def create(ctx: Context): QueueOp[Element, Message, QR, QW] = new BlockingQueueOp[Element](size)
+  override def create(ctx: Context): Try[QueueOp[Element, Message, QR, QW]] = Success(new BlockingQueueOp[Element](size))
 }

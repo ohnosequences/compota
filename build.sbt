@@ -11,7 +11,7 @@ isPrivate := false
 libraryDependencies ++= Seq(
   "commons-io"     % "commons-io" % "2.1",
   "org.json4s"    %% "json4s-native" % "3.2.5",
-  "ohnosequences" %% "aws-scala-tools" % "0.9.0-SNAPSHOT"
+  "ohnosequences" %% "aws-scala-tools" % "0.9.2-SNAPSHOT"
 //  "net.databinder" %% "unfiltered-filter" % "0.7.1",
 //  "net.databinder" %% "unfiltered-netty" % "0.7.1",
 //  "net.databinder" %% "unfiltered-netty-server" % "0.7.1",
@@ -33,8 +33,6 @@ resolvers +=  Resolver.url("era7" + " public ivy releases",  url("http://release
 
 resolvers +=  Resolver.url("era7" + " public ivy snapshots",  url("http://snapshots.era7.com.s3.amazonaws.com"))(Resolver.ivyStylePatterns)
 
-
-dependencyOverrides += "ohnosequences" % "aws-scala-tools_2.10" % "0.9.0-SNAPSHOT"
 
 dependencyOverrides += "commons-codec" % "commons-codec" % "1.6"
 

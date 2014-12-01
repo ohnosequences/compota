@@ -1,7 +1,7 @@
 package ohnosequences.compota.worker
 
 import ohnosequences.compota.environment.Environment
-import ohnosequences.compota.logging.{ConsoleLogger, Logger, S3Logger}
+import ohnosequences.logging.{ConsoleLogger, Logger, S3Logger}
 import ohnosequences.compota.{NisperoAux, Nispero}
 import ohnosequences.compota.queues.{QueueOp, Queue}
 import ohnosequences.compota.tasks.Naming
@@ -39,13 +39,15 @@ class Worker[In, Out, QCtx, InQueue <: Queue[In, QCtx], OutQueue <: Queue[Out, Q
     val logger = env.logger
     logger.info("worker " + nispero.name + " started on instance " + env.instanceId)
 
-    val inputQueue = nispero.inputQueue.create(env.queueCtx)
-    val outputQueue = nispero.outputQueue.create(env.queueCtx)
     //all fail fast
-    nispero.instructions.prepare(logger).flatMap { context =>
-     inputQueue.getReader.flatMap { queueReader =>
-        outputQueue.getWriter.flatMap { queueWriter =>
-          messageLoop(inputQueue, queueReader, queueWriter, env, context)
+    nispero.inputQueue.create(env.queueCtx).flatMap { inputQueue =>
+      nispero.outputQueue.create(env.queueCtx).flatMap { outputQueue =>
+        nispero.instructions.prepare(logger).flatMap { context =>
+          inputQueue.getReader.flatMap { queueReader =>
+            outputQueue.getWriter.flatMap { queueWriter =>
+              messageLoop(inputQueue, queueReader, queueWriter, env, context)
+            }
+          }
         }
       }
     } match {
@@ -66,7 +68,7 @@ class Worker[In, Out, QCtx, InQueue <: Queue[In, QCtx], OutQueue <: Queue[Out, Q
     //def read
 
     while (!env.isTerminated) {
-      queueReader.getMessage.flatMap { message =>
+      queueReader.receiveMessage.flatMap { message =>
         message.getId.flatMap { id =>
           message.getBody.flatMap { input =>
             logger.info("input: " + input)

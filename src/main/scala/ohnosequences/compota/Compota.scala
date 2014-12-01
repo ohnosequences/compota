@@ -1,14 +1,14 @@
 package ohnosequences.compota
 
 import ohnosequences.compota.graphs.NisperoGraph
-import ohnosequences.compota.logging.ConsoleLogger
 import ohnosequences.compota.queues.{QueueOpAux, QueueAux, MonoidQueueAux, MonoidQueue}
+import ohnosequences.logging.ConsoleLogger
 
 import scala.util.Try
 
 abstract class Compota[Nispero <: NisperoAux](nisperos: List[Nispero],  sinks: List[MonoidQueueAux]) {
 
-  val logger = new ConsoleLogger()
+  val logger = new ConsoleLogger("compota")
 
   val nisperosNames: Map[String, Nispero] =  nisperos.map { nispero =>
     (nispero.name, nispero)
@@ -50,7 +50,7 @@ abstract class Compota[Nispero <: NisperoAux](nisperos: List[Nispero],  sinks: L
   }
 
   def main(args: Array[String]): Unit = {
-    val logger = new ConsoleLogger
+    val logger = new ConsoleLogger("compotaCLI")
     args.toList match {
       case "run" :: "worker" :: name :: Nil => launchWorker(name)
       case _ => logger.error("wrong command")

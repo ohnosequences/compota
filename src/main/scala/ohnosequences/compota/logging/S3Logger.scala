@@ -1,6 +1,6 @@
-package ohnosequences.compota.logging
-
-
-class S3Logger {
-
-}
+//package ohnosequences.compota.logging
+//
+//
+//class S3Logger {
+//
+//}

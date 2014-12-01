@@ -12,4 +12,8 @@ object Resources {
   def workerAutoScalingGroup(metadata: Metadata, name: String) = "compota." + metadata.artifact + "." + name + "." + "worker"
 
 
+  def dynamodbTable(metadata: Metadata, name: String) = "compota." + metadata.artifact + "." + name
+
+  def sqsQueue(metadata: Metadata, name: String) = "compota." + metadata.artifact + "." + name
+
 }

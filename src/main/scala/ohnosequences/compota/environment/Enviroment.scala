@@ -1,6 +1,6 @@
 package ohnosequences.compota.environment
 
-import ohnosequences.compota.logging.Logger
+import ohnosequences.logging.Logger
 
 import scala.util.Failure
 

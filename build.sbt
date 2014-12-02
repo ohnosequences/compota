@@ -1,12 +1,12 @@
 Nice.scalaProject
 
 name := "compota"
-
 description := "compota (ex nisperon)"
-
 organization := "ohnosequences"
 
-isPrivate := false
+bucketSuffix := "era7.com"
+
+scalaVersion := "2.10.4"
 
 libraryDependencies ++= Seq(
   "commons-io"     % "commons-io" % "2.1",
@@ -20,31 +20,8 @@ libraryDependencies ++= Seq(
 
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.11.0" % "test"
 
-testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-maxSize", "40", "-minSuccessfulTests", "10", "-workers", "1", "-verbosity", "1")
-
-
-resolvers ++= Seq(
-  "Era7 Releases"       at "http://releases.era7.com.s3.amazonaws.com",
-  "Era7 Snapshots"      at "http://snapshots.era7.com.s3.amazonaws.com"
-)
-
-
-resolvers +=  Resolver.url("era7" + " public ivy releases",  url("http://releases.era7.com.s3.amazonaws.com"))(Resolver.ivyStylePatterns)
-
-resolvers +=  Resolver.url("era7" + " public ivy snapshots",  url("http://snapshots.era7.com.s3.amazonaws.com"))(Resolver.ivyStylePatterns)
-
-
 dependencyOverrides += "commons-codec" % "commons-codec" % "1.6"
 
-//dependencyOverrides += "org.scala-lang" % "scala-library" % "2.10.4"
+testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-maxSize", "40", "-minSuccessfulTests", "10", "-workers", "1", "-verbosity", "1")
 
-//dependencyOverrides += "org.scala-lang" % "scala-compiler" % "2.10.4"
-
-//dependencyOverrides += "com.fasterxml.jackson.core" % "jackson-core" % "2.1.2"
-
-//dependencyOverrides += "com.fasterxml.jackson.core" % "jackson-databind" % "2.1.2"
-
-//dependencyOverrides += "jline" % "jline" % "2.6"
-
-//dependencyOverrides += "org.slf4j" % "slf4j-api" % "1.7.5"
 

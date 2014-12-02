@@ -9,11 +9,14 @@ import scala.util.Failure
  */
 case class InstanceId(id: String)
 
-trait Environment[QCtx] {
+trait AnyEnvironment {
+
+  type Context
   def instanceId: InstanceId
   val logger: Logger
 
-  def queueCtx: QCtx
+  // TODO: what's this?
+  def queueCtx: Context
 
   def kill()
 
@@ -24,5 +27,9 @@ trait Environment[QCtx] {
   }
   def isTerminated: Boolean
   def reportError(taskId: String, t: Throwable)
+}
 
+trait Environment[C] extends AnyEnvironment {
+
+  type Context = C
 }

@@ -1,12 +1,19 @@
 package ohnosequences.compota
 
 import ohnosequences.compota.graphs.NisperoGraph
-import ohnosequences.compota.queues.{QueueOpAux, QueueAux, MonoidQueueAux, MonoidQueue}
+import ohnosequences.compota.queues._
 import ohnosequences.logging.ConsoleLogger
 
 import scala.util.Try
 
-abstract class Compota[Nispero <: NisperoAux](nisperos: List[Nispero],  sinks: List[MonoidQueueAux]) {
+trait AnyCompota {
+
+  type Nispero <: AnyNispero
+}
+
+abstract class Compota[N <: AnyNispero, MQ <: AnyMonoidQueue](val nisperos: List[N], val sinks: List[MQ]) {
+
+  type Nispero = N
 
   val logger = new ConsoleLogger("compota")
 
@@ -34,7 +41,7 @@ abstract class Compota[Nispero <: NisperoAux](nisperos: List[Nispero],  sinks: L
 
   def deleteNispero(nispero: Nispero)
 
-  def deleteQueue(queue: QueueOpAux)
+  def deleteQueue(queue: AnyQueueOps)
 
 
   def launchWorker(nispero: Nispero)

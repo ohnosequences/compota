@@ -61,6 +61,8 @@ class Worker[In, Out, QCtx, InQueue <: Queue[In, QCtx], OutQueue <: Queue[Out, Q
     }
   }
 
+  def messageLoop(inputQueueOpt: QueueOp[In, ])
+
 
   def messageLoop(queueOp: QueueOp[nispero.inputQueue.Element, nispero.inputQueue.Message, nispero.inputQueue.QR, nispero.inputQueue.QW], queueReader: nispero.inputQueue.QR, queueWriter: nispero.outputQueue.QW, env: Environment[QCtx], instructionsContext: nispero.instructions.Context): Try[Unit] = {
     val logger  = env.logger

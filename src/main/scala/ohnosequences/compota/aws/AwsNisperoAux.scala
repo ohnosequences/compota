@@ -1,11 +1,11 @@
 package ohnosequences.compota.aws
 
-import ohnosequences.compota.worker.Worker
-import ohnosequences.compota.{Nispero, Instructions, NisperoAux}
-import ohnosequences.compota.queues.Queue
+// import ohnosequences.compota.worker.Worker
+import ohnosequences.compota._
+import ohnosequences.compota.queues._
 
 
-trait AwsNisperoAux extends NisperoAux {
+trait AwsNisperoAux extends AnyNispero {
   val configuration: AwsNisperoConfigurationAux
 
   type QueueContext = AWS

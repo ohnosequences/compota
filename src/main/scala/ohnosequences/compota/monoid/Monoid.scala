@@ -2,6 +2,7 @@ package ohnosequences.compota.monoid
 
 import collection.mutable
 
+// TODO: Spire
 trait Monoid[M] {
 
   val unit: M

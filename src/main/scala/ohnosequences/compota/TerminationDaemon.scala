@@ -1,7 +1,6 @@
 package ohnosequences.compota
 
-import ohnosequences.compota.environment.Environment
-
+import ohnosequences.compota.environment._
 //
 //class TerminationDaemon[NT <: NisperoAux](compota: Compota[NT]) {
 //  def start(environment: Environment): Unit = {

@@ -1,13 +1,14 @@
 package ohnosequences.compota.graphs
 
 
-import ohnosequences.compota.NisperoAux
-import ohnosequences.compota.queues.{QueueAux}
+import ohnosequences.compota._
+import ohnosequences.compota.queues._
 
+// TODO: ???
 import scala.collection.mutable.HashMap
 
 //todo fix product queue
-class NisperoGraph(nisperos: Map[String, NisperoAux]) {
+class NisperoGraph(nisperos: Map[String, AnyNispero]) {
 
   val queues = {
     val r = new HashMap[String, QueueAux]()
@@ -50,7 +51,7 @@ class NisperoGraph(nisperos: Map[String, NisperoAux]) {
 
 
   //return either not leafs queues all (to delete them
-  def checkQueues(): Either[QueueAux, List[QueueAux]] = {
+  def checkQueues(): Either[AnyQueue, List[AnyQueue]] = {
     val sorted = graph.sort
     println(sorted)
 

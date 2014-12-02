@@ -5,33 +5,50 @@ import ohnosequences.compota.monoid.Monoid
 import scala.util.{Success, Try}
 
 
-trait AnyMessage {
+//trait AnyMessage {
+//
+//  type Body
+//  def getBody: Try[Body]
+//  // TODO: a better id type
+//  def getId: Try[String] //parse id error?
+//}
 
-  type Body
-  def getBody: Try[Body]
-  // TODO: a better id type
-  def getId: Try[String] //parse id error?
+
+abstract class QueueMessage[B] {
+  def getBody: Try[B]
+  //  // TODO: a better id type
+  def getId: Try[String]
 }
-
 // TODO: they should be defined for queues, not for messages
-trait AnyQueueReader {
+//trait AnyQueueReader {
+//
+//  type Message <: QueueMessage
+//  def receiveMessage: Try[Message]
+//}
 
-  type Message <: AnyMessage
-  def receiveMessage: Try[Message]
+abstract class QueueReader[E, M <: QueueMessage[E]] {
+  def receiveMessage: Try[M]
+
 }
+//
+//trait AnyQueueWriter {
+//
+//  //type Message <: AnyMessage
+//
+//
+//}
 
-trait AnyQueueWriter {
-
-  type Message <: AnyMessage
+abstract class QueueWriter[E] {
 
   //def write(originId: String, writer: String, values: List[Element]): Try[Unit]
-  def writeRaw(values: List[(String, Message)]): Try[Unit]
+  def writeRaw(values: List[(String, E)]): Try[Unit]
 
-  final def writeMessages(prefixId: String, values: List[E]): Try[Unit] = {
+  def writeMessages(prefixId: String, values: List[E]): Try[Unit] = {
     writeRaw(values.zipWithIndex.map { case (value, i) =>
       (prefixId + "." + i, value)
     })
   }
+
 }
 
 trait AnyQueue { queue =>
@@ -40,48 +57,56 @@ trait AnyQueue { queue =>
 
   val name: String
 
-  type Message <: AnyMessage
-
   // not needed here
-  type Body = Message#Body
+  type Elmnt
 
-  type Reader <: AnyQueueReader { type Message <: queue.Message }
-  type Writer <: AnyQueueWriter { type Message <: queue.Message }
+  type Msg <: QueueMessage[Elmnt]
+
+
+
+  type Reader <: QueueReader[Elmnt, Msg]
+  type Writer <: QueueWriter[Elmnt]
 
   // why?? put it somewhere else, not here. At the nispero level, for example
-  // def create(ctx: Context): Try[QueueOps[Element, Message, QR, QW]]
+   def create(ctx: Context): Try[QueueOps[Elmnt, Msg, Reader, Writer]]
 }
 
 
 trait AnyQueueOps {
 
-  // extract everything from here
-  type Queue <: AnyQueue
 
-  def deleteMessage(message: Message): Try[Unit]
 
-  def reader: Try[Queue#Reader]
-  def writer: Try[Queue#Writer]
+  type QElement
+  type QMessage <: QueueMessage[QElement]
+  type Reader <: QueueReader[QElement, QMessage]
+  type Writer <: QueueWriter[QElement]
+
+  def delete(): Try[Unit]
+
+}
+
+// all these types are here just for convenience
+abstract class QueueOps[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: QueueWriter[E]] extends AnyQueueOps {
+
+  def deleteMessage(message: M): Try[Unit]
+
+  def reader: Try[QR]
+  def writer: Try[QW]
 
   def isEmpty: Boolean
 
   def delete(): Try[Unit]
-}
 
-// all these types are here just for convenience
-abstract class QueueOps[Q <: AnyQueue] extends AnyQueueOps {
-
-  type Queue = Q
 }
 
 abstract class Queue[E, Ctx](val name: String) extends AnyQueue {
-  type Element = E
+  type Elmnt = E
   type Context = Ctx
 }
 
 trait AnyMonoidQueue extends AnyQueue {
 
-  def monoid: Monoid[Message#Body]
+  def monoid: Monoid[Elmnt]
   // TODO: what is this???
   def reduce: Try[Unit] = {
     Success(())

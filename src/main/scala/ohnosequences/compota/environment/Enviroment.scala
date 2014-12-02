@@ -11,12 +11,12 @@ case class InstanceId(id: String)
 
 trait AnyEnvironment {
 
-  type Context
+  type QueueContext
   def instanceId: InstanceId
   val logger: Logger
 
   // TODO: what's this?
-  def queueCtx: Context
+  def queueCtx: QueueContext
 
   def kill()
 
@@ -31,5 +31,5 @@ trait AnyEnvironment {
 
 trait Environment[C] extends AnyEnvironment {
 
-  type Context = C
+  type QueueContext = C
 }

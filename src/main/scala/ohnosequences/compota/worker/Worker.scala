@@ -63,7 +63,7 @@ class Worker[In, Out, QCtx, IQ <: Queue[In, QCtx], OQ <: Queue[Out, QCtx]](
    }
 
 
-   def messageLoop(inputQueueOp: QueueOps[In, nispero.inputQueue.Message, nispero.inputQueue.Reader, nispero.inputQueue.Writer],
+   def messageLoop(inputQueueOp: QueueOps[In, nispero.inputQueue.Msg, nispero.inputQueue.Reader, nispero.inputQueue.Writer],
                    queueReader: nispero.inputQueue.Reader,
                    queueWriter: nispero.outputQueue.Writer,
                    env: Environment[QCtx],

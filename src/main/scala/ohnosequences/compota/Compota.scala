@@ -11,7 +11,8 @@ trait AnyCompota {
   type Nispero <: AnyNispero
 }
 
-abstract class Compota[N <: AnyNispero, MQ <: AnyMonoidQueue](val nisperos: List[N], val sinks: List[MQ]) {
+abstract class Compota[N <: AnyNispero](val nisperos: List[N], val sinks: List[AnyMonoidQueue])
+  extends AnyCompota{
 
   type Nispero = N
 

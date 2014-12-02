@@ -11,7 +11,7 @@ import scala.collection.mutable.HashMap
 class NisperoGraph(nisperos: Map[String, AnyNispero]) {
 
   val queues = {
-    val r = new HashMap[String, QueueAux]()
+    val r = new HashMap[String, AnyQueue]()
 
 //    nisperos.values.foreach { nispero =>
 //      r ++= ProductQueue.flatQueue(nispero.inputQueue).map{ q=>

@@ -1,13 +1,12 @@
 package ohnosequences.compota.local
 
-import ohnosequences.compota.{Nispero, Instructions, NisperoAux}
-import ohnosequences.compota.aws.{AWS, AwsNisperoConfigurationAux}
+import ohnosequences.compota.{AnyNispero, Nispero, Instructions}
 import ohnosequences.compota.queues.Queue
 
-trait LocalNisperoAux extends NisperoAux {
+trait LocalNisperoAux extends AnyNispero {
  // val configuration: AwsNisperoConfigurationAux
 
-  override type QCtxCtx = Unit
+  override type QueueCtx = Unit
 
 }
 
@@ -20,7 +19,6 @@ class LocalNispero[In, Out, InQueue <: Queue[In, Unit], OutQueue <: Queue[Out, U
                                                                                    outputQueue: OutQueue,
                                                                                    instructions: Instructions[In, Out])
   extends Nispero[In, Out, Unit, InQueue, OutQueue](name, inputQueue, outputQueue, instructions) with LocalNisperoAux {
-
 
 
 }

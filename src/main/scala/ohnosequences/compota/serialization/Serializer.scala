@@ -1,7 +1,7 @@
 package ohnosequences.compota.serialization
 
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 import scala.util.parsing.json.JSONObject
 
 trait Serializer[T] {
@@ -29,9 +29,17 @@ object unitSerializer extends Serializer[Unit] {
 
 object intSerializer extends Serializer[Int] {
 
-  def fromString(s: String) = Try(s.toInt)
+  def fromString(s: String): Try[Int] = try {
+    if(s == null) {
+      Failure(new Error("can't convert null to Int"))
+    } else {
+      Success(s.toInt)
+    }
+  } catch {
+    case b: NumberFormatException => Failure(b)
+  }
 
-  def toString(t: Int) = Try(t.toString)
+  def toString(t: Int): Try[String] = Success(t.toString)
 
 }
 

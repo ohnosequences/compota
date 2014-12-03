@@ -31,10 +31,12 @@ class RawItem(val id: String, val value: String) {
     )))
   }
 
-  def makeSQSEntry: SendMessageBatchRequestEntry = {
-    new SendMessageBatchRequestEntry(id, value).withMessageAttributes(Map[String, MessageAttributeValue](
-      DynamoDBQueue.idAttr -> new MessageAttributeValue().withStringValue(id).withDataType("String")
-    ))
+  def makeSQSEntry(i: Int): SendMessageBatchRequestEntry = {
+    new SendMessageBatchRequestEntry(i.toString, value)
+
+  //    .withMessageAttributes(Map[String, MessageAttributeValue](
+//      DynamoDBQueue.idAttr -> new MessageAttributeValue().withStringValue(id).withDataType("String")
+//    ))
   }
 
 }
@@ -56,7 +58,8 @@ class DynamoDBQueueWriter[T](queueOp: DynamoDBQueueOP[T], serializer: Serializer
     }.flatMap { items: List[RawItem] =>
       //ddb
       Utils.writeWriteRequests(queueOp.aws.ddb, queueOp.tableName, items.map(_.makeDBWriteRequest), logger).flatMap { r =>
-        SQSUtils.writeBatch(queueOp.aws.sqs.sqs, queueOp.sqsUrl, items.map { item => new RawItem(item.id, "")}) //no body
+        logger.info("writing to SQS")
+        SQSUtils.writeBatch(queueOp.aws.sqs.sqs, queueOp.sqsUrl, items.map { item => new RawItem(item.id, item.id)}) //no body
       }
     }
   }
@@ -65,6 +68,7 @@ class DynamoDBQueueWriter[T](queueOp: DynamoDBQueueOP[T], serializer: Serializer
 
 class DynamoDBQueueReader[T](queueOp: DynamoDBQueueOP[T]) extends QueueReader[T, SQSMessage[T]] {
 
+  val logger = new ConsoleLogger("dynamodb writer")
 
   object TailRecCanNotBeClassMembers {
 
@@ -75,9 +79,12 @@ class DynamoDBQueueReader[T](queueOp: DynamoDBQueueOP[T]) extends QueueReader[T,
                                  message: com.amazonaws.services.sqs.model.Message): Try[SQSMessage[T]] = {
 
 
-      val id = message.getAttributes.get(DynamoDBQueue.idAttr)
+      val id = message.getBody
+      logger.info(message.getAttributes.toMap.toString)
       //failure repeat noitem item
       val itemValue: Try[Option[Either[Unit, String]]] = try {
+        //queueOp.
+        logger.info("getting " + id)
         ddb.getItem(new GetItemRequest()
           .withTableName(tableName)
           .withKey(Map(DynamoDBQueue.idAttr -> new AttributeValue().withS(id)))
@@ -173,11 +180,11 @@ class DynamoDBQueue[T](name: String, val serializer: Serializer[T]) extends Queu
       )
 
       val queueUrl = ctx.aws.sqs.sqs.createQueue(new CreateQueueRequest()
-        .withQueueName(Resources.dynamodbTable(ctx.metadata, name))
+        .withQueueName(Resources.sqsQueue(ctx.metadata, name))
         .withAttributes(Map(QueueAttributeName.ReceiveMessageWaitTimeSeconds.toString -> receiveMessageWaitTimeSeconds.toString)) //max
       ).getQueueUrl
 
-      new DynamoDBQueueOP[Elmnt](name, queueUrl, ctx.aws, serializer)
+      new DynamoDBQueueOP[Elmnt](Resources.dynamodbTable(ctx.metadata, name), queueUrl, ctx.aws, serializer)
     }
   }
 

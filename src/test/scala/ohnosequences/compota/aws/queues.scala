@@ -32,7 +32,7 @@ class QueueTest {
       val queue = new DynamoDBQueue("test", intSerializer)
       val context = new DynamoDBContext(
         metadata = new Metadata {
-          override val artifact: String = ""
+          override val artifact: String = "test"
           override val jarUrl: String = ""
         },
         logger = logger,

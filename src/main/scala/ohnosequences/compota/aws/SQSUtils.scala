@@ -2,7 +2,7 @@ package ohnosequences.compota.aws
 
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{Message, ReceiveMessageRequest, SendMessageBatchRequest}
-import ohnosequences.compota.aws.queues.RawItem
+import ohnosequences.compota.aws.queues.{DynamoDBQueue, RawItem}
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
@@ -18,6 +18,7 @@ object SQSUtils {
         .withQueueUrl(queueUrl)
         .withWaitTimeSeconds(20) //max
         .withMaxNumberOfMessages(1)
+       // .withAttributeNames(DynamoDBQueue.idAttr)
       )
       res.getMessages.headOption
     } match {
@@ -31,6 +32,7 @@ object SQSUtils {
 
   @tailrec
   def writeBatch(sqs: AmazonSQS, queueUrl: String, items: List[RawItem]): Try[Unit] = {
+
     if (items == null | items.isEmpty) {
       Success(())
     } else {
@@ -38,7 +40,9 @@ object SQSUtils {
       Try {
         sqs.sendMessageBatch(new SendMessageBatchRequest()
           .withQueueUrl(queueUrl)
-          .withEntries(left.map(_.makeSQSEntry))
+          .withEntries(left.zipWithIndex.map { case (item, i) =>
+            item.makeSQSEntry(i + 1)
+        })
         )
         ()
       } match {

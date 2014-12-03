@@ -1,5 +1,7 @@
 Nice.scalaProject
 
+scalaVersion := "2.10.4"
+
 name := "compota"
 description := "compota (ex nisperon)"
 organization := "ohnosequences"

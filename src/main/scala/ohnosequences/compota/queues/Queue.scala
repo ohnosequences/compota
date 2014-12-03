@@ -14,99 +14,69 @@ import scala.util.{Success, Try}
 //}
 
 
-abstract class QueueMessage[B] {
-  def getBody: Try[B]
-  //  // TODO: a better id type
+trait AnyMessage {
+
+  type Body
+  // TODO: move all this to ops; Try does not make sense here
+  def getBody: Try[Body]
+  // TODO: a better id type
   def getId: Try[String]
 }
-// TODO: they should be defined for queues, not for messages
-//trait AnyQueueReader {
-//
-//  type Message <: QueueMessage
-//  def receiveMessage: Try[Message]
-//}
-
-abstract class QueueReader[E, M <: QueueMessage[E]] {
-  def receiveMessage: Try[M]
-
-}
-//
-//trait AnyQueueWriter {
-//
-//  //type Message <: AnyMessage
-//
-//
-//}
-
-abstract class QueueWriter[E] {
-
-  //def write(originId: String, writer: String, values: List[Element]): Try[Unit]
-  def writeRaw(values: List[(String, E)]): Try[Unit]
-
-  def writeMessages(prefixId: String, values: List[E]): Try[Unit] = {
-    writeRaw(values.zipWithIndex.map { case (value, i) =>
-      (prefixId + "." + i, value)
-    })
-  }
-
-}
+trait Message[B] extends AnyMessage { type Body = B }
 
 trait AnyQueue { queue =>
   
+  // TODO: move this _out_ of here
+  // it is only ever used for creation, which should not be coupled with declaring this queue
   type Context
 
   val name: String
 
-  // not needed here
-  type Elmnt
+  type Message <: AnyMessage
+}
 
-  type Msg <: QueueMessage[Elmnt]
+trait AnyQueueManager { qm =>
 
+  type Context
+  type Queue <: AnyQueue
+  type QueueOps <: AnyQueueOps { type Queue <: qm.Queue }
 
-
-  type Reader <: QueueReader[Elmnt, Msg]
-  type Writer <: QueueWriter[Elmnt]
-
-  // why?? put it somewhere else, not here. At the nispero level, for example
-   def create(ctx: Context): Try[QueueOps[Elmnt, Msg, Reader, Writer]]
+  def create(ctx: Context): Try[QueueOps]
 }
 
 
-trait AnyQueueOps {
+trait AnyQueueOps { qops =>
 
+  type Queue <: AnyQueue
 
-
-  type QElement
-  type QMessage <: QueueMessage[QElement]
-  type Reader <: QueueReader[QElement, QMessage]
-  type Writer <: QueueWriter[QElement]
-
+  type Reader <: AnyQueueReader { type Queue <: qops.Queue }
+  type Writer <: AnyQueueWriter { type Queue <: qops.Queue }
+  
   def delete(): Try[Unit]
 
+  def reader: Try[Reader]
+  def writer: Try[Writer]
+
+  def isEmpty: Boolean
 }
 
 // all these types are here just for convenience
-abstract class QueueOps[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: QueueWriter[E]] extends AnyQueueOps {
+trait QueueOps[Q <: AnyQueue] extends AnyQueueOps {
 
-  def deleteMessage(message: M): Try[Unit]
+  type Queue = Q
 
-  def reader: Try[QR]
-  def writer: Try[QW]
-
-  def isEmpty: Boolean
-
-  def delete(): Try[Unit]
-
+  // TODO: why here?? if you are declaring writer ops, move it there.
+  def deleteMessage(message: Queue#Message): Try[Unit]
 }
 
-abstract class Queue[E, Ctx](val name: String) extends AnyQueue {
-  type Elmnt = E
+abstract class Queue[Ctx](val name: String) extends AnyQueue {
+
   type Context = Ctx
 }
 
 trait AnyMonoidQueue extends AnyQueue {
 
-  def monoid: Monoid[Elmnt]
+  def monoid: Monoid[Message#Body]
   // TODO: what is this???
   def reduce: Try[Unit] = {
     Success(())
@@ -118,3 +88,30 @@ trait AnyMonoidQueue extends AnyQueue {
 //   override type Element = E
 
 // }
+
+
+trait AnyQueueReader {
+
+  type Queue <: AnyQueue
+
+  def receiveMessage: Try[Queue#Message]
+}
+
+trait QueueReader[Q <: AnyQueue] extends AnyQueueReader { type Queue = Q }
+
+trait AnyQueueWriter {
+
+  type Queue <: AnyQueue
+
+  def writeRaw(values: List[(String, Queue#Message#Body)]): Try[Unit]
+
+  // TODO: this signature is wrong: you should write messages, not their bodies
+  final def writeMessages(prefixId: String, values: List[Queue#Message#Body]): Try[Unit] = {
+
+    writeRaw(values.zipWithIndex.map { case (value, i) =>
+      (prefixId + "." + i, value)
+    })
+  }
+}
+
+trait QueueWriter[Q <: AnyQueue] extends AnyQueueWriter { type Queue = Q }

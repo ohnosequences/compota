@@ -2,13 +2,13 @@ package ohnosequences.compota.aws
 
 import java.io.File
 
-import ohnosequences.compota.queues.{QueueOpAux, QueueAux, MonoidQueueAux}
-import ohnosequences.compota.{Compota, NisperoAux}
+import ohnosequences.compota.queues._
+import ohnosequences.compota.{Compota}
 //import ohnosequences.nisperon.AWS
 
 import scala.util.Try
 
-abstract class AwsCompota(nisperos: List[AwsNisperoAux], sinks: List[MonoidQueueAux], configuration: AwsCompotaConfigurationAux) extends Compota[AwsNisperoAux](nisperos, sinks) {
+abstract class AwsCompota(nisperos: List[AwsNisperoAux], sinks: List[AnyMonoidQueue], configuration: AwsCompotaConfigurationAux) extends Compota[AwsNisperoAux](nisperos, sinks) {
 
 
  // val aws = new AWS(new File("."))
@@ -23,12 +23,13 @@ abstract class AwsCompota(nisperos: List[AwsNisperoAux], sinks: List[MonoidQueue
     //nispero.
   }
 
-  override def deleteQueue(queue: QueueOpAux) = Try {
+  override def deleteQueue(queue: AnyQueueOps) = Try {
     queue.delete
   }
 
   override def launchWorker(nispero: AwsNisperoAux): Unit = {
-    //nispero.worker.start()
+
+    //nispero.createWorker().start()
     println(nispero.configuration)
   }
 

@@ -1,10 +1,10 @@
 package ohnosequences.compota.aws.metamanager
 
-import ohnosequences.compota.{NisperoAux, Nispero, Compota}
+import ohnosequences.compota.{AnyNispero, Nispero, Compota}
 
 
 trait Command {
 
 }
 
-case class CreateWorkerGroup(nispero: NisperoAux) extends Command
+case class CreateWorkerGroup(nispero: AnyNispero) extends Command

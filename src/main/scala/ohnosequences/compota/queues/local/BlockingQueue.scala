@@ -8,33 +8,37 @@ import scala.util.{Try, Success}
 
 
 case class SimpleMessage[E](id: String, body: E) extends QueueMessage[E] {
-  override def getBody = Success(body)
+  override def getBody: Try[E] = Success(body)
 
   override def getId: Try[String] = Success(id)
 }
 
-class BlockingQueueReader[T](queue: BlockingQueueOp[T]) extends QueueReader[T, SimpleMessage[T]] {
+class BlockingQueueReader[T](queueOps: BlockingQueueOps[T]) extends QueueReader[T, SimpleMessage[T]] {
   override def receiveMessage = Try {
-    val (id, body) = queue.rawQueue.take()
+    val (id, body) = queueOps.rawQueue.take()
     SimpleMessage(id, body)
   }
 }
 
-class BlockingQueueWriter[T](queue: BlockingQueueOp[T]) extends QueueWriter[T, SimpleMessage[T]] {
+class BlockingQueueWriter[T](queue: BlockingQueueOps[T]) extends QueueWriter[T] {
+
+  //def write(originId: String, writer: String, values: List[Element]): Try[Unit]
+
   override def writeRaw(values: List[(String, T)]) = Try {
 
     values.foreach(queue.rawQueue.put)
   }
 }
 
-class BlockingQueueOp[T](size: Int) extends QueueOp[T, SimpleMessage[T], BlockingQueueReader[T], BlockingQueueWriter[T]] {
+class BlockingQueueOps[T](queue: BlockingQueue[T], size: Int) extends QueueOps[T, SimpleMessage[T], BlockingQueueReader[T], BlockingQueueWriter[T]] { blockingQueueOps =>
 
   override def deleteMessage(message: SimpleMessage[T]) = Success(())
 
 
-  override def getReader = Success(new BlockingQueueReader(BlockingQueueOp.this))
 
-  override def getWriter = Success(new BlockingQueueWriter(BlockingQueueOp.this))
+  override def reader: Try[BlockingQueueReader[T]] = Success(new BlockingQueueReader(blockingQueueOps))
+
+  override def writer: Try[BlockingQueueWriter[T]] = Success(new BlockingQueueWriter(blockingQueueOps))
 
   override def isEmpty: Boolean = rawQueue.isEmpty
 
@@ -44,12 +48,12 @@ class BlockingQueueOp[T](size: Int) extends QueueOp[T, SimpleMessage[T], Blockin
   val rawQueue = new ArrayBlockingQueue[(String, T)](size)
 }
 
-class BlockingQueue[T](name: String, size: Int) extends Queue[T, Unit](name) {
+class BlockingQueue[T](name: String, size: Int) extends Queue[T, Unit](name) { blockingQueue =>
 
-  override type Message = SimpleMessage[T]
+  type Msg = SimpleMessage[T]
 
-  override type QR = BlockingQueueReader[T]
-  override type QW = BlockingQueueWriter[T]
+  type Reader = BlockingQueueReader[T]
+  type Writer = BlockingQueueWriter[T]
 
-  override def create(ctx: Context): Try[QueueOp[Element, Message, QR, QW]] = Success(new BlockingQueueOp[Element](size))
+  override def create(ctx: Context): Try[QueueOps[T, SimpleMessage[T], BlockingQueueReader[T], BlockingQueueWriter[T]]] = Success(new BlockingQueueOps[T](blockingQueue, size))
 }

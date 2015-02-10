@@ -1,7 +1,7 @@
 package ohnosequences.compota.aws
 
 import ohnosequences.compota.aws.deployment.Metadata
-import ohnosequences.compota.aws.queues.{DynamoDBQueueWriter, DynamoDBQueueReader, DynamoDBContext, DynamoDBQueue}
+import ohnosequences.compota.aws.queues._
 import ohnosequences.compota.serialization.intSerializer
 import ohnosequences.logging.{ConsoleLogger, Logger}
 import org.junit.Test
@@ -15,7 +15,7 @@ class QueueTest {
 
   val logger = new ConsoleLogger("queue-test")
 
-  val timeout: Long = 100*1000
+  val timeout: Long = 200*1000
 
 
   def checkTry[T](atry: Try[T]): Unit = {
@@ -52,21 +52,34 @@ class QueueTest {
 
   def testQueue(reader: DynamoDBQueueReader[Int], writer: DynamoDBQueueWriter[Int]): Try[Unit] = {
     @tailrec
-    def readAllMessages(read: Set[Int], started: Long): Try[Unit] = {
-      logger.info(read.size + " messages left")
+    def readAllMessages(idsToRead: Set[Int], readIds: Set[String], started: Long): Try[Unit] = {
+      logger.info(idsToRead.size + " messages left")
       if(System.currentTimeMillis() - started > timeout) {
         Failure(new Error("timeout"))
-      } else if (read.isEmpty) {
+      } else if (idsToRead.isEmpty) {
         Success(())
       } else {
         reader.receiveMessage.flatMap { message =>
-          message.getBody
+          message.getBody match {
+            case Failure(t) => {
+              if (readIds.contains(message.id)) {
+                logger.warn(t)
+                Success(None)
+              } else {
+                Failure(t)
+              }
+            }
+            case Success(value) => {
+              reader.queueOp.deleteMessage(message)
+              Success(Some((message.id, value)))
+            }
+          }
         } match {
           case Failure(f) => Failure(f)
-          case Success(v) => {
-            readAllMessages(read.-(v), started)
-          }
+          case Success(None) =>  readAllMessages(idsToRead, readIds, started)
+          case Success(Some((id, value))) => readAllMessages(idsToRead.-(value), readIds + id, started)
         }
+
       }
     }
 
@@ -75,7 +88,7 @@ class QueueTest {
     checkTry( writer.writeMessages("i", items))
 
     logger.info("receiving messages")
-    readAllMessages(items.toSet, System.currentTimeMillis())
+    readAllMessages(items.toSet, Set[String](), System.currentTimeMillis())
   }
 
 

@@ -10,7 +10,7 @@ import ohnosequences.logging.{Logger, ConsoleLogger}
 import scala.collection.JavaConversions._
 
 import com.amazonaws.services.dynamodbv2.model._
-import ohnosequences.compota.aws.{Resources, SQSUtils, AWSClients}
+import ohnosequences.compota.aws.{DynamoDBUtils, Resources, SQSUtils, AWSClients}
 import ohnosequences.compota.queues._
 import ohnosequences.compota.serialization.Serializer
 
@@ -19,8 +19,6 @@ import scala.util.{Failure, Success, Try}
 
 class SQSMessage[E](val id: String, val body: E, val handle: String) extends QueueMessage[E] {
   def getBody: Try[E] = Success(body)
-
-  def getId: Try[String] = Success(id)
 }
 
 class RawItem(val id: String, val value: String) {
@@ -65,74 +63,41 @@ class DynamoDBQueueWriter[T](queueOp: DynamoDBQueueOP[T], serializer: Serializer
   }
 }
 
+class DynamoDBMessage[T](val sqsMessage: Message, queueOp: DynamoDBQueueOP[T]) extends QueueMessage[T] {
+  override def getBody: Try[T] = {
+    val itemWrap = queueOp.logger.benchExecute("reading message from DynamoDB with id: " + id) {
+      DynamoDBUtils.getItem(
+        queueOp.aws.ddb,
+        queueOp.tableName,
+        key = Map(DynamoDBQueue.idAttr -> new AttributeValue().withS(id)),
+        attributesToGet = List(DynamoDBQueue.idAttr, DynamoDBQueue.valueAttr),
+        queueOp.logger
+      )
+    }
 
-class DynamoDBQueueReader[T](queueOp: DynamoDBQueueOP[T]) extends QueueReader[T, SQSMessage[T]] {
-
-  val logger = new ConsoleLogger("dynamodb writer")
-
-  object TailRecCanNotBeClassMembers {
-
-    @tailrec
-    def getMessageFromSQSMessage(ddb: AmazonDynamoDB,
-                                 tableName: String,
-                                 serializer: Serializer[T],
-                                 message: com.amazonaws.services.sqs.model.Message): Try[SQSMessage[T]] = {
-
-
-      val id = message.getBody
-      logger.info(message.getAttributes.toMap.toString)
-      //failure repeat noitem item
-      val itemValue: Try[Option[Either[Unit, String]]] = try {
-        //queueOp.
-        logger.info("getting " + id)
-        ddb.getItem(new GetItemRequest()
-          .withTableName(tableName)
-          .withKey(Map(DynamoDBQueue.idAttr -> new AttributeValue().withS(id)))
-          .withAttributesToGet(List(DynamoDBQueue.idAttr, DynamoDBQueue.valueAttr))
-        ).getItem match {
-          case null => Success(Some(Left(())))
-          case itemMap => {
-            Success(Some(Right(itemMap.get(DynamoDBQueue.valueAttr).getS)))
-          }
-        }
-      } catch {
-        case p: ProvisionedThroughputExceededException => {
-          //repeat
-          Success(None)
-        }
-        case a: AmazonClientException => {
-          Failure(a)
+    itemWrap.flatMap { item =>
+      item.get(DynamoDBQueue.valueAttr) match {
+        case None => Failure(new Error(DynamoDBQueue.valueAttr + " is empty"))
+        case Some(s) => {
+          queueOp.serializer.fromString(s.getS)
         }
       }
-
-      itemValue match {
-        case Success(Some(Left(()))) => {
-          //no such item
-          Failure(new Error("no such item"))
-        }
-        case Success(Some(Right(value))) => {
-          serializer.fromString(value).map { body =>
-            new SQSMessage(id, body, message.getReceiptHandle)
-          }
-        }
-        case Failure(f) => Failure(f)
-        case Success(None) => {
-          //repeat
-          getMessageFromSQSMessage(ddb, tableName, serializer, message)
-        }
-      }
-
     }
   }
 
-  import TailRecCanNotBeClassMembers._
+  override val id: String = sqsMessage.getBody
+}
 
+class DynamoDBQueueReader[T](val queueOp: DynamoDBQueueOP[T]) extends QueueReader[T, DynamoDBMessage[T]] {
 
-  override def receiveMessage: Try[SQSMessage[T]] = {
-    SQSUtils.receiveMessage(queueOp.aws.sqs.sqs, queueOp.sqsUrl).flatMap { sqsMessage =>
-      getMessageFromSQSMessage(queueOp.aws.ddb, queueOp.tableName, queueOp.serializer, sqsMessage)
+  val logger = new ConsoleLogger("DynamoDB reader")
+
+  override def receiveMessage: Try[DynamoDBMessage[T]] = {
+    val sqsMessageWrap: Try[Message] = logger.benchExecute("reading message from SQS") {
+      SQSUtils.receiveMessage(queueOp.aws.sqs.sqs, queueOp.sqsUrl)
     }
-  }
+
+    sqsMessageWrap.map { sqsMessage => new DynamoDBMessage(sqsMessage, queueOp)}}
 }
 
 class DynamoDBContext (
@@ -142,8 +107,27 @@ class DynamoDBContext (
 )
 
 class DynamoDBQueueOP[T](val tableName: String, val sqsUrl: String, val aws: AWSClients, val serializer: Serializer[T])
-  extends QueueOps[T, SQSMessage[T], DynamoDBQueueReader[T], DynamoDBQueueWriter[T]] {
-  override def deleteMessage(message: SQSMessage[T]): Try[Unit] = ???
+  extends QueueOps[T, DynamoDBMessage[T], DynamoDBQueueReader[T], DynamoDBQueueWriter[T]] {
+
+  val logger = new ConsoleLogger("DynamoDB Op")
+
+
+  override def deleteMessage(message: DynamoDBMessage[T]): Try[Unit] = {
+
+
+    logger.benchExecute("deleting message: " + message.id + " from DynamoDB"){DynamoDBUtils.deleteItem(
+      aws.ddb,
+      tableName,
+      Map(DynamoDBQueue.idAttr -> new AttributeValue().withS(message.id)),
+      logger
+    )}
+
+    //todo think about that!
+
+    logger.benchExecute("deleting message: " + message.id + " from SQS") {
+      SQSUtils.deleteMessage(aws.sqs.sqs, sqsUrl, message.sqsMessage.getReceiptHandle)
+    }
+  }
 
   override def delete(): Try[Unit] = ???
 
@@ -167,9 +151,9 @@ class DynamoDBQueue[T](name: String, val serializer: Serializer[T]) extends Queu
 
   def receiveMessageWaitTimeSeconds = 20
 
-  override type Msg = SQSMessage[T]
+  override type Msg = DynamoDBMessage[T]
 
-  override def create(ctx: DynamoDBContext): Try[QueueOps[T, SQSMessage[T], DynamoDBQueueReader[T], DynamoDBQueueWriter[T]]] = {
+  override def create(ctx: DynamoDBContext): Try[QueueOps[T, DynamoDBMessage[T], DynamoDBQueueReader[T], DynamoDBQueueWriter[T]]] = {
     Try {
       Utils.createTable(
         ddb = ctx.aws.ddb,

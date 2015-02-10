@@ -5,6 +5,7 @@ import scala.util.{Failure, Success, Try}
 import scala.util.parsing.json.JSONObject
 
 trait Serializer[T] {
+ // def fromString(s: String, errorMessage: String)
   def fromString(s: String): Try[T]
   def toString(t: T): Try[String]
 }

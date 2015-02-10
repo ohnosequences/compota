@@ -30,6 +30,13 @@ object SQSUtils {
     }
   }
 
+  //todo idempotent????
+  def deleteMessage(sqs: AmazonSQS, queueUrl: String, handle: String): Try[Unit] = {
+    Try {
+      sqs.deleteMessage(queueUrl, handle)
+    }
+  }
+
   @tailrec
   def writeBatch(sqs: AmazonSQS, queueUrl: String, items: List[RawItem]): Try[Unit] = {
 

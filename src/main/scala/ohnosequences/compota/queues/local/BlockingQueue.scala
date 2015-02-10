@@ -7,10 +7,9 @@ import ohnosequences.compota.queues._
 import scala.util.{Try, Success}
 
 
-case class SimpleMessage[E](id: String, body: E) extends QueueMessage[E] {
+case class SimpleMessage[E](val id: String, body: E) extends QueueMessage[E] {
   override def getBody: Try[E] = Success(body)
 
-  override def getId: Try[String] = Success(id)
 }
 
 class BlockingQueueReader[T](queueOps: BlockingQueueOps[T]) extends QueueReader[T, SimpleMessage[T]] {

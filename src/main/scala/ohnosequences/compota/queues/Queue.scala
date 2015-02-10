@@ -17,7 +17,7 @@ import scala.util.{Success, Try}
 abstract class QueueMessage[B] {
   def getBody: Try[B]
   //  // TODO: a better id type
-  def getId: Try[String]
+  val id: String
 }
 // TODO: they should be defined for queues, not for messages
 //trait AnyQueueReader {
@@ -27,6 +27,7 @@ abstract class QueueMessage[B] {
 //}
 
 abstract class QueueReader[E, M <: QueueMessage[E]] {
+
   def receiveMessage: Try[M]
 
 }

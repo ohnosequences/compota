@@ -6,6 +6,7 @@ import ohnosequences.compota.queues.{QueueOps, Queue, AnyQueue}
 import ohnosequences.logging.{ConsoleLogger, Logger, S3Logger}
 import ohnosequences.compota.tasks.Naming
 
+import scala.annotation.tailrec
 import scala.util.{Try, Success, Failure}
 
 // TODO: Worker is not needed here. Nispero is more than enough; add start, etc to Nispero as ops
@@ -62,46 +63,52 @@ class Worker[In, Out, QCtx, IQ <: Queue[In, QCtx], OQ <: Queue[Out, QCtx]](
      }
    }
 
+  def messageLoop(inputQueueOp: QueueOps[In, nispero.inputQueue.Msg, nispero.inputQueue.Reader, nispero.inputQueue.Writer],
+                  queueReader: nispero.inputQueue.Reader,
+                  queueWriter: nispero.outputQueue.Writer,
+                  env: Environment[QCtx],
+                  instructionsContext: nispero.instructions.Context): Try[Unit] = {
 
-   def messageLoop(inputQueueOp: QueueOps[In, nispero.inputQueue.Msg, nispero.inputQueue.Reader, nispero.inputQueue.Writer],
-                   queueReader: nispero.inputQueue.Reader,
-                   queueWriter: nispero.outputQueue.Writer,
-                   env: Environment[QCtx],
-                   instructionsContext: nispero.instructions.Context): Try[Unit] = {
-     val logger  = env.logger
+    val logger = env.logger
 
-     //def read
+    @tailrec
+    def messageLoopRec(): Try[Unit] = {
+      if (!env.isTerminated) {
+        Success(())
+      } else {
+        queueReader.receiveMessage.flatMap { message =>
 
-     while (!env.isTerminated) {
-       queueReader.receiveMessage.flatMap { message =>
-         message.getId.flatMap { id =>
-           message.getBody.flatMap { input =>
-             logger.info("input: " + input)
-             nispero.instructions.solve(logger, instructionsContext, input).flatMap { output =>
-               logger.info("result: " + output)
-               queueWriter.writeMessages(id + "." + nispero, output).flatMap { written =>
-                 inputQueueOp.deleteMessage(message)
-                // nispero.inputQueue.deleteMessage(message)
-               }
-             }
-           } match {
-             case Failure(t) => {
-               //non fatal task error: instructions error, read error, write error, delete error
-               env.reportError(id, t)
-               Success(())
-             }
-             case success => success
-           }
+            message.getBody.flatMap { input =>
+              logger.info("input: " + input)
+              nispero.instructions.solve(logger, instructionsContext, input).flatMap { output =>
+                logger.info("result: " + output)
+                queueWriter.writeMessages(message.id + "." + nispero, output).flatMap { written =>
+                  inputQueueOp.deleteMessage(message)
+                }
+              }
+            } match {
+              case Failure(t) => {
+                //non fatal task error: instructions error, read error, write error, delete error
+                env.reportError(message.id, t)
+                Success(())
+              }
+              case success => success
+            }
+          }
+        } match {
+          case Success(_) => {
+            messageLoopRec()
+          }
+          case Failure(t) => {
+            //fatal error
+            logger.error("error during reading from input queue")
+            logger.error(t)
+            Failure(t)
+          }
+        }
 
-         }
-       } match {
-         case Success(_) => {}
-         case Failure(t) => {
-           logger.error("error during reading from input queue")
-           logger.error(t)
-         }
-       }
-     }
-     Success(())
-   }
+    }
+
+    messageLoopRec()
+  }
 }

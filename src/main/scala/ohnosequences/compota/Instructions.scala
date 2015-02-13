@@ -15,9 +15,13 @@ trait AnyInstructions {
 
   def solve(logger: Logger, context: Context, input: Input): Try[List[Output]]
 
+  val name: String
+
 }
 
 trait Instructions[I, O] extends AnyInstructions {
+
+
 
   type Input = I
   type Output = O

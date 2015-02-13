@@ -42,7 +42,7 @@ abstract class Compota[N <: AnyNispero](val nisperos: List[N], val sinks: List[A
 
   def deleteNispero(nispero: Nispero)
 
-  def deleteQueue(queue: AnyQueueOps)
+  def deleteQueue(queue: AnyQueueOp)
 
 
   def launchWorker(nispero: Nispero)

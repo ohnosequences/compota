@@ -1,8 +1,8 @@
 package ohnosequences.compota.worker
 
-import ohnosequences.compota.Nispero
+import ohnosequences.compota.{Instructions, Nispero}
 import ohnosequences.compota.environment.{AnyEnvironment, Environment}
-import ohnosequences.compota.queues.{QueueOps, Queue, AnyQueue}
+import ohnosequences.compota.queues.{QueueOp, Queue, AnyQueue}
 import ohnosequences.logging.{ConsoleLogger, Logger, S3Logger}
 import ohnosequences.compota.tasks.Naming
 
@@ -25,7 +25,7 @@ trait AnyWorker {
   * Worker class execute instructions in an environment: EC2 instance, local thread.
   */
 class Worker[In, Out, QCtx, IQ <: Queue[In, QCtx], OQ <: Queue[Out, QCtx]](
-   val nispero: Nispero[In, Out, QCtx, IQ, OQ]) extends AnyWorker {
+   val inputQueue: IQ, val outputQueue: OQ, instructions: Instructions[In, Out]) extends AnyWorker {
 
    type InputQueue = IQ
    type OutputQueue = OQ
@@ -40,11 +40,11 @@ class Worker[In, Out, QCtx, IQ <: Queue[In, QCtx], OQ <: Queue[Out, QCtx]](
     */
    def start(env: Environment[QCtx]): Unit = {
      val logger = env.logger
-     logger.info("worker " + nispero.name + " started on instance " + env.instanceId)
+     logger.info("worker for instructions " + instructions.name + " started on instance " + env.instanceId)
      //all fail fast
-     nispero.inputQueue.create(env.queueCtx).flatMap { inputQueue =>
-       nispero.outputQueue.create(env.queueCtx).flatMap { outputQueue =>
-         nispero.instructions.prepare(logger).flatMap { context =>
+     inputQueue.create(env.queueCtx).flatMap { inputQueue =>
+       outputQueue.create(env.queueCtx).flatMap { outputQueue =>
+         instructions.prepare(logger).flatMap { context =>
            inputQueue.reader.flatMap { queueReader =>
              outputQueue.writer.flatMap { queueWriter =>
                messageLoop(inputQueue, queueReader, queueWriter, env, context)
@@ -63,26 +63,28 @@ class Worker[In, Out, QCtx, IQ <: Queue[In, QCtx], OQ <: Queue[Out, QCtx]](
      }
    }
 
-  def messageLoop(inputQueueOp: QueueOps[In, nispero.inputQueue.Msg, nispero.inputQueue.Reader, nispero.inputQueue.Writer],
-                  queueReader: nispero.inputQueue.Reader,
-                  queueWriter: nispero.outputQueue.Writer,
+  def messageLoop(inputQueueOp: QueueOp[In, inputQueue.Msg, inputQueue.Reader, inputQueue.Writer],
+                  queueReader: inputQueue.Reader,
+                  queueWriter: outputQueue.Writer,
                   env: Environment[QCtx],
-                  instructionsContext: nispero.instructions.Context): Try[Unit] = {
+                  instructionsContext: instructions.Context): Try[Unit] = {
 
     val logger = env.logger
 
+    logger.info("start message loop")
+
     @tailrec
     def messageLoopRec(): Try[Unit] = {
-      if (!env.isTerminated) {
+      if (env.isTerminated) {
         Success(())
       } else {
         queueReader.receiveMessage.flatMap { message =>
 
             message.getBody.flatMap { input =>
               logger.info("input: " + input)
-              nispero.instructions.solve(logger, instructionsContext, input).flatMap { output =>
+              instructions.solve(logger, instructionsContext, input).flatMap { output =>
                 logger.info("result: " + output)
-                queueWriter.writeMessages(message.id + "." + nispero, output).flatMap { written =>
+                queueWriter.writeMessages(message.id + "." + instructions.name, output).flatMap { written =>
                   inputQueueOp.deleteMessage(message)
                 }
               }

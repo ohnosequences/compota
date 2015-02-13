@@ -51,6 +51,6 @@ extends AnyNispero { nispero =>
   type Output = Out
 
   type W = Worker[In, Out, QCtx, InQueue, OutQueue]
-  def createWorker() = new Worker[In, Out, QCtx, InQueue, OutQueue](Nispero.this)
+  def createWorker() = new Worker[In, Out, QCtx, InQueue, OutQueue](inputQueue, outputQueue, instructions)
 
 }

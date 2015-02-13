@@ -69,11 +69,11 @@ trait AnyQueue { queue =>
   type Writer <: QueueWriter[Elmnt]
 
   // why?? put it somewhere else, not here. At the nispero level, for example
-   def create(ctx: Context): Try[QueueOps[Elmnt, Msg, Reader, Writer]]
+   def create(ctx: Context): Try[QueueOp[Elmnt, Msg, Reader, Writer]]
 }
 
 
-trait AnyQueueOps {
+trait AnyQueueOp {
 
 
 
@@ -87,7 +87,7 @@ trait AnyQueueOps {
 }
 
 // all these types are here just for convenience
-abstract class QueueOps[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: QueueWriter[E]] extends AnyQueueOps {
+abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: QueueWriter[E]] extends AnyQueueOp {
 
   def deleteMessage(message: M): Try[Unit]
 
@@ -98,6 +98,8 @@ abstract class QueueOps[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: 
 
   def delete(): Try[Unit]
 
+
+  def size: Int = 0
 }
 
 abstract class Queue[E, Ctx](val name: String) extends AnyQueue {

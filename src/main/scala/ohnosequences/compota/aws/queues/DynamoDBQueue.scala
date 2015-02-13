@@ -107,7 +107,7 @@ class DynamoDBContext (
 )
 
 class DynamoDBQueueOP[T](val tableName: String, val sqsUrl: String, val aws: AWSClients, val serializer: Serializer[T])
-  extends QueueOps[T, DynamoDBMessage[T], DynamoDBQueueReader[T], DynamoDBQueueWriter[T]] {
+  extends QueueOp[T, DynamoDBMessage[T], DynamoDBQueueReader[T], DynamoDBQueueWriter[T]] {
 
   val logger = new ConsoleLogger("DynamoDB Op")
 
@@ -136,6 +136,8 @@ class DynamoDBQueueOP[T](val tableName: String, val sqsUrl: String, val aws: AWS
   override def isEmpty: Boolean = ???
 
   override def reader: Try[DynamoDBQueueReader[T]] = Success(new DynamoDBQueueReader[T](DynamoDBQueueOP.this))
+
+
 }
 
 object DynamoDBQueue {
@@ -153,7 +155,7 @@ class DynamoDBQueue[T](name: String, val serializer: Serializer[T]) extends Queu
 
   override type Msg = DynamoDBMessage[T]
 
-  override def create(ctx: DynamoDBContext): Try[QueueOps[T, DynamoDBMessage[T], DynamoDBQueueReader[T], DynamoDBQueueWriter[T]]] = {
+  override def create(ctx: DynamoDBContext): Try[QueueOp[T, DynamoDBMessage[T], DynamoDBQueueReader[T], DynamoDBQueueWriter[T]]] = {
     Try {
       Utils.createTable(
         ddb = ctx.aws.ddb,

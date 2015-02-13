@@ -23,7 +23,7 @@ abstract class AwsCompota(nisperos: List[AwsNisperoAux], sinks: List[AnyMonoidQu
     //nispero.
   }
 
-  override def deleteQueue(queue: AnyQueueOps) = Try {
+  override def deleteQueue(queue: AnyQueueOp) = Try {
     queue.delete
   }
 

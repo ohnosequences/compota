@@ -26,7 +26,7 @@ class QueueTest {
     assertEquals(true, atry.isSuccess)
   }
 
-  @Test
+  //@Test
   def writeAndRead() {
     TestCredentials.aws.foreach { aws =>
       val queue = new DynamoDBQueue("test", intSerializer)

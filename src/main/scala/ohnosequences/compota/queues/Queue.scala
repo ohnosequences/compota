@@ -50,7 +50,8 @@ abstract class QueueWriter[E] {
 
   def writeMessages(prefixId: String, values: List[E]): Try[Unit] = {
     writeRaw(values.zipWithIndex.map { case (value, i) =>
-      (prefixId + "." + i, value)
+    //  println("zip generated " + prefixId + "." + i)
+      (prefixId + "_" + i, value)
     })
   }
 
@@ -103,7 +104,7 @@ abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: Q
   def delete(): Try[Unit]
 
 
-  def size: Int = 0
+  def size: Int
 }
 
 abstract class Queue[E, Ctx](val name: String) extends AnyQueue {

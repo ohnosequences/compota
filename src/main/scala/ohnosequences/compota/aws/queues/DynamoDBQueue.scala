@@ -129,6 +129,11 @@ class DynamoDBQueueOP[T](val tableName: String, val sqsUrl: String, val aws: AWS
     }
   }
 
+  //todo size
+
+
+  override def size: Int = 0
+
   override def delete(): Try[Unit] = ???
 
   override def writer: Try[DynamoDBQueueWriter[T]] = Success(new DynamoDBQueueWriter[T](DynamoDBQueueOP.this, serializer))

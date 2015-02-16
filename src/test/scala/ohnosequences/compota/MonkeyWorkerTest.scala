@@ -1,8 +1,8 @@
 package ohnosequences.compota
 
+import ohnosequences.compota.aws.MonkeyQueue
 import ohnosequences.compota.environment.{Environment, ThreadEnvironment}
 import ohnosequences.compota.monoid.intMonoid
-import ohnosequences.compota.queues.local.BlockingQueue
 import ohnosequences.compota.worker.Worker
 import ohnosequences.logging.Logger
 import org.junit.Test
@@ -11,9 +11,9 @@ import org.junit.Assert._
 import scala.annotation.tailrec
 import scala.util.{Failure, Try, Success}
 
-class WorkerTest {
+class MonkeyWorkerTest {
 
-  object testInstructions extends Instructions[Int, Int] {
+  object monkeyInstructions extends Instructions[Int, Int] {
     override type Context = Int
 
     override def solve(logger: Logger, context: Int, input: Int): Try[List[Int]] = {
@@ -29,9 +29,9 @@ class WorkerTest {
 
   @Test
   def workerTest(): Unit = {
-    val input = new BlockingQueue[Int]("in", 2000, intMonoid)
+    val input = new MonkeyQueue[Int]("in", 2000, intMonoid)
 
-    val output = new BlockingQueue[Int]("out", 2000, intMonoid)
+    val output = new MonkeyQueue[Int]("out", 2000, intMonoid)
 
     var expectedResult = 0
 
@@ -41,13 +41,15 @@ class WorkerTest {
 
     val inputData = (1 to n).toList
 
-    for (i <- 1 to n) {
+
+    inputData.foreach { i =>
       expectedResult += i*i + 1
     }
 
-   writer.writeMessages("i", inputData)
+    writer.writeMessages("i", inputData)
 
-    val worker = new Worker[Int, Int, Unit, BlockingQueue[Int], BlockingQueue[Int]](input, output, testInstructions)
+
+    val worker = new Worker[Int, Int, Unit, MonkeyQueue[Int], MonkeyQueue[Int]](input, output, monkeyInstructions)
 
     val outputOp = output.create(()).get
 
@@ -60,16 +62,17 @@ class WorkerTest {
 
     workerThread.start()
 
-    while(!input.rawQueue.isEmpty) {
+    while(!inputOp.isEmpty) {
       println("input queue size: " + inputOp.size + " output: " + outputOp.size)
 
       Thread.sleep(1000)
     }
 
 
-    input.writeEmptyMessage()
+    inputOp.writeEmptyMessage()
     Thread.sleep(1000)
     workerThread.env.kill()
+
 
 
     val reader = outputOp.reader.get
@@ -79,8 +82,11 @@ class WorkerTest {
     var realSumm = 0
 
     for (i <- 1 to 1000) {
-      realSumm += reader.receiveMessage.get.body
+      val res = reader.receiveMessage.get.body
+      realSumm += res
     }
+
+
 
     assertEquals(expectedResult, realSumm)
 

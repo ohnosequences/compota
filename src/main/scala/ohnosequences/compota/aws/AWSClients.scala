@@ -1,2 +1,0 @@
-package ohnosequences.compota.aws
-

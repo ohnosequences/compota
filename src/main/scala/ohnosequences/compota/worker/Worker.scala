@@ -81,7 +81,7 @@ class Worker[In, Out, QCtx, IQ <: Queue[In, QCtx], OQ <: Queue[Out, QCtx]](
         queueReader.receiveMessage.flatMap { message =>
 
             message.getBody.flatMap { input =>
-              logger.info("input: " + input)
+              logger.info("input: " + input + " id: " + message.id)
               instructions.solve(logger, instructionsContext, input).flatMap { output =>
                 logger.info("result: " + output)
                 queueWriter.writeMessages(message.id + "." + instructions.name, output).flatMap { written =>

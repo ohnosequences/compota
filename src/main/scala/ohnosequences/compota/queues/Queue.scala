@@ -14,6 +14,10 @@ import scala.util.{Success, Try}
 //}
 
 
+object QueueMessage {
+  val terminateID = "terminate-id"
+}
+
 abstract class QueueMessage[B] {
   def getBody: Try[B]
   //  // TODO: a better id type

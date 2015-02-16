@@ -2,21 +2,33 @@ package ohnosequences.compota.queues.local
 
 import java.util.concurrent.ArrayBlockingQueue
 
+import ohnosequences.compota.monoid.Monoid
 import ohnosequences.compota.queues._
 
-import scala.util.{Try, Success}
+import scala.util.{Failure, Try, Success}
 
 
-case class SimpleMessage[E](val id: String, body: E) extends QueueMessage[E] {
-  override def getBody: Try[E] = Success(body)
-
+case class SimpleMessage[E](id: String, body: E, empty: Boolean = false) extends QueueMessage[E] {
+  override def getBody: Try[E] = {
+    if (!empty) {
+      Success(body)
+    } else {
+      Failure(new Error("got empty message"))
+    }
+  }
 }
 
+
+
 class BlockingQueueReader[T](queueOps: BlockingQueueOp[T]) extends QueueReader[T, SimpleMessage[T]] {
-  override def receiveMessage = Try {
+  override def receiveMessage: Try[SimpleMessage[T]] = try {
     //println("here")
-    val (id, body) = queueOps.queue.rawQueue.take()
-    SimpleMessage(id, body)
+    queueOps.queue.rawQueue.take() match {
+      case None => Success(SimpleMessage("_", queueOps.queue.monoid.unit, true))
+      case Some((id, body)) => Success(SimpleMessage(id, body))
+    }
+  } catch {
+    case e: InterruptedException => Failure(e)
   }
 }
 
@@ -26,7 +38,9 @@ class BlockingQueueWriter[T](queue: BlockingQueueOp[T]) extends QueueWriter[T] {
 
   override def writeRaw(values: List[(String, T)]) = Try {
 
-    values.foreach(queue.queue.rawQueue.put)
+    values.foreach { value =>
+      queue.queue.rawQueue.put(Some(value))
+    }
   }
 }
 
@@ -52,14 +66,18 @@ class BlockingQueueOp[T](val queue: BlockingQueue[T]) extends QueueOp[T, SimpleM
 
 }
 
-class BlockingQueue[T](name: String, size: Int) extends Queue[T, Unit](name) { blockingQueue =>
+class BlockingQueue[T](name: String, size: Int, val monoid: Monoid[T]) extends Queue[T, Unit](name) { blockingQueue =>
 
-  val rawQueue = new ArrayBlockingQueue[(String, T)](size)
+  val rawQueue = new ArrayBlockingQueue[Option[(String, T)]](size)
 
   type Msg = SimpleMessage[T]
 
   type Reader = BlockingQueueReader[T]
   type Writer = BlockingQueueWriter[T]
+
+  def writeEmptyMessage(): Unit = {
+    rawQueue.put(None)
+  }
 
   override def create(ctx: Context): Try[QueueOp[T, SimpleMessage[T], BlockingQueueReader[T], BlockingQueueWriter[T]]] = Success(new BlockingQueueOp[T](blockingQueue))
 }

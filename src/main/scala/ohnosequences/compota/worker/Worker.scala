@@ -103,8 +103,8 @@ class Worker[In, Out, QCtx, IQ <: Queue[In, QCtx], OQ <: Queue[Out, QCtx]](
           }
           case Failure(t) => {
             //fatal error
-            logger.error("error during reading from input queue")
-            logger.error(t)
+            //logger.error("error during reading from input queue")
+           // logger.error(t)
             Failure(t)
           }
         }

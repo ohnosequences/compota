@@ -26,6 +26,8 @@ trait AnyEnvironment {
     kill()
   }
   def isTerminated: Boolean
+
+  //todo: all repeats are here
   def reportError(taskId: String, t: Throwable)
 }
 

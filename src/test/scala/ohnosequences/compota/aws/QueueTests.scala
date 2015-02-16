@@ -1,9 +1,10 @@
 package ohnosequences.compota.aws
 
+import ohnosequences.benchmark.Bench
 import ohnosequences.compota.aws.deployment.Metadata
 import ohnosequences.compota.aws.queues._
 import ohnosequences.compota.serialization.intSerializer
-import ohnosequences.logging.{ConsoleLogger, Logger}
+import ohnosequences.logging.{ConsoleLogger}
 import org.junit.Test
 import org.junit.Assert._
 
@@ -11,9 +12,9 @@ import scala.annotation.tailrec
 import scala.util.{Failure, Try, Success}
 
 
-class QueueTest {
+class QueueTests {
 
-  val logger = new ConsoleLogger("queue-test")
+  val logger = new ConsoleLogger("queue-test", true)
 
   val timeout: Long = 200*1000
 
@@ -26,27 +27,33 @@ class QueueTest {
     assertEquals(true, atry.isSuccess)
   }
 
-  //@Test
+  @Test
   def writeAndRead() {
-    TestCredentials.aws.foreach { aws =>
-      val queue = new DynamoDBQueue("test", intSerializer)
-      val context = new DynamoDBContext(
-        metadata = new Metadata {
-          override val artifact: String = "test"
-          override val jarUrl: String = ""
-        },
-        logger = logger,
-        aws = aws
-      )
+    val bench = new Bench()
+    TestCredentials.aws match {
+      case None => println("this test requires test credentials")
+      case Some(aws) => {
+        val queue = new DynamoDBQueue("test", intSerializer, Some(bench))
+        val context = new DynamoDBContext(
+          metadata = new Metadata {
+            override val artifact: String = "test"
+            override val jarUrl: String = ""
+          },
+          logger = logger,
+          aws = aws
+        )
 
-      checkTry(queue.create(context).flatMap { queueOp =>
-        queueOp.reader.flatMap{ reader =>
-          queueOp.writer.flatMap { writer =>
-            testQueue(reader, writer)
+        checkTry(queue.create(context).flatMap { queueOp =>
+          queueOp.reader.flatMap { reader =>
+            queueOp.writer.flatMap { writer =>
+              testQueue(reader, writer)
+            }
           }
-        }
-      })
+        })
+        logger.info("performance metrics:")
+        bench.printStats(logger)
 
+      }
     }
   }
 

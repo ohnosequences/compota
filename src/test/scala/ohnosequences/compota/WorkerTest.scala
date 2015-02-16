@@ -1,6 +1,7 @@
 package ohnosequences.compota
 
 import ohnosequences.compota.environment.{Environment, ThreadEnvironment}
+import ohnosequences.compota.monoid.intMonoid
 import ohnosequences.compota.queues.local.BlockingQueue
 import ohnosequences.compota.worker.Worker
 import ohnosequences.logging.Logger
@@ -28,9 +29,9 @@ class WorkerTest {
 
   @Test
   def workerTest(): Unit = {
-    val input = new BlockingQueue[Int]("in", 2000)
+    val input = new BlockingQueue[Int]("in", 2000, intMonoid)
 
-    val output = new BlockingQueue[Int]("out", 2000)
+    val output = new BlockingQueue[Int]("out", 2000, intMonoid)
 
     var expectedResult = 0
 
@@ -62,6 +63,9 @@ class WorkerTest {
       Thread.sleep(1000)
     }
 
+
+    input.writeEmptyMessage()
+    Thread.sleep(1000)
     workerThread.env.kill()
 
 

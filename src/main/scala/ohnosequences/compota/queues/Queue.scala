@@ -77,6 +77,10 @@ trait AnyQueue { queue =>
    def create(ctx: Context): Try[QueueOp[Elmnt, Msg, Reader, Writer]]
 }
 
+object AnyQueue {
+  type of[Ctx] = AnyQueue { type Context = Ctx}
+}
+
 
 trait AnyQueueOp {
 
@@ -103,6 +107,7 @@ abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: Q
 
   def delete(): Try[Unit]
 
+  def listChunk(lastKey: Option[String]): (Option[String], List[String])
 
   def size: Int
 }

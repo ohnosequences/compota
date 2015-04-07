@@ -15,7 +15,6 @@ trait AnyEnvironment {
   def instanceId: InstanceId
   val logger: Logger
 
-  // TODO: what's this?
   def queueCtx: QueueContext
 
   def kill()

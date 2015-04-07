@@ -1,11 +1,11 @@
-package ohnosequences.compota.queues.local
+package ohnosequences.compota.local
 
 import java.util.concurrent.ArrayBlockingQueue
 
 import ohnosequences.compota.monoid.Monoid
 import ohnosequences.compota.queues._
 
-import scala.util.{Failure, Try, Success}
+import scala.util.{Failure, Success, Try}
 
 
 case class SimpleMessage[E](id: String, body: E, empty: Boolean = false) extends QueueMessage[E] {
@@ -59,6 +59,10 @@ class BlockingQueueOp[T](val queue: BlockingQueue[T]) extends QueueOp[T, SimpleM
 
   override def delete() = Success(())
 
+
+  override def listChunk(lastKey: Option[String]): (Option[String], List[String]) = {
+    (None, List[String]())
+  }
 
   override def size: Int = {
     queue.rawQueue.size()

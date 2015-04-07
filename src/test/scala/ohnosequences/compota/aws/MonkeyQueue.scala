@@ -4,7 +4,7 @@ import java.util.concurrent.ArrayBlockingQueue
 
 import ohnosequences.compota.monoid.Monoid
 import ohnosequences.compota.queues._
-import ohnosequences.compota.queues.local.{BlockingQueueWriter, BlockingQueueReader, SimpleMessage, BlockingQueue}
+import ohnosequences.compota.queues.local.BlockingQueueWriter
 
 import scala.util.{Success, Failure, Random, Try}
 

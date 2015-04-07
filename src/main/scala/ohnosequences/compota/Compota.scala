@@ -8,15 +8,17 @@ import scala.util.Try
 
 trait AnyCompota {
 
+
+  type QueueReducer <: AnyQueueReducer
   type Nispero <: AnyNispero
 }
 
-abstract class Compota[N <: AnyNispero](val nisperos: List[N], val sinks: List[AnyMonoidQueue])
+abstract class Compota[N <: AnyNispero, R <: AnyQueueReducer](val nisperos: List[N], val reducers: List[R])
   extends AnyCompota{
 
   type Nispero = N
 
-  val logger = new ConsoleLogger("compota")
+  type QueueReducer = R
 
   val nisperosNames: Map[String, Nispero] =  nisperos.map { nispero =>
     (nispero.name, nispero)
@@ -43,7 +45,6 @@ abstract class Compota[N <: AnyNispero](val nisperos: List[N], val sinks: List[A
   def deleteNispero(nispero: Nispero)
 
   def deleteQueue(queue: AnyQueueOp)
-
 
   def launchWorker(nispero: Nispero)
 
@@ -72,6 +73,5 @@ abstract class Compota[N <: AnyNispero](val nisperos: List[N], val sinks: List[A
   }
 
   def addTasks()
-
 
 }

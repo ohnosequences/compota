@@ -1,10 +1,11 @@
 package ohnosequences.compota
 
 import ohnosequences.compota.aws.MonkeyQueue
-import ohnosequences.compota.environment.{Environment, ThreadEnvironment}
+import ohnosequences.compota.environment.Environment
+import ohnosequences.compota.local.ThreadEnvironment
 import ohnosequences.compota.monoid.intMonoid
 import ohnosequences.compota.worker.Worker
-import ohnosequences.logging.Logger
+import ohnosequences.logging.{ConsoleLogger, Logger}
 import org.junit.Test
 import org.junit.Assert._
 
@@ -28,7 +29,10 @@ class MonkeyWorkerTest {
   }
 
   @Test
-  def workerTest(): Unit = {
+  def monkeyWorkerTest(): Unit = {
+
+    val logger = new ConsoleLogger("monkeyWorkerTest")
+
     val input = new MonkeyQueue[Int]("in", 2000, intMonoid)
 
     val output = new MonkeyQueue[Int]("out", 2000, intMonoid)
@@ -54,7 +58,7 @@ class MonkeyWorkerTest {
     val outputOp = output.create(()).get
 
     object workerThread extends Thread("worker") {
-      val env = new ThreadEnvironment(this)
+      val env = new ThreadEnvironment(this, logger)
       override def run(): Unit = {
         worker.start(env)
       }

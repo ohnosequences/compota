@@ -1,9 +1,11 @@
-package ohnosequences.compota.environment
+package ohnosequences.compota.local
 
-import ohnosequences.logging.{ConsoleLogger, Logger}
+import java.io.File
+import ohnosequences.compota.environment.{Environment, InstanceId}
+import ohnosequences.logging.Logger
 
 
-class ThreadEnvironment(thread: Thread) extends Environment[Unit] {
+class ThreadEnvironment(thread: Thread, val logger: Logger) extends Environment[Unit] {
 
   //type
 
@@ -16,7 +18,7 @@ class ThreadEnvironment(thread: Thread) extends Environment[Unit] {
   //when fatal error occurs
   override def isTerminated: Boolean = isStopped.get()
 
-  override val logger: Logger = new ConsoleLogger("logger")
+  //override val logger: Logger = new FileLogger("logger", logFile, debug = true, false)
 
   override def kill(): Unit ={
     isStopped.set(true)

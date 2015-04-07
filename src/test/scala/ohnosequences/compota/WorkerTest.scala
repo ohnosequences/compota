@@ -1,10 +1,10 @@
 package ohnosequences.compota
 
-import ohnosequences.compota.environment.{Environment, ThreadEnvironment}
+import ohnosequences.compota.environment.Environment
+import ohnosequences.compota.local.{BlockingQueue, ThreadEnvironment}
 import ohnosequences.compota.monoid.intMonoid
-import ohnosequences.compota.queues.local.BlockingQueue
 import ohnosequences.compota.worker.Worker
-import ohnosequences.logging.Logger
+import ohnosequences.logging.{ConsoleLogger, Logger}
 import org.junit.Test
 import org.junit.Assert._
 
@@ -29,6 +29,9 @@ class WorkerTest {
 
   @Test
   def workerTest(): Unit = {
+
+    val logger = new ConsoleLogger("workerTest")
+
     val input = new BlockingQueue[Int]("in", 2000, intMonoid)
 
     val output = new BlockingQueue[Int]("out", 2000, intMonoid)
@@ -52,7 +55,7 @@ class WorkerTest {
     val outputOp = output.create(()).get
 
     object workerThread extends Thread("worker") {
-      val env = new ThreadEnvironment(this)
+      val env = new ThreadEnvironment(this, logger)
       override def run(): Unit = {
         worker.start(env)
       }
@@ -61,7 +64,7 @@ class WorkerTest {
     workerThread.start()
 
     while(!input.rawQueue.isEmpty) {
-      println("input queue size: " + inputOp.size + " output: " + outputOp.size)
+      logger.info("input queue size: " + inputOp.size + " output: " + outputOp.size)
 
       Thread.sleep(1000)
     }
@@ -83,9 +86,6 @@ class WorkerTest {
     }
 
     assertEquals(expectedResult, realSumm)
-
-
-
 
   }
 

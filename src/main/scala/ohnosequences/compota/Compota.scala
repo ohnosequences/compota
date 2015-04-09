@@ -1,24 +1,24 @@
 package ohnosequences.compota
 
+import ohnosequences.compota.environment.AnyEnvironment
 import ohnosequences.compota.graphs.NisperoGraph
 import ohnosequences.compota.queues._
 import ohnosequences.logging.ConsoleLogger
-
 import scala.util.Try
 
 trait AnyCompota {
+  type CompotaEnvironment <: AnyEnvironment
+  type Nispero <: AnyNispero.of[CompotaEnvironment]
 
-
-  type QueueReducer <: AnyQueueReducer
-  type Nispero <: AnyNispero
+  def launch(): Try[Unit]
 }
 
-abstract class Compota[N <: AnyNispero, R <: AnyQueueReducer](val nisperos: List[N], val reducers: List[R])
-  extends AnyCompota{
+abstract class Compota[E <: AnyEnvironment, N <: AnyNispero.of[E]](val nisperos: List[N], val reducers: List[AnyQueueReducer.of[E]])
+  extends AnyCompota {
 
   type Nispero = N
 
-  type QueueReducer = R
+  type CompotaEnvironment = E
 
   val nisperosNames: Map[String, Nispero] =  nisperos.map { nispero =>
     (nispero.name, nispero)
@@ -62,16 +62,15 @@ abstract class Compota[N <: AnyNispero, R <: AnyQueueReducer](val nisperos: List
     val logger = new ConsoleLogger("compotaCLI")
     args.toList match {
       case "run" :: "worker" :: name :: Nil => launchWorker(name)
+      case "add" :: "tasks" :: Nil => {
+        addTasks()
+      }
       case _ => logger.error("wrong command")
     }
   }
 
-  def launch(): Unit = {
-    if(configurationChecks()) {
-      addTasks()
-    }
-  }
+  def addTasks() //special compota defined
 
-  def addTasks()
+  def addTasks(environment: CompotaEnvironment): Try[Unit] //user defined
 
 }

@@ -1,13 +1,21 @@
 package ohnosequences.compota
 
+import ohnosequences.compota.environment.AnyEnvironment
 import ohnosequences.compota.queues._
 import ohnosequences.compota.worker.{Worker, AnyWorker}
-import scala.util.{Try, Success, Failure}
+
+import scala.util.Try
 
 trait AnyNispero {
 
+  type NisperoEnvironment <: AnyEnvironment
+
   type Input
   type Output
+
+  type InContext
+  type OutContext
+
   //type Input
   type InputQueue <: AnyQueue
   val inputQueue: InputQueue
@@ -16,41 +24,56 @@ trait AnyNispero {
   type OutputQueue <: AnyQueue
   val outputQueue: OutputQueue
 
+  val inContext: NisperoEnvironment => InContext
+  val outContext: NisperoEnvironment => OutContext
+
   val instructions: Instructions[Input, Output]
 
 
-  val name: String
 
-  // TODO: What's this??
-  type QueueCtx
+ // val inContext: Environment => InputQueue
+
+  def name: String = instructions.name
 
 
-  type W <: AnyWorker {type QueueContext = QueueCtx}
+  type W <: AnyWorker {type WorkerEnvironment = NisperoEnvironment}
+
   def createWorker(): W
-  // this does not make sense: a worker needs a nispero, a nispero needs a worker, lalala
-  // type Worker <: AnyWorker // {type QueueContext = QCtxCtx}
-  // val worker: W
+
+//  def reduceOutputQueue(environment: NisperoEnvironment): Try[Unit] = {
+//    outputQueue
+//  }
+
 }
 
-abstract class Nispero[In, Out, QCtx, InQueue <: Queue[In, QCtx], OutQueue <: Queue[Out, QCtx]](
-  val name: String,
+object AnyNispero {
+  type of[E <: AnyEnvironment] = AnyNispero { type NisperoEnvironment = E}
+}
+
+
+abstract class Nispero[In, Out, Env <: AnyEnvironment, InCtx, OutCtx, InQueue <: Queue[In, InCtx], OutQueue <: Queue[Out, OutCtx]](
   val inputQueue: InQueue,
+  val inContext: Env => InCtx,
   val outputQueue: OutQueue,
+  val outContext: Env => OutCtx,
   val instructions: Instructions[In, Out]
-  // why not an env val here?
 )
 extends AnyNispero { nispero =>
+
+  type InContext = InCtx
+  type OutContext = OutCtx
 
   type InputQueue = InQueue
   type OutputQueue = OutQueue
 
-  type QueueCtx = QCtx
-
+  type NisperoEnvironment = Env
 
   type Input = In
   type Output = Out
 
-  type W = Worker[In, Out, QCtx, InQueue, OutQueue]
-  def createWorker() = new Worker[In, Out, QCtx, InQueue, OutQueue](inputQueue, outputQueue, instructions)
+  type W = Worker[In, Out, Env, InContext, OutContext, InQueue, OutQueue]
+  def createWorker() = new Worker[In, Out, Env, InContext, OutContext, InQueue, OutQueue](inputQueue, inContext, outputQueue, outContext, instructions)
+
+
 
 }

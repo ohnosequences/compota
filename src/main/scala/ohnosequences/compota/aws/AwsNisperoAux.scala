@@ -9,20 +9,21 @@ import ohnosequences.compota.queues._
 trait AwsNisperoAux extends AnyNispero {
   val configuration: AwsNisperoConfigurationAux
 
-  type QueueContext = DynamoDBContext
+  override type NisperoEnvironment = AwsEnvironment
 
 }
 
 
 
 
-class AwsNispero[In, Out, InQueue <: Queue[In, DynamoDBContext], OutQueue <: Queue[Out, DynamoDBContext]](
-                                                                      name: String,
+class AwsNispero[In, Out, InCtx, OutCtx, InQueue <: Queue[In, InCtx], OutQueue <: Queue[Out, OutCtx]](
                                                                       inputQueue: InQueue,
+                                                                      inputContext: AwsEnvironment => InCtx,
                                                                       outputQueue: OutQueue,
+                                                                      outContext: AwsEnvironment => OutCtx,
                                                                       instructions: Instructions[In, Out],
                                                                       val configuration: AwsNisperoConfigurationAux)
-  extends Nispero[In, Out, DynamoDBContext, InQueue, OutQueue](name, inputQueue, outputQueue, instructions) with AwsNisperoAux {
+  extends Nispero[In, Out, AwsEnvironment, InCtx, OutCtx, InQueue, OutQueue](inputQueue, inputContext, outputQueue, outContext, instructions) with AwsNisperoAux {
 
 
 

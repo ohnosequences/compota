@@ -1,29 +1,62 @@
 package ohnosequences.compota.local
 
-import ohnosequences.compota.queues.{AnyMonoidQueue}
-import ohnosequences.compota.{Compota}
-import ohnosequences.logging.{FileLogger, ConsoleLogger}
 import java.io.File
 
-abstract class LocalCompota(nisperos: List[LocalNisperoAux], sinks: List[AnyMonoidQueue], configuration: LocalCompotaConfiguration) extends Compota[LocalNisperoAux](nisperos, sinks) {
+import ohnosequences.compota.queues.{AnyQueueReducer, AnyQueueOp}
+import ohnosequences.compota.{Compota}
+import ohnosequences.logging.FileLogger
+
+import scala.util.Try
+
+abstract class LocalCompota(nisperos: List[AnyLocalNispero],
+                            reducers: List[AnyQueueReducer.of[ThreadEnvironment]],
+                            configuration: LocalCompotaConfiguration
+                            ) extends
+  Compota[ThreadEnvironment, AnyLocalNispero](nisperos, reducers) {
+
+  override def createNispero(nispero: Nispero): Try[Unit] = ???
+
+  override def deleteNispero(nispero: Nispero): Unit = ???
+
+  override def deleteQueue(queue: AnyQueueOp): Unit = ???
 
 
-  override def launchWorker(nispero: LocalNisperoAux): Unit = {
 
+  override def launchWorker(nispero: AnyLocalNispero): Unit = {
 
-    val workerPrefix = "worker_" + nispero.name
+    val workerDirectory = new File(configuration.workingDirectory, "worker_" + nispero.name)
 
-    val envLogger = new FileLogger(workerPrefix, new File(workerPrefix), debug = configuration.loggerDebug, printToConsole = true)
-    object workerThread extends Thread(workerPrefix) {
-      val env = new ThreadEnvironment(this, envLogger)
-      override def run(): Unit = {
-        nispero.createWorker().start(env)
-      }
+    ThreadEnvironment.execute("worker_" + nispero.name, configuration.loggerDebug, configuration.workingDirectory, workerDirectory) { env =>
+      nispero.createWorker().start(env)
     }
-    workerThread.start()
   }
 
-  override def launch(): Unit = {
-    //thread pool???
+  def launchWorker(nispero: AnyLocalNispero, i: Int): Unit = {
+
+    val prefix = "worker_" + nispero.name + "_" + i
+
+    val workerDirectory = new File(configuration.workingDirectory, prefix)
+
+    ThreadEnvironment.execute(prefix, configuration.loggerDebug, configuration.workingDirectory, workerDirectory) { env =>
+      nispero.createWorker().start(env)
+    }
+  }
+
+  override def addTasks(): Unit = {
+    ThreadEnvironment.execute("add_tasks", configuration.loggerDebug, configuration.workingDirectory, configuration.workingDirectory) { env =>
+      env.logger.info("adding tasks")
+      addTasks(env)
+    }
+  }
+
+  override def launch(): Try[Unit] = {
+    Try {
+      addTasks()
+      nisperos.foreach { nispero =>
+        for (i <- 1 to nispero.workers) {
+          launchWorker(nispero, i)
+        }
+      }
+    }
   }
 }

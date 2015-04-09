@@ -100,10 +100,10 @@ class DynamoDBQueueReader[T](val queueOp: DynamoDBQueueOP[T]) extends QueueReade
     sqsMessageWrap.map { sqsMessage => new DynamoDBMessage(sqsMessage, queueOp, queueOp.bench)}}
 }
 
-class DynamoDBContext (
-  val aws: AWSClients,
-  val metadata: Metadata,
-  val logger: Logger
+case class DynamoDBContext (
+  aws: AWSClients,
+  metadata: Metadata,
+  logger: Logger
 )
 
 class DynamoDBQueueOP[T](val tableName: String, val sqsUrl: String, val aws: AWSClients, val serializer: Serializer[T], val bench: Option[Bench])
@@ -132,13 +132,17 @@ class DynamoDBQueueOP[T](val tableName: String, val sqsUrl: String, val aws: AWS
   //todo size
 
 
-  override def size: Int = 0
+  override def size: Try[Int] = Success(0)
 
   override def delete(): Try[Unit] = ???
 
   override def writer: Try[DynamoDBQueueWriter[T]] = Success(new DynamoDBQueueWriter[T](DynamoDBQueueOP.this, serializer))
 
-  override def isEmpty: Boolean = ???
+  override def isEmpty: Try[Boolean] = ???
+
+  override def read(key: String): Try[T] = ???
+
+  override def list(lastKey: Option[String], limit: Option[Int]): Try[(Option[String], List[String])] = ???
 
   override def reader: Try[DynamoDBQueueReader[T]] = Success(new DynamoDBQueueReader[T](DynamoDBQueueOP.this))
 
@@ -150,8 +154,6 @@ object DynamoDBQueue {
   val valueAttr = "val"
 
   val hash = new AttributeDefinition(idAttr, ScalarAttributeType.S)
-  // val range: AttributeDefinition =  new AttributeDefinition(valueAttr, ScalarAttributeType.S)
-
 }
 
 class DynamoDBQueue[T](name: String, val serializer: Serializer[T], bench: Option[Bench] = None) extends Queue[T, DynamoDBContext](name) {

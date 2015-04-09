@@ -1,20 +1,31 @@
 package ohnosequences.compota.queues
 
-import ohnosequences.compota.environment.Environment
+import ohnosequences.compota.environment.{AnyEnvironment}
 
 import scala.util.Try
 
 
 trait AnyQueueReducer {
-  type CCtx
-  
-  type QQ <: AnyQueue
+  type Environment <: AnyEnvironment
+
+  type QueueContext
+
+  type QQ <: AnyQueue { type Context = QueueContext }
   val queue: QQ
 
-  def reduce(environment: Environment[CCtx]): Try[Unit]
+  val context: Environment => QueueContext
+
+  def reduce(environment: Environment): Try[Unit]
 }
 
-abstract class QueueReducer[In, Ctx, Q <: Queue[In, Ctx]](val queue: Q) extends AnyQueueReducer {
+object AnyQueueReducer {
+  type of[E <: AnyEnvironment] = AnyQueueReducer { type Environment = E}
+}
+
+
+abstract class QueueReducer[Env <: AnyEnvironment, In, Ctx, Q <: Queue[In, Ctx]](val queue: Q, val context:  Env => Ctx) extends AnyQueueReducer {
+  type Environment = Env
+  type QueueContext = Ctx
   type QQ = Q
-  type CCtx = Ctx
+
 }

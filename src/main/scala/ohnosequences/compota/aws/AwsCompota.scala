@@ -8,7 +8,10 @@ import ohnosequences.compota.{Compota}
 
 import scala.util.Try
 
-abstract class AwsCompota(nisperos: List[AwsNisperoAux], sinks: List[AnyMonoidQueue], configuration: AwsCompotaConfigurationAux) extends Compota[AwsNisperoAux](nisperos, sinks) {
+abstract class AwsCompota(
+   nisperos: List[AwsNisperoAux],
+   reducers: List[AnyQueueReducer.of[AwsEnvironment]],
+   configuration: AwsCompotaConfigurationAux) extends Compota[AwsEnvironment, AwsNisperoAux](nisperos, reducers) {
 
 
  // val aws = new AWS(new File("."))
@@ -33,8 +36,6 @@ abstract class AwsCompota(nisperos: List[AwsNisperoAux], sinks: List[AnyMonoidQu
     println(nispero.configuration)
   }
 
-  override def launch(): Unit = {
-    println("launching metamanager")
-  }
+  override def addTasks(): Unit = ???
 
 }

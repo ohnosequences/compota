@@ -1,17 +1,21 @@
 package ohnosequences.compota.local
 
 import java.io.File
-import ohnosequences.compota.environment.{Environment, InstanceId}
-import ohnosequences.logging.Logger
+import ohnosequences.compota.environment.{AnyEnvironment, InstanceId}
+import ohnosequences.logging.{FileLogger, Logger}
 
 
-class ThreadEnvironment(thread: Thread, val logger: Logger) extends Environment[Unit] {
+class ThreadEnvironment(val thread: Thread, val logger: Logger, val workingDirectory: File) extends AnyEnvironment {
 
   //type
 
+
+  override def start: Unit = {
+    thread.start()
+  }
+
   val isStopped = new java.util.concurrent.atomic.AtomicBoolean(false)
 
-  override def queueCtx: Unit = {}
 
   override val instanceId: InstanceId = InstanceId(thread.getName)
 
@@ -26,7 +30,30 @@ class ThreadEnvironment(thread: Thread, val logger: Logger) extends Environment[
   }
 
   override def reportError(taskId: String, t: Throwable): Unit = {
-    logger.error(taskId + " failed ")
+    logger.error(taskId + " failed")
     logger.error(t)
+  }
+}
+
+object ThreadEnvironment {
+  def execute(prefix: String, debug: Boolean, loggingDirectory: File, workingDirectory: File)(statement: ThreadEnvironment => Unit): ThreadEnvironment = {
+    loggingDirectory.mkdir()
+    workingDirectory.mkdir()
+    var env: Option[ThreadEnvironment] = None
+    val envLogger = new FileLogger(prefix, new File(loggingDirectory, prefix + ".log"), debug, printToConsole = true)
+    object thread extends Thread(prefix) {
+      env = Some(new ThreadEnvironment(this, envLogger, workingDirectory))
+      override def run(): Unit ={
+        env match {
+          case Some(e) =>  statement(e)
+          case None => envLogger.error("initialization error")
+        }
+      }
+    }
+    thread.start()
+    env match {
+      case Some(e) =>  e
+      case None => throw new Error("initialization error")
+    }
   }
 }

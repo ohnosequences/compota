@@ -27,7 +27,7 @@ class QueueTests {
     assertEquals(true, atry.isSuccess)
   }
 
-  @Test
+  //@Test
   def writeAndRead() {
     val bench = new Bench()
     TestCredentials.aws match {

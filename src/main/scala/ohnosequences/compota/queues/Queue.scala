@@ -1,8 +1,7 @@
 package ohnosequences.compota.queues
 
-import ohnosequences.compota.monoid.Monoid
-
-import scala.util.{Success, Try}
+import scala.annotation.tailrec
+import scala.util.{Failure, Success, Try}
 
 
 //trait AnyMessage {
@@ -96,20 +95,51 @@ trait AnyQueueOp {
 }
 
 // all these types are here just for convenience
-abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: QueueWriter[E]] extends AnyQueueOp {
+abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: QueueWriter[E]] extends AnyQueueOp { queueOp =>
 
   def deleteMessage(message: M): Try[Unit]
 
   def reader: Try[QR]
   def writer: Try[QW]
 
-  def isEmpty: Boolean
+  def isEmpty: Try[Boolean]
 
   def delete(): Try[Unit]
 
-  def listChunk(lastKey: Option[String]): (Option[String], List[String])
+  def list(lastKey: Option[String], limit: Option[Int] = None): Try[(Option[String], List[String])]
 
-  def size: Int
+  def read(key: String): Try[E]
+
+  def forEachId[T](f: String => T): Try[Unit] = {
+
+    @tailrec
+    def forEachRec(f: String => T, lastKey: Option[String]): Try[Unit] = {
+      list(lastKey = None, limit = None) match {
+        case Success((None, list)) => {
+          //the last chunk
+          Success(list.foreach(f))
+        }
+        case Success((last, list)) => {
+          list.foreach(f)
+          forEachRec(f, last)
+        }
+        case Failure(t) => Failure(t)
+      }
+    }
+
+    forEachRec(f, None)
+
+  }
+
+  def forEach[T](f: (String, E) => T): Try[Unit] = {
+    Try {
+      forEachId { id =>
+        f(id, read(id).get)
+      }
+    }
+  }
+
+  def size: Try[Int]
 }
 
 abstract class Queue[E, Ctx](val name: String) extends AnyQueue {
@@ -117,17 +147,11 @@ abstract class Queue[E, Ctx](val name: String) extends AnyQueue {
   type Context = Ctx
 }
 
-trait AnyMonoidQueue extends AnyQueue {
+//trait AnyReducibleQueue extends AnyQueue {
+//  val monoid: Monoid[Elmnt]
+//
+//  def reduce(environment: Environment[Context]): Try[Unit] = {
+//    Success(())
+//  }
+//}
 
-  def monoid: Monoid[Elmnt]
-  // TODO: what is this???
-  def reduce: Try[Unit] = {
-    Success(())
-  }
-}
-
-//is it needed?
-// trait MonoidQueue[E] extends MonoidQueueAux {
-//   override type Element = E
-
-// }

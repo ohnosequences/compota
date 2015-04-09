@@ -2,6 +2,7 @@ package ohnosequences.compota.environment
 
 import ohnosequences.logging.Logger
 
+import java.io.File
 import scala.util.Failure
 
 /**
@@ -9,13 +10,13 @@ import scala.util.Failure
  */
 case class InstanceId(id: String)
 
-trait AnyEnvironment {
+abstract class AnyEnvironment {
 
-  type QueueContext
+  def start(): Unit
+
   def instanceId: InstanceId
-  val logger: Logger
 
-  def queueCtx: QueueContext
+  val logger: Logger
 
   def kill()
 
@@ -24,13 +25,16 @@ trait AnyEnvironment {
     logger.error(failure)
     kill()
   }
+
   def isTerminated: Boolean
 
   //todo: all repeats are here
   def reportError(taskId: String, t: Throwable)
+
+  val workingDirectory: File
 }
 
-trait Environment[C] extends AnyEnvironment {
-
-  type QueueContext = C
-}
+//trait Environment[C] extends AnyEnvironment {
+//
+//  type QueueContext = C
+//}

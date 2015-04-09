@@ -9,7 +9,7 @@ bucketSuffix := "era7.com"
 
 
 libraryDependencies ++= Seq(
-  "commons-io"     % "commons-io" % "2.1",
+  "commons-io"     % "commons-io" % "2.4",
   "org.json4s"    %% "json4s-native" % "3.2.11",
   "ohnosequences" %% "aws-scala-tools" % "0.13.0-SNAPSHOT",
   "com.novocode" % "junit-interface" % "0.11" % "test"

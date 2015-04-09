@@ -17,19 +17,6 @@ abstract class AwsCompota(
  // val aws = new AWS(new File("."))
 
 
-  override def createNispero(nispero: AwsNisperoAux): Try[Unit] = Try {
-    //aws.as.createAutoScalingGroup(nispero.configuration.workerAutoScalingGroup)
-
-  }
-
-  override def deleteNispero(nispero: AwsNisperoAux) = Try {
-    //nispero.
-  }
-
-  override def deleteQueue(queue: AnyQueueOp) = Try {
-    queue.delete
-  }
-
   override def launchWorker(nispero: AwsNisperoAux): Unit = {
 
     //nispero.createWorker().start()

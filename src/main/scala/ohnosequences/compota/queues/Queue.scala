@@ -1,5 +1,9 @@
 package ohnosequences.compota.queues
 
+import java.util.concurrent.atomic.AtomicBoolean
+
+import ohnosequences.logging.Logger
+
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
@@ -31,7 +35,7 @@ abstract class QueueMessage[B] {
 
 abstract class QueueReader[E, M <: QueueMessage[E]] {
 
-  def receiveMessage: Try[M]
+  def receiveMessage(logger: Logger, isStopped: => Boolean = { false}): Try[M]
 
 }
 //
@@ -90,6 +94,10 @@ trait AnyQueueOp {
   type Reader <: QueueReader[QElement, QMessage]
   type Writer <: QueueWriter[QElement]
 
+  val queue: AnyQueue
+
+  def isEmpty: Try[Boolean]
+
   def delete(): Try[Unit]
 
 }
@@ -102,7 +110,7 @@ abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: Q
   def reader: Try[QR]
   def writer: Try[QW]
 
-  def isEmpty: Try[Boolean]
+
 
   def delete(): Try[Unit]
 

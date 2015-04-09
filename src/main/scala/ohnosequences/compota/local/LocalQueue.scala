@@ -1,8 +1,10 @@
 package ohnosequences.compota.local
 
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{ConcurrentSkipListMap, ConcurrentHashMap}
 
 import ohnosequences.compota.queues._
+import ohnosequences.logging.Logger
 
 import scala.annotation.tailrec
 import scala.util.{Random, Failure, Success, Try}
@@ -95,18 +97,22 @@ class LocalQueueOp[T](val queue: LocalQueue[T]) extends QueueOp[T, LocalMessage[
 
 class LocalQueueReader[T](queueOps: LocalQueueOp[T]) extends QueueReader[T, LocalMessage[T]] {
 
-  override def receiveMessage: Try[LocalMessage[T]] = {
+  override def receiveMessage(logger: Logger, isStopped: => Boolean = {  false}): Try[LocalMessage[T]] = {
     @tailrec
-    def receiveMessageRec: Try[LocalMessage[T]] =
-    {
-      Option(queueOps.queue.rawQueue.pollFirstEntry()) match {
-        case None => {
-          //map is empty
-          //try again
-          Thread.sleep(1000)
-          receiveMessageRec
+    def receiveMessageRec: Try[LocalMessage[T]] = {
+      if (isStopped) {
+        Failure(new Error("client was stopped"))
+      } else {
+        Option(queueOps.queue.rawQueue.pollFirstEntry()) match {
+          case None => {
+            //map is empty
+            //try again
+            logger.debug("queue is empty: " + queueOps.queue.rawQueue.isEmpty)
+            Thread.sleep(1000)
+            receiveMessageRec
+          }
+          case Some(entry) => Success(new LocalMessage(entry.getKey, entry.getValue, queueOps.queue.monkeyAppearanceProbability))
         }
-        case Some(entry) => Success(new LocalMessage(entry.getKey, entry.getValue, queueOps.queue.monkeyAppearanceProbability))
       }
     }
 

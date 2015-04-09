@@ -81,7 +81,7 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
       if (env.isTerminated) {
         Success(())
       } else {
-        queueReader.receiveMessage.flatMap { message =>
+        queueReader.receiveMessage(logger, env.isTerminated).flatMap { message =>
 
             message.getBody.flatMap { input =>
               logger.info("input: " + input.toString.take(100) + " id: " + message.id)
@@ -101,7 +101,9 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
             } match {
               case Failure(t) => {
                 //non fatal task error: instructions error, read error, write error, delete error
-                env.reportError(message.id, t)
+                if(!env.isTerminated) {
+                  env.reportError(message.id, t)
+                }
                 Success(())
               }
               case success => success
@@ -115,7 +117,11 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
             //fatal error
             //logger.error("error during reading from input queue")
            // logger.error(t)
-            Failure(t)
+            if(env.isTerminated) {
+              Success(())
+            } else {
+              Failure(t)
+            }
           }
         }
 

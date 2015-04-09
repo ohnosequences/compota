@@ -22,7 +22,7 @@ class AwsEnvironment(val awsClients: AWSClients, val metadata: Metadata, val wor
 
   override def isTerminated: Boolean = ???
 
-  override def kill(): Unit = ???
+  override def stop(): Unit = ???
 
   //todo: all repeats are here
   override def reportError(taskId: String, t: Throwable): Unit = ???

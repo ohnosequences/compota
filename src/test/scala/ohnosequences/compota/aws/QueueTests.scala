@@ -1,5 +1,7 @@
 package ohnosequences.compota.aws
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 import ohnosequences.benchmark.Bench
 import ohnosequences.compota.aws.deployment.Metadata
 import ohnosequences.compota.aws.queues._
@@ -66,7 +68,7 @@ class QueueTests {
       } else if (idsToRead.isEmpty) {
         Success(())
       } else {
-        reader.receiveMessage.flatMap { message =>
+        reader.receiveMessage(logger).flatMap { message =>
           message.getBody match {
             case Failure(t) => {
               if (readIds.contains(message.id)) {

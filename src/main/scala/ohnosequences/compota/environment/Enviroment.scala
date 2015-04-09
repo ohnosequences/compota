@@ -18,20 +18,21 @@ abstract class AnyEnvironment {
 
   val logger: Logger
 
-  def kill()
+  def stop()
 
   def fatalError(failure: Throwable): Unit = {
     logger.error("fatal error")
     logger.error(failure)
-    kill()
+    stop()
   }
 
   def isTerminated: Boolean
 
   //todo: all repeats are here
-  def reportError(taskId: String, t: Throwable)
+  def reportError(nameSpace: String, t: Throwable)
 
   val workingDirectory: File
+
 }
 
 //trait Environment[C] extends AnyEnvironment {

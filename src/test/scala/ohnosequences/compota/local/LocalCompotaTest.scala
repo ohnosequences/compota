@@ -43,12 +43,12 @@ class LocalCompotaTest {
   val splitNispero = LocalNispero(
     textQueue,
     wordsQueue,
-    splitInstructions, 5)
+    splitInstructions, 2)
 
   val wordLengthNispero = LocalNispero(
     wordsQueue,
     countsQueue,
-    wordLengthInstructions, 5
+    wordLengthInstructions, 2
   )
 
   object wordCountCompotaConfiguration extends LocalCompotaConfiguration {
@@ -65,14 +65,19 @@ class LocalCompotaTest {
     object wordCountCompota extends LocalCompota(List(splitNispero, wordLengthNispero), List(reducer), wordCountCompotaConfiguration) {
       override def addTasks(environment: CompotaEnvironment): Try[Unit] = {
         environment.logger.debug("test")
-        environment.logger.error(new Error("exception"))
+       // environment.logger.error(new Error("exception"))
         val op = textQueue.create(()).get
         val writer = op.writer.get
         writer.writeRaw(List(("1", "a a a b b")))
       }
+
+      override def unDeployActions(force: Boolean, env: ThreadEnvironment): Try[Unit] = {
+        Success(env.logger.info("let's undeploy it"))
+      }
     }
 
     wordCountCompota.launch()
+    wordCountCompota.waitForFinished()
 
 
   //  wordCountCompota.main(Array("add", "tasks"))

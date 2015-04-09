@@ -1,6 +1,8 @@
 package ohnosequences.compota.aws.queues
 
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 import com.amazonaws.services.sqs.model._
 import ohnosequences.awstools.AWSClients
 import ohnosequences.awstools.dynamodb.DynamoDBUtils
@@ -90,14 +92,17 @@ class DynamoDBMessage[T](val sqsMessage: Message, queueOp: DynamoDBQueueOP[T], b
 
 class DynamoDBQueueReader[T](val queueOp: DynamoDBQueueOP[T]) extends QueueReader[T, DynamoDBMessage[T]] {
 
-  val logger = new ConsoleLogger("DynamoDB reader")
+ // val logger = new ConsoleLogger("DynamoDB reader")
 
-  override def receiveMessage: Try[DynamoDBMessage[T]] = {
-    val sqsMessageWrap: Try[Message] = logger.benchExecute("SQS read") {
-      SQSUtils.receiveMessage(queueOp.aws.sqs.sqs, queueOp.sqsUrl)
+  //todo add supperot for stop
+  override def receiveMessage(logger: Logger, isStopped: => Boolean = {false}): Try[DynamoDBMessage[T]] = {
+    val sqsMessageWrap: Try[Message] =
+      logger.benchExecute("SQS read") {
+        SQSUtils.receiveMessage(queueOp.aws.sqs.sqs, queueOp.sqsUrl)
+      }
+
+      sqsMessageWrap.map { sqsMessage => new DynamoDBMessage(sqsMessage, queueOp, queueOp.bench)}
     }
-
-    sqsMessageWrap.map { sqsMessage => new DynamoDBMessage(sqsMessage, queueOp, queueOp.bench)}}
 }
 
 case class DynamoDBContext (
@@ -106,7 +111,7 @@ case class DynamoDBContext (
   logger: Logger
 )
 
-class DynamoDBQueueOP[T](val tableName: String, val sqsUrl: String, val aws: AWSClients, val serializer: Serializer[T], val bench: Option[Bench])
+class DynamoDBQueueOP[T](val queue: DynamoDBQueue[T], val tableName: String, val sqsUrl: String, val aws: AWSClients, val serializer: Serializer[T], val bench: Option[Bench])
   extends QueueOp[T, DynamoDBMessage[T], DynamoDBQueueReader[T], DynamoDBQueueWriter[T]] {
 
   val logger = new ConsoleLogger("DynamoDB OP")
@@ -156,7 +161,7 @@ object DynamoDBQueue {
   val hash = new AttributeDefinition(idAttr, ScalarAttributeType.S)
 }
 
-class DynamoDBQueue[T](name: String, val serializer: Serializer[T], bench: Option[Bench] = None) extends Queue[T, DynamoDBContext](name) {
+class DynamoDBQueue[T](name: String, val serializer: Serializer[T], bench: Option[Bench] = None) extends Queue[T, DynamoDBContext](name) { queue =>
 
   def receiveMessageWaitTimeSeconds = 20
 
@@ -177,7 +182,7 @@ class DynamoDBQueue[T](name: String, val serializer: Serializer[T], bench: Optio
         .withAttributes(Map(QueueAttributeName.ReceiveMessageWaitTimeSeconds.toString -> receiveMessageWaitTimeSeconds.toString)) //max
       ).getQueueUrl
 
-      new DynamoDBQueueOP[Elmnt](Resources.dynamodbTable(ctx.metadata, name), queueUrl, ctx.aws, serializer, bench)
+      new DynamoDBQueueOP[Elmnt](queue, Resources.dynamodbTable(ctx.metadata, name), queueUrl, ctx.aws, serializer, bench)
     }
   }
 

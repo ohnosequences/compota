@@ -5,12 +5,15 @@ import ohnosequences.compota.environment.{AnyEnvironment, InstanceId}
 import ohnosequences.logging.{FileLogger, Logger}
 
 
-class ThreadEnvironment(val thread: Thread, val logger: Logger, val workingDirectory: File) extends AnyEnvironment {
+class ThreadEnvironment(val thread: Thread,
+                        val logger: Logger,
+                        val workingDirectory: File
+                         ) extends AnyEnvironment {
 
   //type
 
 
-  override def start: Unit = {
+  override def start(): Unit = {
     thread.start()
   }
 
@@ -24,7 +27,7 @@ class ThreadEnvironment(val thread: Thread, val logger: Logger, val workingDirec
 
   //override val logger: Logger = new FileLogger("logger", logFile, debug = true, false)
 
-  override def kill(): Unit ={
+  override def stop(): Unit ={
     isStopped.set(true)
  //   thread.stop()
   }
@@ -33,6 +36,7 @@ class ThreadEnvironment(val thread: Thread, val logger: Logger, val workingDirec
     logger.error(taskId + " failed")
     logger.error(t)
   }
+
 }
 
 object ThreadEnvironment {
@@ -56,4 +60,6 @@ object ThreadEnvironment {
       case None => throw new Error("initialization error")
     }
   }
+
+
 }

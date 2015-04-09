@@ -2,74 +2,45 @@ package ohnosequences.compota.graphs
 
 
 import ohnosequences.compota._
+import ohnosequences.compota.environment.AnyEnvironment
 import ohnosequences.compota.queues._
 
-// TODO: ???
-import scala.collection.mutable.HashMap
+import scala.collection.mutable
+import scala.util.Try
 
-//todo fix product queue
-class NisperoGraph(nisperos: Map[String, AnyNispero]) {
+//todo add product queue
+object NisperoGraph {
+  def apply[E <: AnyEnvironment](env: E, nisperos: List[AnyNispero.of[E]]): Try[NisperoGraph] = {
+    val nisperoNames = new mutable.HashMap[String, AnyNispero]()
+    val queuesNames = new mutable.HashMap[String, AnyQueueOp]()
+    val edges = mutable.ListBuffer[Edge[String, String]]()
 
-  val queues = {
-    val r = new HashMap[String, AnyQueue]()
-
-//    nisperos.values.foreach { nispero =>
-//      r ++= ProductQueue.flatQueue(nispero.inputQueue).map{ q=>
-//        q.name -> q
-//      }
-//      r ++= ProductQueue.flatQueue(nispero.outputQueue).map{ q=>
-//        q.name -> q
-//      }
-//    }
-    r
-  }
-
-    val edges = nisperos.values.toList.flatMap { nispero =>
-      for {
-        i <- Seq(nispero.inputQueue)
-        o <- Seq(nispero.outputQueue)
-      } yield Edge(
-        label = nispero.name,
-        source = Node(i.name),
-        target = Node(o.name)
-      )
+    Try {
+      nisperos.foreach { nispero =>
+        nisperoNames.put(nispero.name, nispero)
+        queuesNames.put(nispero.inputQueue.name, nispero.inputQueue.create(nispero.inContext(env)).get)
+        queuesNames.put(nispero.outputQueue.name, nispero.outputQueue.create(nispero.outContext(env)).get)
+        edges += Edge(nispero.name, Node(nispero.inputQueue.name), Node(nispero.outputQueue.name))
+      }
+      new NisperoGraph(new Graph(edges.toList), nisperoNames.toMap, queuesNames.toMap)
     }
-
-//  val edges = nisperos.values.toList.flatMap { nispero =>
-//    for {
-//      i <- ProductQueue.flatQueue(nispero.inputQueue)
-//      o <- ProductQueue.flatQueue(nispero.outputQueue)
-//    } yield Edge(
-//      label = nispero.name,
-//      source = Node(i.name),
-//      target = Node(o.name)
-//    )
-//  }
-
-  val graph: Graph[String, String] = new Graph(edges)
+  }
+}
 
 
+class NisperoGraph(graph: Graph[String, String], nisperos: Map[String, AnyNispero], queues: Map[String, AnyQueueOp]) {
 
-  //return either not leafs queues all (to delete them
-  def checkQueues(): Either[AnyQueue, List[AnyQueue]] = {
-    val sorted = graph.sort
-    println(sorted)
+  val sortedQueueNames = graph.sort
 
-
-    val notLeafsQueues = sorted.filterNot(graph.out(_).isEmpty).map { node =>
+  //return either first not empty queue, either all not-leafs (to delete them)
+  def checkQueues(env: AnyEnvironment): Try[Either[AnyQueueOp, List[AnyQueueOp]]] = Try {
+    val notLeafsQueues: List[AnyQueueOp] = sortedQueueNames.filterNot(graph.out(_).isEmpty).map { node =>
       queues(node.label)
     }
-
-    notLeafsQueues.find { queue =>
-    //  !queue.isEmpty
-      true
-    } match {
-      case None => println("all queues are empty"); Right(notLeafsQueues)
-      case Some(queue) => println("queue " + queue.name + " isn't empty"); Left(queue)
+    notLeafsQueues.find { queue => !queue.isEmpty.get  } match {
+      case None =>  Right(notLeafsQueues)
+      case Some(queueOp) => Left(queueOp)
     }
-
-
   }
-
 }
 

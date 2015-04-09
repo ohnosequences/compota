@@ -17,11 +17,11 @@ trait AnyNispero {
   type OutContext
 
   //type Input
-  type InputQueue <: AnyQueue
+  type InputQueue <: AnyQueue.of[InContext]
   val inputQueue: InputQueue
 
   //type Output
-  type OutputQueue <: AnyQueue
+  type OutputQueue <: AnyQueue.of[OutContext]
   val outputQueue: OutputQueue
 
   val inContext: NisperoEnvironment => InContext

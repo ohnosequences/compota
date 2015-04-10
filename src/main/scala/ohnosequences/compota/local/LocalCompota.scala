@@ -28,6 +28,8 @@ abstract class LocalCompota(nisperos: List[AnyLocalNispero],
 
   val nisperosEnvironments = new ConcurrentHashMap[String, ConcurrentHashMap[String, ThreadEnvironment]]()
 
+  val errorCounts = new ConcurrentHashMap[String, Int]()
+
   nisperos.foreach { nispero =>
     nisperosEnvironments.put(nispero.name, new ConcurrentHashMap[String, ThreadEnvironment]())
   }
@@ -39,7 +41,12 @@ abstract class LocalCompota(nisperos: List[AnyLocalNispero],
 
     val workerDirectory = new File(configuration.workingDirectory, "worker_" + nispero.name)
 
-    ThreadEnvironment.execute("worker_" + nispero.name, configuration.loggerDebug, configuration.workingDirectory, workerDirectory) { env =>
+    ThreadEnvironment.execute("worker_" + nispero.name,
+      configuration.workingDirectory,
+      workerDirectory,
+      configuration,
+      errorCounts,
+      sendUnDeployCommand) { env =>
       nispero.createWorker().start(env)
     }
   }
@@ -50,28 +57,50 @@ abstract class LocalCompota(nisperos: List[AnyLocalNispero],
 
     val workerDirectory = new File(configuration.workingDirectory, prefix)
 
-    val env = ThreadEnvironment.execute(prefix, configuration.loggerDebug, configuration.workingDirectory, workerDirectory) { env =>
+    val env = ThreadEnvironment.execute(prefix,
+      configuration.workingDirectory,
+      workerDirectory,
+      configuration,
+      errorCounts,
+      sendUnDeployCommand
+      ) { env =>
       nispero.createWorker().start(env)
     }
     nisperosEnvironments.get(nispero.name).put(prefix, env)
   }
 
   override def addTasks(): Unit = {
-    ThreadEnvironment.execute("add_tasks", configuration.loggerDebug, configuration.workingDirectory, configuration.workingDirectory) { env =>
+    ThreadEnvironment.execute("add_tasks",
+      configuration.workingDirectory,
+      configuration.workingDirectory,
+      configuration,
+      errorCounts,
+      sendUnDeployCommand
+    ) { env =>
       env.logger.info("adding tasks")
       addTasks(env)
     }
   }
 
   def launchMetamanager(): Unit = {
-    ThreadEnvironment.execute("metamanager", configuration.loggerDebug, configuration.workingDirectory, configuration.workingDirectory) { env =>
+    ThreadEnvironment.execute("metamanager",configuration.workingDirectory,
+      configuration.workingDirectory,
+      configuration,
+      errorCounts,
+      sendUnDeployCommand
+    ) { env =>
       env.logger.debug("launching metamanger")
-      metamanager.launchMetaManager(env, controlQueue, {e: ThreadEnvironment => ()})
+      metamanager.launchMetaManager(env, controlQueue, {e: ThreadEnvironment => ()}, {prepareUnDeployActions(env)})
     }
   }
 
   def launchTerminationDaemon(): Unit = {
-    ThreadEnvironment.execute("termination_daemon", configuration.loggerDebug, configuration.workingDirectory, configuration.workingDirectory) { env =>
+    ThreadEnvironment.execute("termination_daemon", configuration.workingDirectory,
+      configuration.workingDirectory,
+      configuration,
+      errorCounts,
+      sendUnDeployCommand
+    ) { env =>
       env.logger.debug("launching termination daemon")
       launchTerminationDaemon(env)
     }
@@ -93,7 +122,7 @@ abstract class LocalCompota(nisperos: List[AnyLocalNispero],
   override def sendUnDeployCommand(reason: String, force: Boolean): Try[Unit] = {
     controlQueue.create(()).flatMap { queueOp =>
       queueOp.writer.flatMap { writer =>
-        writer.writeRaw(List(("und", UnDeploy(reason, force))))
+        writer.writeRaw(List(("undeploy_" + reason + "_" + force, UnDeploy(reason, force))))
       }
     }
   }

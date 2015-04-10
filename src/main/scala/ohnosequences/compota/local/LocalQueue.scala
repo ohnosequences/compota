@@ -111,7 +111,10 @@ class LocalQueueReader[T](queueOps: LocalQueueOp[T]) extends QueueReader[T, Loca
             Thread.sleep(1000)
             receiveMessageRec
           }
-          case Some(entry) => Success(new LocalMessage(entry.getKey, entry.getValue, queueOps.queue.monkeyAppearanceProbability))
+          case Some(entry) => {
+            queueOps.queue.rawQueue.put(entry.getKey, entry.getValue)
+            Success(new LocalMessage(entry.getKey, entry.getValue, queueOps.queue.monkeyAppearanceProbability))
+          }
         }
       }
     }

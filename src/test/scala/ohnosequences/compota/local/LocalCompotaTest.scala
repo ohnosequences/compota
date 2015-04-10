@@ -15,6 +15,7 @@ class LocalCompotaTest {
     override type Context = Unit
 
     override def solve(logger: Logger, context: Unit, input: String): Try[List[Int]] = {
+      throw new Error("uuu!")
       Success(List(input.length))
     }
 
@@ -52,13 +53,13 @@ class LocalCompotaTest {
   )
 
   object wordCountCompotaConfiguration extends LocalCompotaConfiguration {
-    override val loggerDebug: Boolean = true
+    override val loggerDebug: Boolean = false
   }
 
 
   @Test
   def localCompotaTest(): Unit = {
-    val logger = new ConsoleLogger("localCompotaTest", debug = true)
+    val logger = new ConsoleLogger("localCompotaTest", debug = false)
 
     val reducer = InMemoryQueueReducer(countsQueue, intMonoid)
 
@@ -72,7 +73,7 @@ class LocalCompotaTest {
       }
 
       override def unDeployActions(force: Boolean, env: ThreadEnvironment): Try[Unit] = {
-        Success(env.logger.info("let's undeploy it"))
+        Success(env.logger.info("undeploying force=" + force))
       }
     }
 

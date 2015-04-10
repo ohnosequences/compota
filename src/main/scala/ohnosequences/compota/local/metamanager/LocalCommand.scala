@@ -9,8 +9,8 @@ case class UnDeploy(reason: String, force: Boolean) extends LocalCommand {
   override def prefix: String = "undeploy_" + reason + "_" + force
 }
 
-case class StopNispero(nisperoId: Int) extends LocalCommand {
-  override def prefix: String = "stop_nispero_" + nisperoId
+case class StopNispero(nisperoId: Int, force: Boolean) extends LocalCommand {
+  override def prefix: String = "stop_nispero_" + nisperoId + "_" + force
 }
 
 case class LaunchReducer(reducerId: Int) extends LocalCommand {

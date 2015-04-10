@@ -1,12 +1,9 @@
 package ohnosequences.compota.worker
 
-import ohnosequences.compota.{Instructions, Nispero}
+import ohnosequences.compota.{Instructions}
 import ohnosequences.compota.environment.{AnyEnvironment}
 import ohnosequences.compota.queues.{QueueOp, Queue, AnyQueue}
-import ohnosequences.logging.{ConsoleLogger, Logger, S3Logger}
 import org.apache.commons.io.FileUtils
-import java.io.File
-
 
 import scala.annotation.tailrec
 import scala.util.{Try, Success, Failure}
@@ -45,12 +42,19 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
      val logger = env.logger
      logger.info("worker for instructions " + instructions.name + " started on instance " + env.instanceId)
      //all fail fast
-     inputQueue.create(inContext(env)).flatMap { inputQueue =>
-       outputQueue.create(outContext(env)).flatMap { outputQueue =>
-         instructions.prepare(logger).flatMap { context =>
-           inputQueue.reader.flatMap { queueReader =>
-             outputQueue.writer.flatMap { queueWriter =>
-               messageLoop(inputQueue, queueReader, queueWriter, env, context)
+     env.repeat("preparing worker", 5, timeout = Some(10000)) {
+       logger.debug("create context for queue " + inputQueue.name)
+       inputQueue.create(inContext(env)).flatMap { inputQueue =>
+         logger.debug("create context for queue " + outputQueue.name)
+         outputQueue.create(outContext(env)).flatMap { outputQueue =>
+           logger.debug("preparing instructions")
+           instructions.prepare(logger).flatMap { context =>
+             logger.debug("creating reader for queue " + inputQueue.queue.name)
+             inputQueue.reader.flatMap { queueReader =>
+               logger.debug("creating writer for queue " + outputQueue.queue.name)
+               outputQueue.writer.flatMap { queueWriter =>
+                 messageLoop(inputQueue, queueReader, queueWriter, env, context)
+               }
              }
            }
          }
@@ -61,7 +65,9 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
        }
        case Failure(t) => {
          //fatal error
-         env.fatalError(t)
+         if (!env.isTerminated) {
+           env.fatalError("worker_" + instructions.name + "_init", t)
+         }
        }
      }
    }
@@ -81,50 +87,49 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
       if (env.isTerminated) {
         Success(())
       } else {
+        logger.debug("receiving message from queue " + inputQueue.name)
         queueReader.receiveMessage(logger, env.isTerminated).flatMap { message =>
 
-            message.getBody.flatMap { input =>
-              logger.info("input: " + input.toString.take(100) + " id: " + message.id)
+          logger.debug("parsing the message " + message.id)
+          message.getBody.flatMap { input =>
+            logger.info("received: " + input.toString.take(100) + " id: " + message.id)
 
+            logger.debug("cleaning working directory: " + env.workingDirectory)
+            FileUtils.cleanDirectory(env.workingDirectory)
 
-              logger.debug("cleaning working directory: " + env.workingDirectory)
-              FileUtils.cleanDirectory(env.workingDirectory)
+            logger.debug("running " + instructions.name + " instructions")
+            instructions.solve(logger, instructionsContext, input).flatMap { output =>
+              logger.info("result: " + output.toString.take(100))
 
-              logger.debug("running " + instructions.name + " instructions")
-              instructions.solve(logger, instructionsContext, input).flatMap { output =>
-                logger.info("result: " + output)
-
-                queueWriter.writeMessages(message.id + "." + instructions.name, output).flatMap { written =>
-                  inputQueueOp.deleteMessage(message)
-                }
+              logger.debug("writing result to queue " + outputQueue.name + " with message id " + message.id + "." + instructions.name)
+              queueWriter.writeMessages(message.id + "." + instructions.name, output).flatMap { written =>
+                logger.debug("deleting message with id " + message.id + " from queue " + inputQueue.name)
+                inputQueueOp.deleteMessage(message)
               }
-            } match {
-              case Failure(t) => {
-                //non fatal task error: instructions error, read error, write error, delete error
-                if(!env.isTerminated) {
-                  env.reportError(message.id, t)
-                }
-                Success(())
-              }
-              case success => success
             }
-          }
-        } match {
-          case Success(_) => {
-            messageLoopRec()
-          }
-          case Failure(t) => {
-            //fatal error
-            //logger.error("error during reading from input queue")
-           // logger.error(t)
-            if(env.isTerminated) {
+          } match {
+            case Failure(t) => {
+              if (!env.isTerminated) {
+                env.reportError(message.id, t)
+              }
               Success(())
-            } else {
-              Failure(t)
             }
+            case success => success
           }
         }
-
+      } match {
+        case Success(_) => {
+          messageLoopRec()
+        }
+        case Failure(t) => {
+          //receive message error
+          if (env.isTerminated) {
+            Success(())
+          } else {
+            Failure(t)
+          }
+        }
+      }
     }
 
     messageLoopRec()

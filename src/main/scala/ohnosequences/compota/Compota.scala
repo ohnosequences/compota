@@ -5,7 +5,7 @@ import ohnosequences.compota.graphs.NisperoGraph
 import ohnosequences.compota.metamanager.AnyMetaManager
 import ohnosequences.compota.queues._
 import ohnosequences.logging.ConsoleLogger
-import scala.util.Try
+import scala.util.{Success, Try}
 
 trait AnyCompota {
   type CompotaEnvironment <: AnyEnvironment
@@ -62,6 +62,8 @@ trait AnyCompota {
   def unDeployActions(force: Boolean, env: CompotaEnvironment): Try[Unit]
 
   def finishUnDeploy(): Try[Unit]
+
+  def prepareUnDeployActions(env: CompotaEnvironment): Try[Unit] = {Success(())}
 
   def sendUnDeployCommand(reason: String, force: Boolean): Try[Unit]
 

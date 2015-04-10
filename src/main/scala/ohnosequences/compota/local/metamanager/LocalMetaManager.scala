@@ -34,9 +34,9 @@ class LocalMetaManager(
       command match {
         case UnDeploy(reason, force) => {
           logger.info("undeploying reason: " + reason + " force: " + force)
-          Success(List(StopNispero(0)))
+          Success(List(StopNispero(0, force)))
         }
-        case StopNispero(nisperoId) => {
+        case StopNispero(nisperoId, force) => {
           if (nisperoId < nisperos.size) {
             val nispero = nisperos(nisperoId)
             logger.info("stopping " + nispero.name + " nispero")
@@ -45,9 +45,14 @@ class LocalMetaManager(
               logger.debug("stopping environment: " + id)
               e.stop()
             }
-            Success(List(StopNispero(nisperoId + 1)))
+            Success(List(StopNispero(nisperoId + 1, force)))
           } else {
-            Success(List(LaunchReducer(0)))
+            if (force) {
+              Success(List(UnDeployActions(force)))
+            } else {
+              Success(List(LaunchReducer(0)))
+            }
+
           }
         }
 

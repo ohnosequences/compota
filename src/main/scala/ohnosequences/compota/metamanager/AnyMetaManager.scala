@@ -14,33 +14,48 @@ trait AnyMetaManager {
 
   def process(command: MetaManagerCommand, env: MetaManagerEnvironment): Try[List[MetaManagerCommand]]
 
-  def launchMetaManager[QContext](env: MetaManagerEnvironment, queue: Queue[MetaManagerCommand, QContext], context: MetaManagerEnvironment => QContext): Unit = {
+  def launchMetaManager[QContext](
+                                   env: MetaManagerEnvironment,
+                                   queue: Queue[MetaManagerCommand, QContext],
+                                   context: MetaManagerEnvironment => QContext,
+                                   prepareUnDeployingActions: => Try[Unit]): Unit = {
 
     @tailrec
     def messageLoop(queueOp: QueueOp[MetaManagerCommand, queue.Msg, queue.Reader, queue.Writer], reader: queue.Reader, writer: queue.Writer): Try[Unit] = {
-      val logger = env.logger
-      logger.debug("reading message from control queue")
-      reader.receiveMessage(logger, env.isTerminated).flatMap { message =>
-        logger.debug("parsing message")
-        message.getBody.flatMap { body =>
-          logger.debug("processing message " + body)
-          process(body, env).flatMap { commands =>
-            logger.debug("writing result: " + commands)
-            writer.writeRaw(commands.map { c => (c.prefix, c)}).flatMap { written =>
-              logger.debug("deleting message: " + message.id)
-              queueOp.deleteMessage(message)
+      if(!env.isTerminated) {
+        val logger = env.logger
+        logger.debug("reading message from control queue")
+        reader.receiveMessage(logger, env.isTerminated).flatMap { message =>
+          logger.debug("parsing message")
+          message.getBody.flatMap { body =>
+            logger.debug("processing message " + body)
+            process(body, env).flatMap { commands =>
+              logger.debug("writing result: " + commands)
+              writer.writeRaw(commands.map { c => (c.prefix, c)}).flatMap { written =>
+                logger.debug("deleting message: " + message.id)
+                queueOp.deleteMessage(message)
+              }
+            } match {
+              case Failure(t) => {
+                env.reportError("metamanager_" + body.prefix, t)
+                Failure(t)
+              }
+              case Success(s) => Success(s)
             }
           }
+        } match {
+          case Failure(t) => {
+            if(!env.isTerminated) {
+              env.reportError("metamanager_receive_message", t)
+            }
+            messageLoop(queueOp, reader, writer)
+          }
+          case Success(()) => {
+            messageLoop(queueOp, reader, writer)
+          }
         }
-      } match {
-        case Failure(t) => {
-          env.reportError("metamanager", t)
-          //todo add fatal error here!
-          messageLoop(queueOp, reader, writer)
-        }
-        case Success(()) => {
-          messageLoop(queueOp, reader, writer)
-        }
+      } else {
+        Success(())
       }
     }
 
@@ -48,25 +63,33 @@ trait AnyMetaManager {
     val logger = env.logger
     logger.info("starting metamanager")
 
-    logger.debug("creating control queue context")
-    val qContext = context(env)
+    env.repeat("metamanager_init", 5, Some(10000)) {
 
-    logger.debug("creating control queue " + queue.name)
-    queue.create(qContext).flatMap { queueOp =>
-      logger.debug("creating control queue reader")
-      queueOp.reader.flatMap { reader =>
-        logger.debug("creating control queue writer")
-        queueOp.writer.flatMap { writer =>
-          logger.debug("starting message loop")
-          messageLoop(queueOp, reader, writer)
+      logger.debug("creating control queue context")
+      val qContext = context(env)
+
+      logger.debug("creating control queue " + queue.name)
+      queue.create(qContext).flatMap { queueOp =>
+        logger.debug("creating control queue reader")
+        queueOp.reader.flatMap { reader =>
+          logger.debug("creating control queue writer")
+          queueOp.writer.flatMap { writer =>
+            logger.debug("prepare undeploying action")
+            prepareUnDeployingActions.flatMap { res =>
+              logger.debug("starting message loop")
+              messageLoop(queueOp, reader, writer)
+            }
+          }
         }
       }
     } match {
       case Failure(t) => {
         //fatal error
-        env.reportError("metamanager_create_queue", t)
+        if(!env.isTerminated) {
+          env.fatalError("metamanager_init", t)
+        }
       }
-      case Success(queueOp) => {
+      case Success(()) => {
         ()
       }
     }
@@ -77,28 +100,3 @@ trait AnyMetaManager {
 object AnyMetaManager {
   type of[E <: AnyEnvironment] = AnyMetaManager { type MetaManagerEnvironment = E }
 }
-
-//class MetaManager {
-//
-//  def proccess(command: Command): Try[List[Command]] = {
-//    command match {
-//      case CreateWorkerGroup(nispero) => {
-////        val workersGroup = nispero.nisperoConfiguration.workerGroup
-////
-////        logger.info("nispero " + nispero.nisperoConfiguration.name + ": generating user script")
-////        val script = userScript(worker)
-////
-////        logger.info("nispero " + nispero.nisperoConfiguration.name + ": launching workers group")
-////        val workers = workersGroup.autoScalingGroup(
-////          name = nispero.nisperoConfiguration.workersGroupName,
-////          defaultInstanceSpecs = nispero.nisperoConfiguration.nisperonConfiguration.defaultInstanceSpecs,
-////          amiId = nispero.managerDistribution.ami.id,
-////          userData = script
-////        )
-////
-////        aws.as.createAutoScalingGroup(workers)
-//        Success(List[Command]())
-//      }
-//    }
-//  }
-//}

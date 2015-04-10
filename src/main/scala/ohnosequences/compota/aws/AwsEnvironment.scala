@@ -8,9 +8,13 @@ import ohnosequences.compota.aws.queues.DynamoDBContext
 import ohnosequences.compota.environment.{InstanceId, AnyEnvironment}
 import ohnosequences.logging.Logger
 
+import scala.util.Try
+
 
 class AwsEnvironment(val awsClients: AWSClients, val metadata: Metadata, val workingDirectory: File) extends AnyEnvironment {
 
+
+  override def sendUnDeployCommand(reason: String, force: Boolean): Try[Unit] = ???
 
   override def start(): Unit = ???
 

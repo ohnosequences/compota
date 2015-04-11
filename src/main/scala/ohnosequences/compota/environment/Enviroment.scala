@@ -36,6 +36,17 @@ abstract class AnyEnvironment {
 
   val workingDirectory: File
 
+
+
+  def repeat[T](action: =>Try[T]): Unit = {
+    @tailrec
+    def repeatRec(): Unit = {
+      action
+      repeatRec()
+    }
+    repeatRec()
+  }
+
   def repeat[T](actionName: String, attempts: Int, timeout: Option[Long] = None)(action: =>Try[T]): Try[T] = {
     @tailrec
     def repeatRec(attemptsLeft: Int, lastRes: Try[T], timeout: Option[Long]): Try[T] = {

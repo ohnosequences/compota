@@ -6,6 +6,9 @@ import ohnosequences.compota.queues.{Queue, QueueOp}
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
+import scala.concurrent._
+import ExecutionContext.Implicits.global
+
 //abstract manager without command queue manipulations
 
 trait AnyMetaManager {
@@ -22,38 +25,47 @@ trait AnyMetaManager {
 
     @tailrec
     def messageLoop(queueOp: QueueOp[MetaManagerCommand, queue.Msg, queue.Reader, queue.Writer], reader: queue.Reader, writer: queue.Writer): Try[Unit] = {
-      if(!env.isTerminated) {
+      if (!env.isTerminated) {
         val logger = env.logger
         logger.debug("reading message from control queue")
-        reader.receiveMessage(logger, env.isTerminated).flatMap { message =>
+        reader.receiveMessage(logger, env.isTerminated).recoverWith { case t =>
+          env.reportError("metamanager_control_queue", new Error("couldn't reacive message from control queue", t))
+          Failure(t)
+        }.flatMap { message =>
           logger.debug("parsing message")
-          message.getBody.flatMap { body =>
-            logger.debug("processing message " + body)
-            process(body, env).flatMap { commands =>
-              logger.debug("writing result: " + commands)
-              writer.writeRaw(commands.map { c => (c.prefix, c)}).flatMap { written =>
-                logger.debug("deleting message: " + message.id)
-                queueOp.deleteMessage(message)
-              }
-            } match {
+          message.getBody.recoverWith { case t =>
+            env.reportError("metamanager_control_queue", new Error("couldn't parse message " + message.id + " from control queue", t))
+            Failure(t)
+          }.map { body =>
+            future {
+              logger.debug("processing message " + body)
+              process(body, env)
+            }.onComplete {
               case Failure(t) => {
+                //future failure
                 env.reportError("metamanager_" + body.prefix, t)
-                Failure(t)
               }
-              case Success(s) => Success(s)
+              case Success(Failure(t)) => {
+                //command processing failure
+                env.reportError("metamanager_" + body.prefix, t)
+              }
+              case Success(Success(commands)) => {
+                logger.debug("writing result: " + commands)
+                writer.writeRaw(commands.map { c => (c.prefix, c)}).recoverWith { case t =>
+                  env.reportError("metamanager_control_queue", new Error("couldn't write message to control queue", t))
+                  Failure(t)
+                }.flatMap { written =>
+                  logger.debug("deleting message: " + message.id)
+                  queueOp.deleteMessage(message).recoverWith { case t =>
+                    env.reportError("metamanager_control_queue", new Error("couldn't delete message " + message.id + " from control queue", t))
+                    Failure(t)
+                  }
+                }
+              }
             }
-          }
-        } match {
-          case Failure(t) => {
-            if(!env.isTerminated) {
-              env.reportError("metamanager_receive_message", t)
-            }
-            messageLoop(queueOp, reader, writer)
-          }
-          case Success(()) => {
-            messageLoop(queueOp, reader, writer)
           }
         }
+        messageLoop(queueOp, reader, writer)
       } else {
         Success(())
       }
@@ -63,38 +75,25 @@ trait AnyMetaManager {
     val logger = env.logger
     logger.info("starting metamanager")
 
-    env.repeat("metamanager_init", 5, Some(10000)) {
-
+    env.repeat {
       logger.debug("creating control queue context")
       val qContext = context(env)
-
       logger.debug("creating control queue " + queue.name)
       queue.create(qContext).flatMap { queueOp =>
         logger.debug("creating control queue reader")
         queueOp.reader.flatMap { reader =>
           logger.debug("creating control queue writer")
           queueOp.writer.flatMap { writer =>
-            logger.debug("prepare undeploying action")
-            prepareUnDeployingActions.flatMap { res =>
-              logger.debug("starting message loop")
-              messageLoop(queueOp, reader, writer)
-            }
+            logger.debug("starting message loop")
+            messageLoop(queueOp, reader, writer)
           }
         }
-      }
-    } match {
-      case Failure(t) => {
-        //fatal error
-        if(!env.isTerminated) {
-          env.fatalError("metamanager_init", t)
-        }
-      }
-      case Success(()) => {
-        ()
+      }.recover { case t =>
+        env.reportError("metamanager_control_queue_init", new Error("Couldn't initiate control queue", t))
       }
     }
-
   }
+
 }
 
 object AnyMetaManager {

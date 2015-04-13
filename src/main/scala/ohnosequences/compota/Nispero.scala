@@ -40,6 +40,15 @@ trait AnyNispero {
 
   def createWorker(): W
 
+
+//  def deleteInputQueue(env: NisperoEnvironment): Try[Unit] = {
+//    inputQueue.delete(inContext(env))
+//  }
+//
+//  def deleteOutputQueue(env: NisperoEnvironment): Try[Unit] = {
+//    outputQueue.delete(outContext(env))
+//  }
+
 //  def reduceOutputQueue(environment: NisperoEnvironment): Try[Unit] = {
 //    outputQueue
 //  }
@@ -48,6 +57,8 @@ trait AnyNispero {
 
 object AnyNispero {
   type of[E <: AnyEnvironment] = AnyNispero { type NisperoEnvironment = E}
+
+
 }
 
 

@@ -3,11 +3,12 @@ package ohnosequences.compota.aws
 import ohnosequences.awstools.autoscaling._
 import ohnosequences.awstools.ec2.{InstanceType, InstanceSpecs}
 import ohnosequences.awstools.s3.ObjectAddress
+import ohnosequences.compota.AnyCompotaConfiguration
 import ohnosequences.compota.aws.deployment.{Metadata, userScriptGenerator}
 
 
 
-abstract class AwsCompotaConfigurationAux(val metadata: Metadata) {
+abstract class AwsCompotaConfigurationAux(val metadata: Metadata) extends AnyCompotaConfiguration {
 
   def name = metadata.artifact
 

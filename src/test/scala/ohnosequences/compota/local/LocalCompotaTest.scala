@@ -5,7 +5,9 @@ import ohnosequences.compota.monoid.{stringMonoid, intMonoid}
 import ohnosequences.logging.{ConsoleLogger, Logger}
 import org.junit.Test
 import org.junit.Assert._
+import scala.concurrent.duration._
 
+import scala.concurrent.duration.Duration
 import scala.util.{Success, Try}
 
 class LocalCompotaTest {
@@ -15,7 +17,7 @@ class LocalCompotaTest {
     override type Context = Unit
 
     override def solve(logger: Logger, context: Unit, input: String): Try[List[Int]] = {
-      throw new Error("uuu!")
+    //  throw new Error("uuu!")
       Success(List(input.length))
     }
 
@@ -44,16 +46,19 @@ class LocalCompotaTest {
   val splitNispero = LocalNispero(
     textQueue,
     wordsQueue,
-    splitInstructions, 2)
+    splitInstructions, 1)
 
   val wordLengthNispero = LocalNispero(
     wordsQueue,
     countsQueue,
-    wordLengthInstructions, 2
+    wordLengthInstructions, 1
   )
 
   object wordCountCompotaConfiguration extends LocalCompotaConfiguration {
     override val loggerDebug: Boolean = false
+
+    override val timeout= Duration(100, SECONDS)
+    override val terminationDaemonIdleTime =  Duration(100, SECONDS)
   }
 
 
@@ -63,7 +68,13 @@ class LocalCompotaTest {
 
     val reducer = InMemoryQueueReducer(countsQueue, intMonoid)
 
-    object wordCountCompota extends LocalCompota(List(splitNispero, wordLengthNispero), List(reducer), wordCountCompotaConfiguration) {
+    object wordCountCompota extends LocalCompota[Int](List(splitNispero, wordLengthNispero), List(reducer), wordCountCompotaConfiguration) {
+
+
+      val s = System.currentTimeMillis()
+
+      override def prepareUnDeployActions(env: wordCountCompota.CompotaEnvironment): Try[Int] = Success(1000)
+
       override def addTasks(environment: CompotaEnvironment): Try[Unit] = {
         environment.logger.debug("test")
        // environment.logger.error(new Error("exception"))
@@ -72,8 +83,9 @@ class LocalCompotaTest {
         writer.writeRaw(List(("1", "a a a b b")))
       }
 
-      override def unDeployActions(force: Boolean, env: ThreadEnvironment): Try[Unit] = {
-        Success(env.logger.info("undeploying force=" + force))
+      override def unDeployActions(force: Boolean, env: ThreadEnvironment, context: Int): Try[String] = {
+        Success("message context = " +context)
+
       }
     }
 

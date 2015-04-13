@@ -78,6 +78,10 @@ trait AnyQueue { queue =>
 
   // why?? put it somewhere else, not here. At the nispero level, for example
    def create(ctx: Context): Try[QueueOp[Elmnt, Msg, Reader, Writer]]
+
+   def delete(ctx: Context): Try[Unit] = {
+     create(ctx).flatMap(_.delete())
+   }
 }
 
 object AnyQueue {

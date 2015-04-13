@@ -1,19 +1,24 @@
 package ohnosequences.compota
 
+import ohnosequences.compota.Namespace._
 import ohnosequences.compota.environment.AnyEnvironment
 import ohnosequences.compota.graphs.NisperoGraph
 import ohnosequences.compota.metamanager.AnyMetaManager
 import ohnosequences.compota.queues._
 import ohnosequences.logging.ConsoleLogger
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 trait AnyCompota {
   type CompotaEnvironment <: AnyEnvironment
   type Nispero <: AnyNispero.of[CompotaEnvironment]
   type MetaManager <:  AnyMetaManager.of[CompotaEnvironment]
 
+  type CompotaUnDeployActionContext
+
   val nisperos: List[Nispero]
   val reducers: List[AnyQueueReducer.of[CompotaEnvironment]]
+
+  val baseConfiguration: AnyCompotaConfiguration
 
   val nisperosNames: Map[String, Nispero] =  nisperos.map { nispero =>
     (nispero.name, nispero)
@@ -34,7 +39,7 @@ trait AnyCompota {
     true
   }
 
-  def launchWorker(nispero: Nispero)
+  def launchWorker(nispero: Nispero): Unit
 
   def launchWorker(name: String) {
 
@@ -52,40 +57,49 @@ trait AnyCompota {
     val logger = new ConsoleLogger("compotaCLI")
     args.toList match {
       case "run" :: "worker" :: name :: Nil => launchWorker(name)
-      case "add" :: "tasks" :: Nil => {
-        addTasks()
-      }
       case _ => logger.error("wrong command")
     }
   }
 
-  def unDeployActions(force: Boolean, env: CompotaEnvironment): Try[Unit]
+  def unDeployActions(force: Boolean, env: CompotaEnvironment, context: CompotaUnDeployActionContext): Try[String]
 
-  def finishUnDeploy(): Try[Unit]
+  def finishUnDeploy(reason: String, message: String): Try[Unit]
 
-  def prepareUnDeployActions(env: CompotaEnvironment): Try[Unit] = {Success(())}
+  def prepareUnDeployActions(env: CompotaEnvironment): Try[CompotaUnDeployActionContext]
 
   def sendUnDeployCommand(reason: String, force: Boolean): Try[Unit]
 
-  def addTasks()
-
   def addTasks(environment: CompotaEnvironment): Try[Unit] //user defined
 
-  def launchTerminationDaemon(environment: CompotaEnvironment): Try[Unit] = {
-    NisperoGraph[CompotaEnvironment](environment, nisperos).flatMap { nisperoGraph =>
-      val terminationDaemon = new TerminationDaemon(nisperoGraph, sendUnDeployCommand)
-      terminationDaemon.start(environment)
-    }
-  }
+  def startedTime(): Try[Long]
+
+  def tasksAdded(): Try[Boolean]
+
+  def setTasksAdded(): Try[Unit]
+
+  def createNisperoWorkers(env: CompotaEnvironment, nispero: Nispero): Try[Unit]
+
+  def deleteNisperoWorkers(env: CompotaEnvironment, nispero: Nispero): Try[Unit]
+
+  def deleteManager(env: CompotaEnvironment): Try[Unit]
+
+  def launchTerminationDaemon(terminationDaemon: TerminationDaemon): Try[Unit]
+
 
 }
 
-abstract class Compota[E <: AnyEnvironment, N <: AnyNispero.of[E]](
+object AnyCompota {
+  type of[E <: AnyEnvironment, U] = AnyCompota { type CompotaEnvironment = E ; type CompotaUnDeployActionContext = U  }
+}
+
+abstract class Compota[E <: AnyEnvironment, N <: AnyNispero.of[E], U](
                                                                     override val nisperos: List[N],
-                                                                    override val reducers: List[AnyQueueReducer.of[E]])
+                                                                    override val reducers: List[AnyQueueReducer.of[E]],
+                                                                    val baseConfiguration: AnyCompotaConfiguration)
   extends AnyCompota {
 
   type Nispero = N
   type CompotaEnvironment = E
+  type CompotaUnDeployActionContext = U
 
 }

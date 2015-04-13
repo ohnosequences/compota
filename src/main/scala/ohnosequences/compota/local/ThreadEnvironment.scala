@@ -2,6 +2,7 @@ package ohnosequences.compota.local
 
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import ohnosequences.compota.Namespace
 import ohnosequences.compota.environment.{AnyEnvironment, InstanceId}
 import ohnosequences.logging.{FileLogger, Logger}
 
@@ -19,9 +20,6 @@ class ThreadEnvironment(val thread: Thread,
   //type
 
 
-  override def start(): Unit = {
-    thread.start()
-  }
 
   val isStopped = new java.util.concurrent.atomic.AtomicBoolean(false)
 
@@ -40,14 +38,14 @@ class ThreadEnvironment(val thread: Thread,
  //   thread.stop()
   }
 
-  override def reportError(taskId: String, t: Throwable): Unit = {
-    val e = errorCounts.getOrDefault(taskId, 0) + 1
+  def reportError(nameSpace: Namespace, t: Throwable): Unit = {
+    val e = errorCounts.getOrDefault(nameSpace.toString, 0) + 1
     if (e > configuration.errorThreshold) {
-      logger.error("reached error threshold for " + taskId)
-      sendUnDeployCommand("reached error threshold for " + taskId, true)
+      logger.error("reached error threshold for " + nameSpace.toString)
+      sendUnDeployCommand("reached error threshold for " + nameSpace.toString, true)
     } else {
-      errorCounts.put(taskId, e)
-      logger.error(taskId + " failed " + e + " times")
+      errorCounts.put(nameSpace.toString, e)
+      logger.error(nameSpace.toString + " failed " + e + " times")
       logger.debug(t)
     }
   }

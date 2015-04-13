@@ -2,11 +2,18 @@ package ohnosequences.compota.local
 
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{ConcurrentSkipListMap, ConcurrentHashMap}
+import scala.concurrent.{ExecutionContext, Future}
+import ExecutionContext.Implicits.global
+
 
 import ohnosequences.compota.queues._
 import ohnosequences.logging.Logger
 
 import scala.annotation.tailrec
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.concurrent.duration.Duration._
+
 import scala.util.{Random, Failure, Success, Try}
 
 import scala.collection.JavaConversions._
@@ -31,6 +38,8 @@ case class LocalMessage[T](id: String, body: T, monkeyAppearanceProbability: Mon
   override def getBody: Try[T] = {
     Monkey.call(Success(body), monkeyAppearanceProbability.getBody)
   }
+
+  val deleted = new AtomicBoolean(false)
 }
 
 object Monkey {
@@ -45,7 +54,9 @@ object Monkey {
   }
 }
 
-class LocalQueue[T](name: String, val monkeyAppearanceProbability: MonkeyAppearanceProbability = MonkeyAppearanceProbability()) extends Queue[T, Unit](name) { queue =>
+class LocalQueue[T](name: String,
+                    val monkeyAppearanceProbability: MonkeyAppearanceProbability = MonkeyAppearanceProbability(),
+                    val visibilityTimeout: Duration = Duration(30, SECONDS)) extends Queue[T, Unit](name) { queue =>
 
   val rawQueue = new ConcurrentSkipListMap[String, T]()
 
@@ -62,7 +73,8 @@ class LocalQueue[T](name: String, val monkeyAppearanceProbability: MonkeyAppeara
 class LocalQueueOp[T](val queue: LocalQueue[T]) extends QueueOp[T, LocalMessage[T], LocalQueueReader[T], LocalQueueWriter[T]] { queueOp =>
 
   override def deleteMessage(message: LocalMessage[T]): Try[Unit] = {
-    Monkey.call(Try {queue.rawQueue.remove(message.id)}, queue.monkeyAppearanceProbability.deleteMessage)
+
+    Monkey.call(Try {message.deleted.set(true); queue.rawQueue.remove(message.id); }, queue.monkeyAppearanceProbability.deleteMessage)
   }
 
   override def reader: Try[LocalQueueReader[T]] = {
@@ -112,8 +124,15 @@ class LocalQueueReader[T](queueOps: LocalQueueOp[T]) extends QueueReader[T, Loca
             receiveMessageRec
           }
           case Some(entry) => {
-            queueOps.queue.rawQueue.put(entry.getKey, entry.getValue)
-            Success(new LocalMessage(entry.getKey, entry.getValue, queueOps.queue.monkeyAppearanceProbability))
+            val  res = new LocalMessage(entry.getKey, entry.getValue, queueOps.queue.monkeyAppearanceProbability)
+            Future {
+              Thread.sleep(queueOps.queue.visibilityTimeout.toMillis)
+              if(!res.deleted.get()) {
+                logger.info("return message to queue: " + entry.getValue)
+                queueOps.queue.rawQueue.put(entry.getKey, entry.getValue)
+              }
+            }
+            Success(res)
           }
         }
       }

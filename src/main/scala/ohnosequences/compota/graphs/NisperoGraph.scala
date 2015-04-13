@@ -32,6 +32,12 @@ class NisperoGraph(graph: Graph[String, String], nisperos: Map[String, AnyNisper
 
   val sortedQueueNames = graph.sort
 
+  val queueOps: List[AnyQueueOp] = {
+    sortedQueueNames.map { node =>
+      queues(node.label)
+    }
+  }
+
   //return either first not empty queue, either all not-leafs (to delete them)
   def checkQueues(env: AnyEnvironment): Try[Either[AnyQueueOp, List[AnyQueueOp]]] = Try {
     val notLeafsQueues: List[AnyQueueOp] = sortedQueueNames.filterNot(graph.out(_).isEmpty).map { node =>

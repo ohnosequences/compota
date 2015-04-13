@@ -3,6 +3,7 @@ package ohnosequences.compota.aws
 import java.io.File
 
 import ohnosequences.awstools.AWSClients
+import ohnosequences.compota.Namespace
 import ohnosequences.compota.aws.deployment.Metadata
 import ohnosequences.compota.aws.queues.DynamoDBContext
 import ohnosequences.compota.environment.{InstanceId, AnyEnvironment}
@@ -16,7 +17,6 @@ class AwsEnvironment(val awsClients: AWSClients, val metadata: Metadata, val wor
 
   override def sendUnDeployCommand(reason: String, force: Boolean): Try[Unit] = ???
 
-  override def start(): Unit = ???
 
   def toDynamoDBContext: DynamoDBContext = {
     DynamoDBContext(awsClients, metadata, logger)
@@ -29,7 +29,7 @@ class AwsEnvironment(val awsClients: AWSClients, val metadata: Metadata, val wor
   override def stop(): Unit = ???
 
   //todo: all repeats are here
-  override def reportError(taskId: String, t: Throwable): Unit = ???
+  override def reportError(namespace: Namespace, t: Throwable): Unit = ???
 
   override val logger: Logger = ???
 }

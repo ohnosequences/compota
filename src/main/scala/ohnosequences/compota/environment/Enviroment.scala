@@ -1,9 +1,12 @@
 package ohnosequences.compota.environment
 
+import java.util.concurrent.ExecutorService
+
 import ohnosequences.compota.Namespace
 import ohnosequences.logging.Logger
 
 import java.io.File
+import scala.concurrent.ExecutionContext
 import scala.util.{Try}
 
 
@@ -15,11 +18,15 @@ abstract class AnyEnvironment {
 
   val logger: Logger
 
-  def stop()
+  val executor: ExecutorService
+
+  def terminate(): Unit
 
   def sendUnDeployCommand(reason: String, force: Boolean): Try[Unit]
 
-  def isTerminated: Boolean
+  def isStopped: Boolean
+
+  def stop(): Unit
 
   /**
    * all repeats are here, "5 errors - reboot,  10 errors - undeplot compota

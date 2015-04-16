@@ -5,6 +5,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import ohnosequences.logging.Logger
 
 import scala.annotation.tailrec
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 
@@ -35,16 +37,43 @@ abstract class QueueMessage[B] {
 
 abstract class QueueReader[E, M <: QueueMessage[E]] {
 
-  def receiveMessage(logger: Logger, isStopped: => Boolean = { false}): Try[M]
+  val queueOp: AnyQueueOp
+
+  def receiveMessage(logger: Logger): Try[Option[M]]
+
+  def waitForMessage(logger: Logger,
+                     isStopped: => Boolean = {false},
+                     initialTimeout: Duration = Duration(100, MILLISECONDS)
+                      ): Try[Option[M]] = {
+
+    @tailrec
+    def waitForMessageRep(timeout: Long): Try[Option[M]] = {
+      if(isStopped) {
+        Success(None)
+      } else {
+        Try {receiveMessage(logger)}.flatMap{e => e}  match {
+          case Failure(t) if isStopped => {
+            Success(None)
+          }
+          case Failure(t)=> {
+            Failure(t)
+          }
+          case Success(None) => {
+            logger.debug("queue reader for " + queueOp.queue.name + " waiting for message")
+            Thread.sleep(timeout)
+            waitForMessageRep(timeout * 3 / 2)
+          }
+          case Success(Some(message)) => {
+            Success(Some(message))
+          }
+        }
+      }
+    }
+
+    waitForMessageRep(initialTimeout.toMillis)
+  }
 
 }
-//
-//trait AnyQueueWriter {
-//
-//  //type Message <: AnyMessage
-//
-//
-//}
 
 abstract class QueueWriter[E] {
 

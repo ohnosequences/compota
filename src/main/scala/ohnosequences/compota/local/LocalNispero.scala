@@ -6,7 +6,7 @@ import ohnosequences.compota.queues.Queue
 trait AnyLocalNispero extends AnyNispero {
  // val configuration: AwsNisperoConfigurationAux
 
-  override type NisperoEnvironment = ThreadEnvironment
+  override type NisperoEnvironment = LocalEnvironment
 
   val workers: Int
 
@@ -15,25 +15,25 @@ trait AnyLocalNispero extends AnyNispero {
 
 class LocalNispero[In, Out, InContext, OutContext, InQueue <: Queue[In, InContext], OutQueue <: Queue[Out, OutContext]](
                                                                                    inputQueue: InQueue,
-                                                                                   inContext: ThreadEnvironment => InContext,
+                                                                                   inContext: LocalEnvironment => InContext,
                                                                                    outputQueue: OutQueue,
-                                                                                   outContext: ThreadEnvironment => OutContext,
+                                                                                   outContext: LocalEnvironment => OutContext,
                                                                                    instructions: Instructions[In, Out],
                                                                                    val workers: Int)
-  extends Nispero[In, Out, ThreadEnvironment, InContext, OutContext, InQueue, OutQueue](inputQueue, inContext, outputQueue, outContext, instructions) with AnyLocalNispero {
+  extends Nispero[In, Out, LocalEnvironment, InContext, OutContext, InQueue, OutQueue](inputQueue, inContext, outputQueue, outContext, instructions) with AnyLocalNispero {
 
 }
 
 
 object LocalNispero {
-  def apply[In, Out, InQueue <: Queue[In, Unit], OutQueue <: Queue[Out, Unit]](
+  def apply[In, Out, InQueue <: Queue[In, LocalContext], OutQueue <: Queue[Out, LocalContext]](
                                                                                  inputQueue: InQueue,
                                                                                  outputQueue: OutQueue,
                                                                                  instructions: Instructions[In, Out],
                                                                                  worker: Int):
-  LocalNispero[In, Out, Unit, Unit, InQueue, OutQueue] = new LocalNispero[In, Out, Unit, Unit, InQueue, OutQueue](
-  inputQueue, {t: ThreadEnvironment => ()},
-  outputQueue, {t: ThreadEnvironment => ()},
+  LocalNispero[In, Out, LocalContext, LocalContext, InQueue, OutQueue] = new LocalNispero[In, Out, LocalContext, LocalContext, InQueue, OutQueue](
+  inputQueue, {e: LocalEnvironment => e.localContext},
+  outputQueue, {e: LocalEnvironment => e.localContext},
   instructions,
   worker)
 }

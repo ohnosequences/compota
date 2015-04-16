@@ -42,7 +42,7 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
      val logger = env.logger
      logger.info("worker for instructions " + instructions.name + " started on instance " + env.instanceId)
      //all fail fast
-     while (!env.isTerminated) {
+     while (!env.isStopped) {
        logger.debug("create context for queue " + inputQueue.name)
        inputQueue.create(inContext(env)).flatMap { inputQueue =>
          logger.debug("create context for queue " + outputQueue.name)
@@ -54,6 +54,7 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
                logger.debug("creating writer for queue " + outputQueue.queue.name)
                outputQueue.writer.flatMap { queueWriter =>
                  messageLoop(inputQueue, queueReader, queueWriter, env, context)
+                 Success(())
                }
              }
            }
@@ -62,6 +63,9 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
          env.reportError(Namespace.worker / instructions.name / "init", t)
        }
      }
+
+     logger.info("worker finished")
+
    }
 
 //  def userCode(action: => Try[Unit]): Try[Unit] = {
@@ -72,53 +76,53 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
                   queueReader: inputQueue.Reader,
                   queueWriter: outputQueue.Writer,
                   env: Env,
-                  instructionsContext: instructions.Context): Try[Unit] = {
+                  instructionsContext: instructions.Context): Unit = {
 
     val logger = env.logger
 
 
-
-
     @tailrec
-    def messageLoopRec(): Try[Unit] = {
-      if (env.isTerminated) {
+    def messageLoopRec(): Unit = {
+      if (env.isStopped) {
         Success(())
       } else {
         logger.debug("receiving message from queue " + inputQueue.name)
-        queueReader.receiveMessage(logger, env.isTerminated).recoverWith { case t =>
+        queueReader.waitForMessage(logger, {env.isStopped}).recoverWith { case t =>
           env.reportError(Namespace.worker / instructions.name / "receive_message", new Error("couldn't receive message", t))
           Failure(t)
-        }.flatMap { message =>
-          logger.debug("parsing the message " + message.id)
-          message.getBody.recoverWith { case t =>
-            env.reportError(new Namespace(message.id), new Error("couldn't parse the message", t))
-            Failure(t)
-          }.flatMap { input =>
-            logger.info("received: " + input.toString.take(100) + " id: " + message.id)
-
-            logger.debug("cleaning working directory: " + env.workingDirectory)
-            FileUtils.cleanDirectory(env.workingDirectory)
-
-            logger.debug("running " + instructions.name + " instructions")
-            Try {instructions.solve(logger, instructionsContext, input)}.flatMap{e=>e}.recoverWith { case t =>
-              env.reportError(new Namespace(message.id), new Error("instructions error", t))
+        }.foreach {
+          case None => ()
+          case Some(message) =>
+            logger.debug("parsing the message " + message.id)
+            message.getBody.recoverWith { case t =>
+              env.reportError(new Namespace(message.id), new Error("couldn't parse the message", t))
               Failure(t)
-            }.flatMap { output =>
-              logger.info("result: " + output.toString().take(100))
-              logger.debug("writing result to queue " + outputQueue.name + " with message id " + message.id + "." + instructions.name)
-              val newId = message.id + "." + instructions.name
-              queueWriter.writeMessages(newId, output).recoverWith { case t =>
-                env.reportError(Namespace.worker / instructions.name / "write_message" / newId, new Error("couldn't write message", t))
+            }.flatMap { input =>
+              logger.info("received: " + input.toString.take(100) + " id: " + message.id)
+
+              logger.debug("cleaning working directory: " + env.workingDirectory)
+              FileUtils.cleanDirectory(env.workingDirectory)
+
+              logger.debug("running " + instructions.name + " instructions")
+              Try {instructions.solve(logger, instructionsContext, input)}.flatMap{e=>e}.recoverWith { case t =>
+                env.reportError(new Namespace(message.id), new Error("instructions error", t))
                 Failure(t)
-              }.flatMap { written =>
-                logger.debug("deleting message with id " + message.id + " from queue " + inputQueue.name)
-                inputQueueOp.deleteMessage(message).recoverWith { case t =>
-                  env.reportError(Namespace.worker / instructions.name / "delete_message" / newId, new Error("couldn't delete message", t))
+              }.flatMap { output =>
+                logger.info("result: " + output.toString().take(100))
+                logger.debug("writing result to queue " + outputQueue.name + " with message id " + message.id + "." + instructions.name)
+                val newId = message.id + "." + instructions.name
+                queueWriter.writeMessages(newId, output).recoverWith { case t =>
+                  env.reportError(Namespace.worker / instructions.name / "write_message" / newId, new Error("couldn't write message", t))
                   Failure(t)
+                }.flatMap { written =>
+                  logger.debug("deleting message with id " + message.id + " from queue " + inputQueue.name)
+                  inputQueueOp.deleteMessage(message).recoverWith { case t =>
+                    env.reportError(Namespace.worker / instructions.name / "delete_message" / newId, new Error("couldn't delete message", t))
+                    Failure(t)
+                  }
                 }
               }
             }
-          }
         }
         messageLoopRec()
       }

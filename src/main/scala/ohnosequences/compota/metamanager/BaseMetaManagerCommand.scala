@@ -4,7 +4,7 @@ import ohnosequences.compota.serialization.{JSON, Serializer}
 
 import scala.util.{Failure, Try}
 
-object CommandSerializer extends Serializer[BaseMetaManagerCommand] {
+object BaseCommandSerializer extends Serializer[BaseMetaManagerCommand] {
   override def fromString(s: String): Try[BaseMetaManagerCommand] = {
     JSON.extract[Command0](s).flatMap { command0 =>
       command0.toBaseMetaManagerCommand

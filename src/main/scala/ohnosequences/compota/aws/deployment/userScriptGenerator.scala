@@ -9,16 +9,17 @@ object userScriptGenerator {
 
       val raw = """
                   |#!/bin/sh
-                  |cd /root
+                  |mkdir -p $workingDir$
+                  |cd $workingDir$
+                  |
                   |exec &> log.txt
                   |yum install java-1.7.0-openjdk.x86_64 -y
                   |chmod a+r log.txt
                   |alternatives --install /usr/bin/java java /usr/lib/jvm/jre-1.7.0-openjdk.x86_64/bin/java 20000
-                  |alternatives --auto java
+                  |alternatives --auto java                  |
                   |
-                  |cd $workingDir$
-                  |aws s3 cp s3://$jarUrl$ /root/$jarFile$ --region eu-west-1
-                  |java -jar /root/$jarFile$ $component$ $name$
+                  |aws s3 cp s3://$jarUrl$ $workingDir$/$jarFile$ --region eu-west-1
+                  |java -jar $workingDir$/$jarFile$ $component$ $name$
                   |
                 """.stripMargin
         .replace("jarUrl", jarUrl)

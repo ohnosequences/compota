@@ -9,23 +9,23 @@ import scala.annotation.tailrec
 import scala.concurrent.duration.Duration
 import scala.util.{Try, Success, Failure}
 
-class TerminationDaemon(nisperoGraph: NisperoGraph,
-                        sendUnDeployCommand: (String, Boolean) => Try[Unit],
+class TerminationDaemon[E <: AnyEnvironment](nisperoGraph: NisperoGraph,
+                        sendUnDeployCommand: (E, String, Boolean) => Try[Unit],
                         startedTime: Long,
                         timeout: Duration,
                         terminationDaemonIdleTime: Duration) {
-  def start(environment: AnyEnvironment): Try[Unit] = {
+  def start(environment: E): Try[Unit] = {
 
 
     @tailrec
     def startRec():  Try[Unit] = {
 
-      if (environment.isTerminated) {
+      if (environment.isStopped) {
         Success(())
-      } else if (System.currentTimeMillis() - startedTime > timeout.toMillis) {
+      } else if ((System.currentTimeMillis() - startedTime) > timeout.toMillis) {
         environment.logger.info("reached compota timeout: " + timeout.toMinutes + " mins")
         environment.logger.info("sending undeploy command")
-        sendUnDeployCommand("timeout", true).recover { case t =>
+        sendUnDeployCommand(environment, "timeout", true).recover { case t =>
           environment.reportError(terminationDaemon / "send_undeploy_command", new Error("couldn't send undeploy command", t))
           Failure(t)
         }
@@ -44,7 +44,7 @@ class TerminationDaemon(nisperoGraph: NisperoGraph,
             environment.logger.info("all queues are empty")
 
             environment.logger.info("sending undeploy command")
-            sendUnDeployCommand("terminated", false).recoverWith { case t =>
+            sendUnDeployCommand(environment, "terminated", false).recoverWith { case t =>
               environment.reportError(terminationDaemon / "send_undeploy_command", new Error("couldn't send undeploy command", t))
               Failure(t)
             }

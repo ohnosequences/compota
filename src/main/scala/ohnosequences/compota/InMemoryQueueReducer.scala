@@ -1,7 +1,9 @@
 package ohnosequences.compota
 
+import ohnosequences.compota.aws.AwsEnvironment
+import ohnosequences.compota.aws.queues.DynamoDBContext
 import ohnosequences.compota.environment.AnyEnvironment
-import ohnosequences.compota.local.{ThreadEnvironment, MonkeyAppearanceProbability, Monkey}
+import ohnosequences.compota.local.{LocalContext, LocalEnvironment, MonkeyAppearanceProbability, Monkey}
 import ohnosequences.compota.monoid.Monoid
 import ohnosequences.compota.queues.{QueueReducer, AnyQueueReducer, Queue}
 
@@ -28,10 +30,17 @@ class InMemoryQueueReducer[E <: AnyEnvironment, I, C, Q <: Queue[I, C]](queue: Q
 }
 
 object InMemoryQueueReducer {
-  def apply[I, Q <: Queue[I, Unit]](
+  def apply[I, Q <: Queue[I, LocalContext]](
                                                           queue: Q,
                                                           monoid: Monoid[I],
                                                           monkeyAppearanceProbability: MonkeyAppearanceProbability = MonkeyAppearanceProbability()
-                                                          ): InMemoryQueueReducer[ThreadEnvironment, I, Unit, Q] =
-  new InMemoryQueueReducer[ThreadEnvironment, I, Unit, Q](queue, {e: ThreadEnvironment => Unit}, monoid, monkeyAppearanceProbability)
+                                                          ): InMemoryQueueReducer[LocalEnvironment, I, LocalContext, Q] =
+  new InMemoryQueueReducer[LocalEnvironment, I, LocalContext, Q](queue, {e: LocalEnvironment => e.localContext}, monoid, monkeyAppearanceProbability)
+
+  def create[I, Q <: Queue[I, DynamoDBContext]](
+                                     queue: Q,
+                                     monoid: Monoid[I],
+                                     monkeyAppearanceProbability: MonkeyAppearanceProbability = MonkeyAppearanceProbability()
+                                     ): InMemoryQueueReducer[AwsEnvironment, I, DynamoDBContext, Q] =
+    new InMemoryQueueReducer[AwsEnvironment, I, DynamoDBContext, Q](queue, {e: AwsEnvironment => e.createDynamoDBContext()}, monoid, monkeyAppearanceProbability)
 }

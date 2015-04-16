@@ -1,19 +1,23 @@
 package ohnosequences.compota.aws
 
-import ohnosequences.compota.aws.deployment.Metadata
+import ohnosequences.compota.aws.deployment.AnyMetadata
 
 object Resources {
 
-  def managerLaunchConfiguration(metadata: Metadata) = "compota_" + metadata.artifact + "_manager"
+  def managerLaunchConfiguration(metadata: AnyMetadata) = "compota_" + metadata.artifact + "_manager"
 
-  def managerAutoScalingGroup(metadata: Metadata) = "compota_" + metadata.artifact + "_manager"
+  def managerAutoScalingGroup(metadata: AnyMetadata) = "compota_" + metadata.artifact + "_manager"
 
-  def workerLaunchConfiguration(metadata: Metadata, name: String) = "compota_" + metadata.artifact + "." + name + "_" + "worker"
-  def workerAutoScalingGroup(metadata: Metadata, name: String) = "compota_" + metadata.artifact + "." + name + "_" + "worker"
+  def workerLaunchConfiguration(metadata: AnyMetadata, name: String) = "compota_" + metadata.artifact + "." + name + "_" + "worker"
 
+  def workerAutoScalingGroup(metadata: AnyMetadata, name: String) = "compota_" + metadata.artifact + "." + name + "_" + "worker"
 
-  def dynamodbTable(metadata: Metadata, name: String) = "compota_" + metadata.artifact + "_" + name
+  def errorTable(metadata: AnyMetadata): String = dynamodbTable(metadata, "errors")
 
-  def sqsQueue(metadata: Metadata, name: String) = "compota_" + metadata.artifact + "_" + name
+  def controlQueue(metadata: AnyMetadata): String = dynamodbTable(metadata, "controlQueue")
+
+  def dynamodbTable(metadata: AnyMetadata, name: String) = "compota_" + metadata.artifact + "_" + name
+
+  def sqsQueue(metadata: AnyMetadata, name: String) = "compota_" + metadata.artifact + "_" + name
 
 }

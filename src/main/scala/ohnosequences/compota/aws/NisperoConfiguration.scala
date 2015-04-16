@@ -4,11 +4,15 @@ import ohnosequences.awstools.autoscaling._
 import ohnosequences.awstools.ec2.{InstanceType, InstanceSpecs}
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.compota.AnyCompotaConfiguration
-import ohnosequences.compota.aws.deployment.{Metadata, userScriptGenerator}
+import ohnosequences.compota.aws.deployment.{AnyMetadata, Metadata, userScriptGenerator}
 
 
 
-abstract class AwsCompotaConfigurationAux(val metadata: Metadata) extends AnyCompotaConfiguration {
+abstract class AwsCompotaConfiguration(val metadata: AnyMetadata) extends AnyCompotaConfiguration {
+
+  val localErrorThreshold: Int = 100
+
+  val globalErrorThresholdPerNameSpace: Int = 10
 
   def name = metadata.artifact
 
@@ -22,11 +26,13 @@ abstract class AwsCompotaConfigurationAux(val metadata: Metadata) extends AnyCom
 
   def deviceMapping = Map("/dev/xvdb" -> "ephemeral0")
 
-  def workingDirectory = "/media"
-
+  def workingDirectory = "/media/ephemeral0/compota"
 
   def managerInstanceType = InstanceType.c1_medium
 
+  def errorTable: String = Resources.errorTable(metadata)
+
+  def controlQueue: String = Resources.controlQueue(metadata)
 
   def managerInstanceSpecs = new InstanceSpecs(
     instanceType = managerInstanceType,
@@ -66,7 +72,7 @@ abstract class AwsCompotaConfigurationAux(val metadata: Metadata) extends AnyCom
 //class CompotaConfiguration(val name: String) extends CompotaConfigurationAux
 
 
-abstract class AwsNisperoConfigurationAux(val name: String, val compotaConfiguration: AwsCompotaConfigurationAux) {
+abstract class AwsNisperoConfiguration(val name: String, val compotaConfiguration: AwsCompotaConfiguration) {
 
   def workerInstanceType = compotaConfiguration.workerInstanceType
 
@@ -104,21 +110,3 @@ abstract class AwsNisperoConfigurationAux(val name: String, val compotaConfigura
 
 }
 
-//case class CompotaConfiguration (
-//  name: String,
-//  managerGroupLaunchConfiguration: LaunchConfiguration = LaunchConfiguration(
-//    name = name,
-//    purchaseModel = OnDemand,
-//    instanceSpecs = new InstanceSpecs(
-//      instanceType = InstanceType.c1_medium,
-//      instanceAm
-//
-//    )
-//  )
-//}
-
-//trait NisperoConfiguration {
-//  val compotaConfiguration: CompotaConfiguration
-//
-//
-//}

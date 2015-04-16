@@ -23,7 +23,7 @@ trait BaseMetaManager extends AnyMetaManager {
                        unDeployContext: MetaManagerUnDeployingActionContext,
                        controlQueueOp: AnyQueueOp,
                        queueOps: List[AnyQueueOp],
-                       terminationDaemon: TerminationDaemon
+                       terminationDaemon: TerminationDaemon[MetaManagerEnvironment]
                        ): Try[List[BaseMetaManagerCommand]] = {
     val logger = env.logger
     logger.info("processing tasks " + command)
@@ -88,7 +88,7 @@ trait BaseMetaManager extends AnyMetaManager {
         }
       }
       case ReduceQueue(index, reason) => {
-        Success(List(DeleteQueue(0, reason, force = true)))
+        Success(List(DeleteQueue(0, reason, force = false)))
       }
       case DeleteQueue(index, reason, force) if index < queueOps.size => {
         logger.info("deleting queue " + queueOps(index).queue.name)
@@ -135,17 +135,16 @@ trait BaseMetaManager extends AnyMetaManager {
         }
       }
       case FinishCompota(reason, message) => {
-        compota.finishUnDeploy(reason, message).map { res =>
+        compota.finishUnDeploy(env, reason, message).map { res =>
           List(UnDeployMetaManger)
         }
       }
       case UnDeployMetaManger => {
         Try {
           logger.info("deleting control queue " + controlQueueOp.queue.name)
-          controlQueueOp.delete()
-
-          compota.deleteManager(env)
           env.stop()
+          controlQueueOp.delete()
+          compota.deleteManager(env)
 
         }.map { res =>
           List[BaseMetaManagerCommand]()

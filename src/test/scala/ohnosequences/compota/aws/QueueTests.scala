@@ -37,10 +37,10 @@ class QueueTests {
       case Some(aws) => {
         val queue = new DynamoDBQueue("test", intSerializer, Some(bench))
         val context = new DynamoDBContext(
-          metadata = new Metadata {
-            override val artifact: String = "test"
-            override val jarUrl: String = ""
-          },
+          metadata = new Metadata (
+            artifact = "test",
+            jarUrl = ""
+          ),
           logger = logger,
           aws = aws
         )
@@ -68,7 +68,8 @@ class QueueTests {
       } else if (idsToRead.isEmpty) {
         Success(())
       } else {
-        reader.receiveMessage(logger).flatMap { message =>
+        reader.receiveMessage(logger).flatMap { messageRaw =>
+          val message = messageRaw.get
           message.getBody match {
             case Failure(t) => {
               if (readIds.contains(message.id)) {

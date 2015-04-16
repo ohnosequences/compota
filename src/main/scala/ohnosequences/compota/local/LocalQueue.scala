@@ -1,16 +1,15 @@
 package ohnosequences.compota.local
 
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.{ConcurrentSkipListMap, ConcurrentHashMap}
+import java.util.concurrent.{ConcurrentSkipListMap}
+
 import scala.concurrent.{ExecutionContext, Future}
-import ExecutionContext.Implicits.global
 
 
 import ohnosequences.compota.queues._
 import ohnosequences.logging.Logger
 
 import scala.annotation.tailrec
-import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.concurrent.duration.Duration._
 
@@ -56,7 +55,8 @@ object Monkey {
 
 class LocalQueue[T](name: String,
                     val monkeyAppearanceProbability: MonkeyAppearanceProbability = MonkeyAppearanceProbability(),
-                    val visibilityTimeout: Duration = Duration(30, SECONDS)) extends Queue[T, Unit](name) { queue =>
+                    val visibilityTimeout: Duration = Duration(30, SECONDS))
+  extends Queue[T, LocalContext](name) { queue =>
 
   val rawQueue = new ConcurrentSkipListMap[String, T]()
 
@@ -65,12 +65,12 @@ class LocalQueue[T](name: String,
   type Reader = LocalQueueReader[T]
   type Writer = LocalQueueWriter[T]
 
-  override def create(ctx: Unit): Try[QueueOp[T, LocalMessage[T], LocalQueueReader[T], LocalQueueWriter[T]]] = {
-    Monkey.call(Success(new LocalQueueOp[T](queue)), monkeyAppearanceProbability.create)
+  override def create(ctx: LocalContext): Try[QueueOp[T, LocalMessage[T], LocalQueueReader[T], LocalQueueWriter[T]]] = {
+    Monkey.call(Success(new LocalQueueOp[T](queue, ctx)), monkeyAppearanceProbability.create)
   }
 }
 
-class LocalQueueOp[T](val queue: LocalQueue[T]) extends QueueOp[T, LocalMessage[T], LocalQueueReader[T], LocalQueueWriter[T]] { queueOp =>
+class LocalQueueOp[T](val queue: LocalQueue[T], val ctx: LocalContext) extends QueueOp[T, LocalMessage[T], LocalQueueReader[T], LocalQueueWriter[T]] { queueOp =>
 
   override def deleteMessage(message: LocalMessage[T]): Try[Unit] = {
 
@@ -107,41 +107,34 @@ class LocalQueueOp[T](val queue: LocalQueue[T]) extends QueueOp[T, LocalMessage[
   }
 }
 
-class LocalQueueReader[T](queueOps: LocalQueueOp[T]) extends QueueReader[T, LocalMessage[T]] {
+class LocalQueueReader[T](val queueOp: LocalQueueOp[T]) extends QueueReader[T, LocalMessage[T]] {
 
-  override def receiveMessage(logger: Logger, isStopped: => Boolean = {  false}): Try[LocalMessage[T]] = {
-    @tailrec
-    def receiveMessageRec: Try[LocalMessage[T]] = {
-      if (isStopped) {
-        Failure(new Error("client was stopped"))
-      } else {
-        Option(queueOps.queue.rawQueue.pollFirstEntry()) match {
-          case None => {
-            //map is empty
-            //try again
-            logger.debug("queue is empty: " + queueOps.queue.rawQueue.isEmpty)
-            Thread.sleep(1000)
-            receiveMessageRec
-          }
-          case Some(entry) => {
-            val  res = new LocalMessage(entry.getKey, entry.getValue, queueOps.queue.monkeyAppearanceProbability)
-            Future {
-              Thread.sleep(queueOps.queue.visibilityTimeout.toMillis)
-              if(!res.deleted.get()) {
-                logger.info("return message to queue: " + entry.getValue)
-                queueOps.queue.rawQueue.put(entry.getKey, entry.getValue)
-              }
+  override def receiveMessage(logger: Logger): Try[Option[LocalMessage[T]]] = {
+    Option(queueOp.queue.rawQueue.pollFirstEntry()) match {
+      case None => Success(None)
+      case Some(entry) => {
+        val  res = new LocalMessage(entry.getKey, entry.getValue, queueOp.queue.monkeyAppearanceProbability)
+        queueOp.ctx.executor.execute { new Runnable {
+          override def toString: String = queueOp.queue.name + " message extender for " + entry.getKey
+
+          override def run(): Unit = {
+            Thread.sleep(queueOp.queue.visibilityTimeout.toMillis)
+            if(!res.deleted.get()) {
+              logger.info("return message to queue: " + entry.getValue)
+              queueOp.queue.rawQueue.put(entry.getKey, entry.getValue)
             }
-            Success(res)
           }
         }
+
+        }
+//        Future {
+//
+//        }(ExecutionContext.fromExecutor(queueOp.ctx.executor))
+        Success(Some(res))
       }
     }
-
-    Monkey.call(receiveMessageRec, queueOps.queue.monkeyAppearanceProbability.receiveMessage)
-
-
   }
+
 }
 
 class LocalQueueWriter[T](queueOp: LocalQueueOp[T]) extends QueueWriter[T] {

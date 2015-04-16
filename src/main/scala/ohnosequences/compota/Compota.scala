@@ -24,6 +24,8 @@ trait AnyCompota {
     (nispero.name, nispero)
   }.toMap
 
+  def launchMetaManager(): Unit
+
   def configurationChecks(): Boolean = {
     //sinks are leafs
 
@@ -57,17 +59,18 @@ trait AnyCompota {
     val logger = new ConsoleLogger("compotaCLI")
     args.toList match {
       case "run" :: "worker" :: name :: Nil => launchWorker(name)
+      case "run" :: "metamanager" :: Nil => launchMetaManager()
       case _ => logger.error("wrong command")
     }
   }
 
   def unDeployActions(force: Boolean, env: CompotaEnvironment, context: CompotaUnDeployActionContext): Try[String]
 
-  def finishUnDeploy(reason: String, message: String): Try[Unit]
+  def finishUnDeploy(env: CompotaEnvironment, reason: String, message: String): Try[Unit]
 
   def prepareUnDeployActions(env: CompotaEnvironment): Try[CompotaUnDeployActionContext]
 
-  def sendUnDeployCommand(reason: String, force: Boolean): Try[Unit]
+  def sendUnDeployCommand(env: CompotaEnvironment, reason: String, force: Boolean): Try[Unit]
 
   def addTasks(environment: CompotaEnvironment): Try[Unit] //user defined
 
@@ -83,8 +86,7 @@ trait AnyCompota {
 
   def deleteManager(env: CompotaEnvironment): Try[Unit]
 
-  def launchTerminationDaemon(terminationDaemon: TerminationDaemon): Try[Unit]
-
+  def launchTerminationDaemon(terminationDaemon: TerminationDaemon[CompotaEnvironment]): Try[Unit]
 
 }
 

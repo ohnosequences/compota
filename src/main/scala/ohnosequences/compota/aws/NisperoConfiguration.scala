@@ -39,7 +39,7 @@ abstract class AwsCompotaConfiguration(val metadata: AnyMetadata) extends AnyCom
     instanceProfile = instanceProfile,
     deviceMapping = deviceMapping,
     amiId = amiId,
-    userData = userScriptGenerator.generate("manager", "manager", metadata.jarUrl, workingDirectory)
+    userData = userScriptGenerator.generate("manager", "manager", metadata.jarUrl, metadata.testJarUrl, metadata.mainClass, workingDirectory)
   )
 
   def managerPurchaseModel: PurchaseModel = OnDemand
@@ -85,7 +85,7 @@ abstract class AwsNisperoConfiguration(val name: String, val compotaConfiguratio
     instanceProfile = compotaConfiguration.instanceProfile,
     deviceMapping = compotaConfiguration.deviceMapping,
     amiId = compotaConfiguration.amiId,
-    userData = userScriptGenerator.generate(name, "worker", compotaConfiguration.metadata.jarUrl, workerWorkingDirectory)
+    userData = userScriptGenerator.generate(name, "worker", compotaConfiguration.metadata.jarUrl, compotaConfiguration.metadata.testJarUrl, compotaConfiguration.metadata.mainClass, workerWorkingDirectory)
   )
 
   def workerLaunchConfiguration = LaunchConfiguration(

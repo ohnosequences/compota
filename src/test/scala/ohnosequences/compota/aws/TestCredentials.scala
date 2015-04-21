@@ -4,6 +4,6 @@ import ohnosequences.awstools.AWSClients
 
 object TestCredentials {
   val aws: Option[AWSClients] = {
-    generated.test.credentials.credentialsProvider.map (AWSClients.create(_))
+    ohnosequences.compota.test.generated.credentials.credentialsProvider.map (AWSClients.create(_))
   }
 }

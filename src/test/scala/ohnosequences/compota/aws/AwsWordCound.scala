@@ -57,7 +57,12 @@ class AwsWordCount {
     serializer = intSerializer
   )
 
-  val metadata = new Metadata("artifact", "jar_url")
+  val rawMetadata = ohnosequences.compota.test.generated.metadata
+  val metadata = new Metadata(
+    rawMetadata.artifact,
+    rawMetadata.jarUrl,
+    rawMetadata.testJarUrl,
+    Some(this.getClass.toString))
 
   object wordCountCompotaConfiguration extends AwsCompotaConfiguration(metadata) {
 
@@ -90,32 +95,32 @@ class AwsWordCount {
   )
 
 
+  val reducer = InMemoryQueueReducer.create(countsQueue, intMonoid)
+
+  object wordCountCompota extends AwsCompota[Int](List(splitNispero, wordLengthNispero), List(reducer), wordCountCompotaConfiguration) {
+
+    val s = System.currentTimeMillis()
+
+    override def prepareUnDeployActions(env: wordCountCompota.CompotaEnvironment): Try[Int] = Success(1000)
+
+    override def addTasks(environment: AwsEnvironment): Try[Unit] = {
+      environment.logger.debug("test")
+      // environment.logger.error(new Error("exception"))
+      val op = textQueue.create(environment.createDynamoDBContext()).get
+      val writer = op.writer.get
+      writer.writeRaw(List(("1", "a a a b b")))
+    }
+
+    override def unDeployActions(force: Boolean, env: AwsEnvironment, context: Int): Try[String] = {
+      Success("message context = " +context)
+
+    }
+  }
 
   @Test
   def localCompotaTest(): Unit = {
-    val logger = new ConsoleLogger("localCompotaTest", debug = false)
 
-    val reducer = InMemoryQueueReducer.create(countsQueue, intMonoid)
 
-    object wordCountCompota extends AwsCompota[Int](List(splitNispero, wordLengthNispero), List(reducer), wordCountCompotaConfiguration) {
-
-      val s = System.currentTimeMillis()
-
-      override def prepareUnDeployActions(env: wordCountCompota.CompotaEnvironment): Try[Int] = Success(1000)
-
-      override def addTasks(environment: AwsEnvironment): Try[Unit] = {
-        environment.logger.debug("test")
-        // environment.logger.error(new Error("exception"))
-        val op = textQueue.create(environment.createDynamoDBContext()).get
-        val writer = op.writer.get
-        writer.writeRaw(List(("1", "a a a b b")))
-      }
-
-      override def unDeployActions(force: Boolean, env: AwsEnvironment, context: Int): Try[String] = {
-        Success("message context = " +context)
-
-      }
-    }
 
    // wordCountCompota.launch()
    // wordCountCompota.waitForFinished()

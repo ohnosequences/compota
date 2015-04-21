@@ -39,7 +39,8 @@ class QueueTests {
         val context = new DynamoDBContext(
           metadata = new Metadata (
             artifact = "test",
-            jarUrl = ""
+            jarUrl = "",
+            None, None
           ),
           logger = logger,
           aws = aws

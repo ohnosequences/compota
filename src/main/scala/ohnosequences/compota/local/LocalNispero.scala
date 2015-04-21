@@ -24,6 +24,15 @@ class LocalNispero[In, Out, InContext, OutContext, InQueue <: Queue[In, InContex
 
 }
 
+class LocalNisperoLocal[In, Out, InQueue <: Queue[In, LocalContext], OutQueue <: Queue[Out, LocalContext]](
+                                                                                                                         inputQueue: InQueue,
+                                                                                                                         outputQueue: OutQueue,
+                                                                                                                         instructions: Instructions[In, Out],
+                                                                                                                         workers: Int)
+  extends LocalNispero[In, Out, LocalContext, LocalContext, InQueue, OutQueue](inputQueue, {e: LocalEnvironment => e.localContext}, outputQueue, {e: LocalEnvironment => e.localContext}, instructions, workers) with AnyLocalNispero {
+
+}
+
 
 object LocalNispero {
   def apply[In, Out, InQueue <: Queue[In, LocalContext], OutQueue <: Queue[Out, LocalContext]](

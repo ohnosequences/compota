@@ -29,6 +29,12 @@ class InMemoryQueueReducer[E <: AnyEnvironment, I, C, Q <: Queue[I, C]](queue: Q
   }
 }
 
+
+class InMemoryQueueReducerLocal[I, Q <: Queue[I, LocalContext]](queue: Q,
+                                                                monoid: Monoid[I],
+                                                                monkeyAppearanceProbability: MonkeyAppearanceProbability = MonkeyAppearanceProbability())
+  extends InMemoryQueueReducer[LocalEnvironment, I, LocalContext, Q](queue, {e: LocalEnvironment => e.localContext}, monoid, monkeyAppearanceProbability)
+
 object InMemoryQueueReducer {
   def apply[I, Q <: Queue[I, LocalContext]](
                                                           queue: Q,

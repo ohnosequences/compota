@@ -19,6 +19,7 @@ import ohnosequences.compota.queues._
 import ohnosequences.compota.serialization.Serializer
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration._
 
@@ -38,7 +39,6 @@ class RawItem(val id: String, val value: String) {
 }
 
 class DynamoDBQueueWriter[T](queueOp: DynamoDBQueueOP[T], serializer: Serializer[T]) extends QueueWriter[T] {
-  //def write(originId: String, writer: String, values: List[Element]): Try[Unit]
 
   val logger = new ConsoleLogger("dynamodb writer")
 
@@ -72,11 +72,11 @@ class DynamoDBMessage[T](val sqsMessage: Message, queueOp: DynamoDBQueueOP[T], b
   override def getBody: Try[T] = {
     val itemWrap = queueOp.logger.benchExecute("DynamoDB read", bench) {
       DynamoDBUtils.getItem(
-        queueOp.aws.ddb,
-        queueOp.tableName,
+        ddb = queueOp.aws.ddb,
+        logger = Some(queueOp.logger),
+        tableName = queueOp.tableName,
         key = Map(DynamoDBQueue.idAttr -> new AttributeValue().withS(id)),
-        attributesToGet = List(DynamoDBQueue.idAttr, DynamoDBQueue.valueAttr),
-        queueOp.logger
+        attributesToGet = List(DynamoDBQueue.idAttr, DynamoDBQueue.valueAttr)
       )
     }
 
@@ -127,9 +127,9 @@ class DynamoDBQueueOP[T](val queue: DynamoDBQueue[T], val tableName: String, val
 
     logger.benchExecute("DynamoDB delete", bench){DynamoDBUtils.deleteItem(
       aws.ddb,
+      Some(logger),
       tableName,
-      Map(DynamoDBQueue.idAttr -> new AttributeValue().withS(message.id)),
-      logger
+      Map(DynamoDBQueue.idAttr -> new AttributeValue().withS(message.id))
     )}
 
     //todo think about that!
@@ -139,24 +139,53 @@ class DynamoDBQueueOP[T](val queue: DynamoDBQueue[T], val tableName: String, val
     }
   }
 
-  //todo size
-
-
   override def size: Try[Int] = Success(0)
 
-  override def delete(): Try[Unit] = ???
+  override def delete(): Try[Unit] = {
+    DynamoDBUtils.deleteTable(aws.ddb, tableName).flatMap { res =>
+      SQSUtils.deleteQueue(aws.sqs.sqs, sqsUrl)
+    }
+  }
 
   override def writer: Try[DynamoDBQueueWriter[T]] = Success(new DynamoDBQueueWriter[T](DynamoDBQueueOP.this, serializer))
 
-  override def isEmpty: Try[Boolean] = ???
+  override def isEmpty: Try[Boolean] = {
+    DynamoDBUtils.isEmpty(aws.ddb, tableName, Some(logger))
+  }
 
-  override def read(key: String): Try[T] = ???
+  override def get(key: String): Try[T] = {
 
-  override def list(lastKey: Option[String], limit: Option[Int]): Try[(Option[String], List[String])] = ???
+    DynamoDBUtils.getItem(
+      ddb = aws.ddb,
+      logger = Some(logger),
+      tableName = tableName,
+      Map(DynamoDBQueue.idAttr -> new AttributeValue().withS(key)),
+      attributesToGet = Seq(DynamoDBQueue.valueAttr)
+    ).flatMap { item =>
+      serializer.fromString(item(DynamoDBQueue.valueAttr).getS)
+    }
+  }
+
+
+  override def list(lastKey: Option[String], limit: Option[Int]): Try[(Option[String], List[String])] = {
+    DynamoDBUtils.list(
+      ddb = aws.ddb,
+      logger = Some(logger),
+      tableName = tableName,
+      lastKey = lastKey.map { v => Map(DynamoDBQueue.idAttr -> new AttributeValue().withS(v)) },
+      attributesToGet = Seq(DynamoDBQueue.idAttr),
+      limit = limit
+    ).map { res =>
+      (res._1.flatMap { i => i.get(DynamoDBQueue.idAttr).map(_.getS)},
+      res._2.map { i => i(DynamoDBQueue.idAttr).getS})
+    }
+
+  }
 
   override def reader: Try[DynamoDBQueueReader[T]] = Success(new DynamoDBQueueReader[T](DynamoDBQueueOP.this))
 
-
+  //todo improve performance
+ // override def forEach[T](f: (String, T) => T): Try[Unit] = super.forEach(f)
 }
 
 object DynamoDBQueue {

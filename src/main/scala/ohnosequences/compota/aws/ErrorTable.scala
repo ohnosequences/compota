@@ -2,7 +2,7 @@ package ohnosequences.compota.aws
 
 import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ScalarAttributeType, AttributeDefinition}
 import ohnosequences.awstools.AWSClients
-import ohnosequences.awstools.dynamodb.DynamoDBUtils
+import ohnosequences.awstools.dynamodb.{RepeatConfiguration, DynamoDBUtils}
 import ohnosequences.compota.Namespace
 import ohnosequences.compota.environment.InstanceId
 import ohnosequences.logging.Logger
@@ -21,11 +21,11 @@ class ErrorTable(logger: Logger, tableName: String, aws: AWSClients) {
       rangeKeyName -> rangeKey(instanceId),
       bodyKeyName ->  new AttributeValue().withS(message)
     )
-    DynamoDBUtils.putItem(aws.ddb, logger, tableName, item, 10)
+    DynamoDBUtils.putItem(aws.ddb, Some(logger), tableName, item, RepeatConfiguration(attemptThreshold = 10))
   }
 
   def getNameSpaceErrorsCount(nameSpace: Namespace): Try[Int] = {
-    DynamoDBUtils.countKeysPerHash(aws.ddb, logger, tableName, hashKeyName, hashKey(nameSpace), 5)
+    DynamoDBUtils.countKeysPerHash(aws.ddb, Some(logger), tableName, hashKeyName, hashKey(nameSpace), RepeatConfiguration(attemptThreshold = 10))
   }
 
   def recover(): Try[Unit] = {

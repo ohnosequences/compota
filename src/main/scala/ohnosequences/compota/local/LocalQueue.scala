@@ -102,7 +102,7 @@ class LocalQueueOp[T](val queue: LocalQueue[T], val ctx: LocalContext) extends Q
     Monkey.call(Success(queue.rawQueue.size()), queue.monkeyAppearanceProbability.size)
   }
 
-  override def read(key: String): Try[T] = {
+  override def get(key: String): Try[T] = {
     Monkey.call(Success(queue.rawQueue.get(key)), queue.monkeyAppearanceProbability.read)
   }
 }

@@ -1,6 +1,7 @@
 package ohnosequences.compota.metamanager
 
-import java.util.concurrent.{Executors, ExecutorService}
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.{ConcurrentHashMap, Executors, ExecutorService}
 
 import ohnosequences.compota.environment.AnyEnvironment
 import ohnosequences.compota.graphs.NisperoGraph
@@ -31,6 +32,18 @@ trait AnyMetaManager {
   def initMessage(): MetaManagerCommand
 
 
+  val runingTasks = new ConcurrentHashMap[String, AtomicInteger]()
+
+
+  def getProcessingTasks(): List[(String, Int)] = {
+    import scala.collection.JavaConversions._
+    runingTasks.filter { case (p, i) =>
+      i.get() > 0
+    }.map { case (p, i) =>
+      (p, i.get())
+    }.toList
+  }
+
   def process(command: MetaManagerCommand,
               env: MetaManagerEnvironment,
               unDeployActionsContext: MetaManagerUnDeployingActionContext,
@@ -45,6 +58,7 @@ trait AnyMetaManager {
                                    context: MetaManagerEnvironment => QContext
 
   ): Unit = {
+
 
     @tailrec
     def messageLoop(queueOp: QueueOp[MetaManagerCommand, queue.Msg, queue.Reader, queue.Writer],
@@ -78,6 +92,9 @@ trait AnyMetaManager {
               Try{env.executor.execute (  new Runnable {
                 override def toString: String = body.prefix + " executor"
                 override def run(): Unit = {
+                  runingTasks.putIfAbsent(body.prefix, new AtomicInteger())
+                  runingTasks.get(body.prefix).incrementAndGet()
+
                   logger.debug("processing message " + body)
                   process(body, env, unDeployingActionsContext, queueOp, queueOps, terminationDaemon) match {
                     case Failure(t) => {
@@ -98,6 +115,7 @@ trait AnyMetaManager {
                       }
                     }
                   }
+                  runingTasks.get(body.prefix).decrementAndGet()
                 }
               })}
             }
@@ -108,6 +126,8 @@ trait AnyMetaManager {
         Success(())
       }
     }
+
+
 
 
     val logger = env.logger

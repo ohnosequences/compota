@@ -149,7 +149,7 @@ abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: Q
 
   def list(lastKey: Option[String], limit: Option[Int] = None): Try[(Option[String], List[String])]
 
-  def read(key: String): Try[E]
+  def get(key: String): Try[E]
 
   def forEachId[T](f: String => T): Try[Unit] = {
 
@@ -175,7 +175,7 @@ abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: Q
   def forEach[T](f: (String, E) => T): Try[Unit] = {
     Try {
       forEachId { id =>
-        f(id, read(id).get)
+        f(id, get(id).get)
       }
     }
   }

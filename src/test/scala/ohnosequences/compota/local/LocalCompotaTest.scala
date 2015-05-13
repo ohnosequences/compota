@@ -90,7 +90,7 @@ object wordCountCompota extends LocalCompota[Int](List(splitNispero, wordLengthN
 class LocalCompotaTest {
 
 
-  @Test
+  //@Test
   def localCompotaTest(): Unit = {
     wordCountCompota.launch()
     wordCountCompota.waitForFinished()

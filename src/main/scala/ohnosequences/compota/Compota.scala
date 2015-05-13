@@ -18,15 +18,17 @@ trait AnyCompota {
   val nisperos: List[Nispero]
   val reducers: List[AnyQueueReducer.of[CompotaEnvironment]]
 
+  def name: String = "compota"
+
   val baseConfiguration: AnyCompotaConfiguration
 
-  val nisperosNames: Map[String, Nispero] =  nisperos.map { nispero =>
+  def nisperosNames: Map[String, Nispero] =  nisperos.map { nispero =>
     (nispero.name, nispero)
   }.toMap
 
   def launchMetaManager(): Unit
 
-  def configurationChecks(): Boolean = {
+  def configurationChecks(env: CompotaEnvironment): Try[Boolean] = {
     //sinks are leafs
 
     //reducers have different queues!!!!
@@ -38,7 +40,7 @@ trait AnyCompota {
     //      //etc
     //      true
     //    }
-    true
+    Success(true)
   }
 
   def launchWorker(nispero: Nispero): Unit

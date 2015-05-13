@@ -42,6 +42,10 @@ abstract class AwsCompota[U] (
     new S3Logger(awsClients.s3, prefix, configuration.loggerDebug, workingDir, logFile)
   }
 
+  def executeLocal(prefix: String)(statement: AwsEnvironment => Unit): Unit = {
+
+  }
+
   def execute(prefix: String, workingDirectory: File, logFile: File, isMetaManager: Boolean)(statement: AwsEnvironment => Unit): Unit = {
 
     val instanceID = awsClients.ec2.getCurrentInstanceId.getOrElse("unknown")

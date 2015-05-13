@@ -15,8 +15,8 @@ trait BaseMetaManager extends AnyMetaManager {
 
   override def initMessage(): BaseMetaManagerCommand = CreateNisperoWorkers(0)
 
-  val unDeployActionStarted = new AtomicBoolean(false)
-  val unDeployActionForce = new AtomicBoolean(false)
+ // val unDeployActionStarted = new AtomicBoolean(false)
+ // val unDeployActionForce = new AtomicBoolean(false)
 
   override def process(command: BaseMetaManagerCommand,
                        env: MetaManagerEnvironment,
@@ -103,14 +103,15 @@ trait BaseMetaManager extends AnyMetaManager {
       }
 
       case UnDeployActions(reason, true) => {
-        if(unDeployActionStarted.get() && unDeployActionForce.get()) {
-          logger.info("undeploy actions has been already started")
-          Success(List[BaseMetaManagerCommand]())
-        } else {
-          logger.info("running undeploy actions force=true")
-          unDeployActionForce.set(true)
-          unDeployActionStarted.set(true)
+//        if(unDeployActionStarted.get() && unDeployActionForce.get()) {
+//          logger.info("undeploy actions has been already started")
+//          Success(List[BaseMetaManagerCommand]())
+//        } else {
+//          logger.info("running undeploy actions force=true")
+//          unDeployActionForce.set(true)
+//          unDeployActionStarted.set(true)
 
+        //skip undeploy steps in case of error
           Try{compota.unDeployActions(true, env, unDeployContext)}.flatMap{e => e} match {
             case Success(message) => Success(List(FinishCompota(reason, message)))
             case Failure(t) => {
@@ -118,21 +119,21 @@ trait BaseMetaManager extends AnyMetaManager {
               Success(List(FinishCompota(reason, t.toString)))
             }
           }
-        }
+       // }
       }
       case UnDeployActions(reason, false) => {
-        if(unDeployActionStarted.get()) {
-          logger.info("undeploy actions has been already started")
-          Success(List[BaseMetaManagerCommand]())
-        } else {
-          logger.info("running undeploy actions")
-          unDeployActionStarted.set(true)
-          unDeployActionForce.set(false)
+//        if(unDeployActionStarted.get()) {
+//          logger.info("undeploy actions has been already started")
+//          Success(List[BaseMetaManagerCommand]())
+//        } else {
+//          logger.info("running undeploy actions")
+//          unDeployActionStarted.set(true)
+//          unDeployActionForce.set(false)
 
           Try{compota.unDeployActions(false, env, unDeployContext)}.flatMap{e => e}.map { message =>
             List(FinishCompota(reason, message))
           }
-        }
+       // }
       }
       case FinishCompota(reason, message) => {
         compota.finishUnDeploy(env, reason, message).map { res =>

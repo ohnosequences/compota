@@ -1,5 +1,6 @@
 package ohnosequences.compota.aws
 
+import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.compota.aws.deployment.Metadata
 import ohnosequences.compota.aws.queues.DynamoDBQueue
 import ohnosequences.compota.local.LocalNispero
@@ -103,6 +104,17 @@ class AwsWordCount {
 
     override def prepareUnDeployActions(env: wordCountCompota.CompotaEnvironment): Try[Int] = Success(1000)
 
+
+    override def configurationChecks(env: CompotaEnvironment): Try[Boolean] = {
+      Try{
+        configuration.metadata.testJarUrl.exists { s =>
+          ObjectAddress(s).map { obj =>
+            env.awsClients.s3.objectExists(obj, Some(env.logger))
+          }.getOrElse(false)
+        }
+      }
+    }
+
     override def addTasks(environment: AwsEnvironment): Try[Unit] = {
       environment.logger.debug("test")
       // environment.logger.error(new Error("exception"))
@@ -119,6 +131,8 @@ class AwsWordCount {
 
   @Test
   def localCompotaTest(): Unit = {
+
+    wordCountCompota()
 
 
 

@@ -16,21 +16,24 @@ class TerminationDaemon[E <: AnyEnvironment](nisperoGraph: NisperoGraph,
                         terminationDaemonIdleTime: Duration) {
   def start(environment: E): Try[Unit] = {
 
+    def isTimeoutReached: Boolean = {
+      (System.currentTimeMillis() - startedTime) > timeout.toMillis
+    }
 
     @tailrec
-    def startRec():  Try[Unit] = {
+    def startRec(): Try[Unit] = {
 
-      if (environment.isStopped) {
-        Success(())
-      } else if ((System.currentTimeMillis() - startedTime) > timeout.toMillis) {
+      if (isTimeoutReached) {
         environment.logger.info("reached compota timeout: " + timeout.toMinutes + " mins")
         environment.logger.info("sending undeploy command")
-        sendUnDeployCommand(environment, "timeout", true).recover { case t =>
+        sendUnDeployCommand(environment, "timeout", true).recoverWith[Unit] { case t =>
           environment.reportError(terminationDaemon / "send_undeploy_command", new Error("couldn't send undeploy command", t))
-          Failure(t)
+          Failure[Unit](t)
         }
         environment.logger.info("stopping termination daemon")
         environment.stop()
+        Success[Unit](())
+      } else if (environment.isStopped) {
         Success(())
       } else {
         nisperoGraph.checkQueues(environment) match {
@@ -56,6 +59,7 @@ class TerminationDaemon[E <: AnyEnvironment](nisperoGraph: NisperoGraph,
         startRec()
       }
     }
+
     startRec()
   }
 }

@@ -88,7 +88,7 @@ class ConsolePlan(users: Users, console: Console) extends Plan with Secured // a
     }
 
     case GET(Path(Seg("log" :: id :: Nil))) => {
-      console.getTaskLog(id) match {
+      console.getNamespaceLog(id) match {
         case Some(Left(url)) => Redirect(url.toString)
         case Some(Right(log)) => ResponseString(log)
         case None => NotFound
@@ -125,6 +125,21 @@ class ConsolePlan(users: Users, console: Console) extends Plan with Secured // a
         }
       }
     }
+
+    case GET(Path(Seg("error" :: "message" :: namespase :: timestamp :: instanceId ::  Nil))) => {
+      console.printMessage(namespase, timestamp, instanceId) match {
+        case Success(s) => ResponseString(s)
+        case Failure(t) => NotFound
+      }
+    }
+
+    case GET(Path(Seg("error" :: "stackTrace" :: namespase :: timestamp :: instanceId ::  Nil))) => {
+      console.printStackTrace(namespase, timestamp, instanceId) match {
+        case Success(s) => ResponseString(s)
+        case Failure(t) => NotFound
+      }
+    }
+
 
     case GET(Path(Seg("nispero" :: nispero :: "workerInstances" ::  Nil))) => {
       ResponseString(console.workersInfo(nispero).toString())

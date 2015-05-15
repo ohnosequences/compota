@@ -18,9 +18,7 @@ trait AnyCompota {
   val nisperos: List[Nispero]
   val reducers: List[AnyQueueReducer.of[CompotaEnvironment]]
 
-  def name: String = "compota"
-
-  val baseConfiguration: AnyCompotaConfiguration
+  val configuration: AnyCompotaConfiguration
 
   def nisperosNames: Map[String, Nispero] =  nisperos.map { nispero =>
     (nispero.name, nispero)
@@ -99,7 +97,7 @@ object AnyCompota {
 abstract class Compota[E <: AnyEnvironment, N <: AnyNispero.of[E], U](
                                                                     override val nisperos: List[N],
                                                                     override val reducers: List[AnyQueueReducer.of[E]],
-                                                                    val baseConfiguration: AnyCompotaConfiguration)
+                                                                    val configuration: AnyCompotaConfiguration)
   extends AnyCompota {
 
   type Nispero = N

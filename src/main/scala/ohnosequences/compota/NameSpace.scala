@@ -14,7 +14,7 @@ object Namespace {
   val worker = new Namespace("worker")
 }
 
-class Namespace(val stringRep: String) {  namespace =>
+case class Namespace(stringRep: String) {  namespace =>
   def /(subSpace: Namespace): Namespace = {
     new Namespace(stringRep + Namespace.separator + subSpace.stringRep)
   }

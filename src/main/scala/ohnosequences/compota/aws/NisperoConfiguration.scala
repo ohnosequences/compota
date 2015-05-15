@@ -3,7 +3,7 @@ package ohnosequences.compota.aws
 import ohnosequences.awstools.autoscaling._
 import ohnosequences.awstools.ec2.{InstanceType, InstanceSpecs}
 import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.compota.AnyCompotaConfiguration
+import ohnosequences.compota.{AnyNisperoConfiguration, AnyCompotaConfiguration}
 import ohnosequences.compota.aws.deployment.{AnyMetadata, Metadata, userScriptGenerator}
 
 
@@ -72,7 +72,7 @@ abstract class AwsCompotaConfiguration(val metadata: AnyMetadata) extends AnyCom
 //class CompotaConfiguration(val name: String) extends CompotaConfigurationAux
 
 
-abstract class AwsNisperoConfiguration(val name: String, val compotaConfiguration: AwsCompotaConfiguration) {
+abstract class AwsNisperoConfiguration(val name: String, val compotaConfiguration: AwsCompotaConfiguration) extends AnyNisperoConfiguration {
 
   def workerInstanceType = compotaConfiguration.workerInstanceType
 

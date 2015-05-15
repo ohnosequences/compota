@@ -30,9 +30,6 @@ trait AnyNispero {
   val instructions: Instructions[Input, Output]
 
 
-
- // val inContext: Environment => InputQueue
-
   def name: String = instructions.name
 
 
@@ -67,7 +64,8 @@ abstract class Nispero[In, Out, Env <: AnyEnvironment, InCtx, OutCtx, InQueue <:
   val inContext: Env => InCtx,
   val outputQueue: OutQueue,
   val outContext: Env => OutCtx,
-  val instructions: Instructions[In, Out]
+  val instructions: Instructions[In, Out],
+  val configuration: AnyNisperoConfiguration
 )
 extends AnyNispero { nispero =>
 

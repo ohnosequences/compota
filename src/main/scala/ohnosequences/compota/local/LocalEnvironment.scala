@@ -8,10 +8,11 @@ import ohnosequences.logging.{FileLogger, Logger}
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try
+import scala.collection.JavaConversions._
 
 
 class LocalEnvironment(val executor: ExecutorService,
-                        val logger: Logger,
+                        val logger: FileLogger,
                         val workingDirectory: File,
                         val errorCounts: ConcurrentHashMap[String, Int],
                         val configuration: LocalCompotaConfiguration,
@@ -20,6 +21,10 @@ class LocalEnvironment(val executor: ExecutorService,
 
   //type
 
+
+  def instanceLogFile: File = {
+    logger.logFile
+  }
 
   val isStoppedFlag = new java.util.concurrent.atomic.AtomicBoolean(false)
 
@@ -34,8 +39,15 @@ class LocalEnvironment(val executor: ExecutorService,
   //override val logger: Logger = new FileLogger("logger", logFile, debug = true, false)
 
   override def stop(): Unit ={
+    //logger. flush????
     isStoppedFlag.set(true)
  //   thread.stop()
+  }
+
+  def getThreadInfo: Option[(Thread, Array[StackTraceElement])] = {
+    Thread.getAllStackTraces.find { case (t, st) =>
+      t.getName.eq(instanceId.id)
+    }
   }
 
 
@@ -77,7 +89,10 @@ object LocalEnvironment {
     val env: LocalEnvironment = new LocalEnvironment(executor, envLogger, workingDirectory, errorCount, configuration, sendUnDeployCommand)
 
     executor.execute(new Runnable {
-      override def run(): Unit = statement(env)
+      override def run(): Unit = {
+        Thread.currentThread().setName(env.instanceId.id)
+        statement(env)
+      }
     })
     env
   }

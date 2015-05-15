@@ -1,5 +1,6 @@
 package ohnosequences.compota.queues
 
+import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 
 import ohnosequences.logging.Logger
@@ -120,8 +121,6 @@ object AnyQueue {
 
 trait AnyQueueOp {
 
-
-
   type QElement
   type QMessage <: QueueMessage[QElement]
   type Reader <: QueueReader[QElement, QMessage]
@@ -133,10 +132,25 @@ trait AnyQueueOp {
 
   def delete(): Try[Unit]
 
+  def get(key: String): Try[QElement]
+
+  def getContent(key: String): Try[Either[URL, String]] = {
+    get(key).map { r =>
+      Right(r.toString)
+    }
+  }
+
+  def list(lastKey: Option[String], limit: Option[Int] = None): Try[(Option[String], List[String])]
+
 }
 
 // all these types are here just for convenience
 abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: QueueWriter[E]] extends AnyQueueOp { queueOp =>
+
+  type QElement = E
+  type QMessage = M
+  type Reader = QR
+  type Writer = QW
 
   def deleteMessage(message: M): Try[Unit]
 
@@ -147,9 +161,9 @@ abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: Q
 
   def delete(): Try[Unit]
 
-  def list(lastKey: Option[String], limit: Option[Int] = None): Try[(Option[String], List[String])]
 
-  def get(key: String): Try[E]
+
+
 
   def forEachId[T](f: String => T): Try[Unit] = {
 

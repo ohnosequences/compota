@@ -2,7 +2,7 @@ package ohnosequences.compota.environment
 
 import java.util.concurrent.ExecutorService
 
-import ohnosequences.compota.Namespace
+import ohnosequences.compota.{ErrorTable, Namespace}
 import ohnosequences.logging.Logger
 
 import java.io.File
@@ -17,6 +17,8 @@ abstract class AnyEnvironment {
   def instanceId: InstanceId
 
   val logger: Logger
+
+  val errorTable: ErrorTable
 
   val executor: ExecutorService
 

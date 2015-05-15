@@ -2,6 +2,7 @@ package ohnosequences.compota.local.metamanager
 
 import java.util.concurrent.ConcurrentHashMap
 
+import ohnosequences.compota.environment.InstanceId
 import ohnosequences.compota.metamanager.{BaseMetaManager, AnyMetaManager}
 import ohnosequences.compota.queues.{AnyQueueOp, AnyQueueReducer}
 
@@ -14,7 +15,7 @@ import scala.util.{Failure, Success, Try}
 
 class LocalMetaManager[U](
                         val compota: LocalCompota[U],
-                        nisperoEnvironments: ConcurrentHashMap[String, ConcurrentHashMap[String, LocalEnvironment]]
+                        nisperoEnvironments: ConcurrentHashMap[InstanceId, (AnyLocalNispero, LocalEnvironment)]
                         ) extends BaseMetaManager {
 
   override type MetaManagerEnvironment = LocalEnvironment

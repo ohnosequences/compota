@@ -4,11 +4,11 @@ import ohnosequences.compota.{AnyNispero, Nispero, Instructions}
 import ohnosequences.compota.queues.Queue
 
 trait AnyLocalNispero extends AnyNispero {
- // val configuration: AwsNisperoConfigurationAux
+
+  val localConfiguration: LocalNisperoConfiguration
 
   override type NisperoEnvironment = LocalEnvironment
 
-  val workers: Int
 
 }
 
@@ -19,8 +19,14 @@ class LocalNispero[In, Out, InContext, OutContext, InQueue <: Queue[In, InContex
                                                                                    outputQueue: OutQueue,
                                                                                    outContext: LocalEnvironment => OutContext,
                                                                                    instructions: Instructions[In, Out],
-                                                                                   val workers: Int)
-  extends Nispero[In, Out, LocalEnvironment, InContext, OutContext, InQueue, OutQueue](inputQueue, inContext, outputQueue, outContext, instructions) with AnyLocalNispero {
+                                                                                   val localConfiguration: LocalNisperoConfiguration)
+  extends Nispero[In, Out, LocalEnvironment, InContext, OutContext, InQueue, OutQueue](
+    inputQueue,
+    inContext,
+    outputQueue,
+    outContext,
+    instructions,
+    localConfiguration) with AnyLocalNispero {
 
 }
 
@@ -28,7 +34,8 @@ class LocalNisperoLocal[In, Out, InQueue <: Queue[In, LocalContext], OutQueue <:
                                                                                                                          inputQueue: InQueue,
                                                                                                                          outputQueue: OutQueue,
                                                                                                                          instructions: Instructions[In, Out],
-                                                                                                                         workers: Int)
+                                                                                                                         localConfiguration: LocalNisperoConfiguration
+                                                                                                            )
   extends LocalNispero[In, Out, LocalContext, LocalContext, InQueue, OutQueue](inputQueue, {e: LocalEnvironment => e.localContext}, outputQueue, {e: LocalEnvironment => e.localContext}, instructions, workers) with AnyLocalNispero {
 
 }
@@ -39,12 +46,12 @@ object LocalNispero {
                                                                                  inputQueue: InQueue,
                                                                                  outputQueue: OutQueue,
                                                                                  instructions: Instructions[In, Out],
-                                                                                 worker: Int):
+                                                                                 localConfiguration: LocalNisperoConfiguration):
   LocalNispero[In, Out, LocalContext, LocalContext, InQueue, OutQueue] = new LocalNispero[In, Out, LocalContext, LocalContext, InQueue, OutQueue](
   inputQueue, {e: LocalEnvironment => e.localContext},
   outputQueue, {e: LocalEnvironment => e.localContext},
   instructions,
-  worker)
+  localConfiguration)
 }
 
 

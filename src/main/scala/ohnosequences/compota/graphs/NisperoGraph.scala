@@ -28,7 +28,7 @@ object NisperoGraph {
 }
 
 
-class NisperoGraph(graph: Graph[String, String], nisperos: Map[String, AnyNispero], queues: Map[String, AnyQueueOp]) {
+class NisperoGraph(graph: Graph[String, String], nisperos: Map[String, AnyNispero], val queues: Map[String, AnyQueueOp]) {
 
   val sortedQueueNames = graph.sort
 

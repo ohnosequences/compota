@@ -77,7 +77,10 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
 
     val workerDirectory = new File(localConfiguration.workingDirectory, "worker_" + nispero.configuration.name)
 
-    LocalEnvironment.execute(executor,
+    LocalEnvironment.execute(
+      instancesEnvironments,
+      Some(nispero),
+      executor,
       errorTable,
       "worker_" + nispero.configuration.name,
       localConfiguration.workingDirectory,
@@ -98,6 +101,8 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
     val workerDirectory = new File(localConfiguration.workingDirectory, prefix)
 
     val env = LocalEnvironment.execute(
+      instancesEnvironments,
+      Some(nispero),
       executor,
       errorTable,
       prefix,
@@ -110,11 +115,13 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
       nispero.createWorker().start(env)
     }
 
-    instancesEnvironments.put(env.instanceId, (nispero, env))
+
   }
 
   def launchMetaManager(): Unit = {
     LocalEnvironment.execute(
+      instancesEnvironments,
+      None,
       executor,
       errorTable,
       "metamanager",localConfiguration.workingDirectory,
@@ -131,6 +138,8 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
 
   override def launchTerminationDaemon(terminationDaemon: TerminationDaemon[CompotaEnvironment]): Try[Unit] = {
     LocalEnvironment.execute(
+      instancesEnvironments,
+      None,
       executor,
       errorTable,
       "termination daemon",
@@ -177,8 +186,10 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
         if (n.configuration.name.equals(nispero.configuration.name)) {
           env.logger.debug("stopping environment: " + id)
           e.stop()
+
         }
       }
+
     }
   }
 

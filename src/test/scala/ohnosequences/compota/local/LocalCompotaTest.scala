@@ -28,7 +28,7 @@ object splitInstructions extends Instructions[String, String] {
   override type Context = Unit
 
   override def solve(logger: Logger, context: Unit, input: String): Try[List[String]] = {
-    Thread.sleep(10000)
+    Thread.sleep(100000)
     Success(input.split("\\s+").toList)
   }
 

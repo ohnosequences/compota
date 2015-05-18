@@ -167,7 +167,7 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
       import scala.collection.JavaConversions._
 
       Thread.getAllStackTraces.foreach { case (thread, sts) =>
-        resp.append(thread + ":" + thread.getState)
+        resp.append(thread + ":" + thread.getState + System.lineSeparator())
         sts.foreach { st =>
           resp.append("      " + st.toString + System.lineSeparator())
         }

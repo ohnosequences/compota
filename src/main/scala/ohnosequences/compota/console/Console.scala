@@ -69,23 +69,23 @@ trait AnyWorkerInfo {
   def printConnectAction: NodeSeq = {
     <a class="btn btn-info sshInstance" href="#" data-id={instanceId.id}>
       <i class="icon-refresh icon-white"></i>
-      Connect</a>
+      SSH</a>
   }
 
   def printTerminateAction: NodeSeq = {
-    <a class="btn btn-danger terminate" href="#" data-id={instanceId.id}>
+    <a class="btn btn-danger terminateInstance" href="#" data-id={instanceId.id}>
       <i class="icon-refresh icon-white"></i>
       Terminate</a>
   }
 
   def printStackTrace: NodeSeq = {
-    <a class="btn btn-info stackTrace" href="#" data-id={instanceId.id}>
+    <a class="btn btn-info instanceStackTrace" href="#" data-id={instanceId.id}>
       <i class="icon-refresh icon-white"></i>
       StackTrace</a>
   }
 
   def viewLog: NodeSeq = {
-    <a class="btn btn-info viewLog" href="#" data-id={instanceId.id}>
+    <a class="btn btn-info instanceLog" href="#" data-id={instanceId.id}>
       <i class="icon-refresh icon-white"></i>
       ViewLog</a>
   }

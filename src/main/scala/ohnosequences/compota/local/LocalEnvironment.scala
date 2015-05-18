@@ -79,7 +79,9 @@ class LocalEnvironment(val executor: ExecutorService,
 }
 
 object LocalEnvironment {
-  def execute(executor: ExecutorService,
+  def execute(instancesEnvironments: ConcurrentHashMap[InstanceId, (AnyLocalNispero, LocalEnvironment)],
+              nispero: Option[AnyLocalNispero], //for workers only
+              executor: ExecutorService,
               localErrorTable: LocalErrorTable,
               prefix: String,
               loggingDirectory: File,
@@ -95,9 +97,19 @@ object LocalEnvironment {
 
     executor.execute(new Runnable {
       override def run(): Unit = {
+        nispero.foreach { nispero =>
+          instancesEnvironments.put(env.instanceId, (nispero, env))
+        }
+
+        val oldName = Thread.currentThread().getName
         Thread.currentThread().setName(prefix)
         env.logger.info("changing thread to " + prefix)
         statement(env)
+
+        Thread.currentThread().setName(oldName)
+        env.logger.info("removing id " + prefix)
+        instancesEnvironments.remove(env.instanceId)
+
       }
     })
     env

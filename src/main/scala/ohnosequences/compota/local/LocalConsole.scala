@@ -1,5 +1,6 @@
 package ohnosequences.compota.local
 
+import java.io.File
 import java.net.URL
 
 import ohnosequences.compota.Namespace
@@ -22,6 +23,17 @@ class LocalConsole[U](localCompota: LocalCompota[U], env: LocalEnvironment,  nis
       val log = scala.io.Source.fromFile(localCompota.localConfiguration.taskLogFile(new Namespace(id))).getLines().mkString
       Right(log)
     }
+  }
+
+  override def sidebar: NodeSeq = {
+    <ul class="nav nav-sidebar">
+      {nisperosLinks()}
+    </ul>
+      <ul class="nav nav-sidebar">
+        <li><a href="/errors">errors</a></li>
+        <li><a href="/threads">threads</a></li>
+        <li><a href="#" class="undeploy">undeploy</a></li>
+      </ul>
   }
 
   override def shutdown(): Unit = {
@@ -161,5 +173,9 @@ class LocalConsole[U](localCompota: LocalCompota[U], env: LocalEnvironment,  nis
         }
       }
     }
+  }
+
+  override def mainHTML: String = {
+    scala.io.Source.fromFile(new File("E:\\reps\\compota\\src\\main\\resources\\console\\main.html")).getLines().mkString(System.lineSeparator())
   }
 }

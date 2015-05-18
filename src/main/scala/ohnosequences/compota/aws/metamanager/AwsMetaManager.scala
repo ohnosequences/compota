@@ -3,7 +3,7 @@ package ohnosequences.compota.aws.metamanager
 import java.util.concurrent.atomic.AtomicBoolean
 
 import ohnosequences.compota.{TerminationDaemon, AnyCompota}
-import ohnosequences.compota.aws.{ErrorTable, AwsCompota, AnyAwsNispero, AwsEnvironment}
+import ohnosequences.compota.aws._
 import ohnosequences.compota.local.LocalCompota
 import ohnosequences.compota.metamanager.{UnDeploy, BaseMetaManagerCommand, BaseMetaManager, AnyMetaManager}
 import ohnosequences.compota.queues.{AnyQueueOp, Queue}
@@ -21,7 +21,7 @@ class AwsMetaManager[U](val compota: AwsCompota[U]) extends BaseMetaManager {
   override def process(command: BaseMetaManagerCommand, env: AwsEnvironment, unDeployContext: MetaManagerUnDeployingActionContext, controlQueueOp: AnyQueueOp, queueOps: List[AnyQueueOp],
                        terminationDaemon: TerminationDaemon[AwsEnvironment]): Try[List[BaseMetaManagerCommand]] = {
     command match {
-      case UnDeploy(reason, force) if reason.startsWith(ErrorTable.errorTableError) => {
+      case UnDeploy(reason, force) if reason.startsWith(AwsErrorTable.errorTableError) => {
         env.errorTable.recover() match {
           case Failure(t) => {
             env.logger.error("couldn't recover error table")

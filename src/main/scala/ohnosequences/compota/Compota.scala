@@ -1,6 +1,8 @@
 package ohnosequences.compota
 
+
 import ohnosequences.compota.Namespace._
+import ohnosequences.compota.console.{UnfilteredConsoleServer, AnyConsole, Console}
 import ohnosequences.compota.environment.AnyEnvironment
 import ohnosequences.compota.graphs.NisperoGraph
 import ohnosequences.compota.metamanager.AnyMetaManager
@@ -21,7 +23,7 @@ trait AnyCompota {
   val configuration: AnyCompotaConfiguration
 
   def nisperosNames: Map[String, Nispero] =  nisperos.map { nispero =>
-    (nispero.name, nispero)
+    (nispero.configuration.name, nispero)
   }.toMap
 
   def launchMetaManager(): Unit
@@ -87,6 +89,18 @@ trait AnyCompota {
   def deleteManager(env: CompotaEnvironment): Try[Unit]
 
   def launchTerminationDaemon(terminationDaemon: TerminationDaemon[CompotaEnvironment]): Try[Unit]
+
+
+  def getConsoleInstance(nisperoGraph: NisperoGraph, env: CompotaEnvironment): AnyConsole
+
+  def launchConsole(compota: AnyConsole, env: CompotaEnvironment): Unit = {
+    env.executor.submit(new Runnable {
+      override def run() {
+        val server = new UnfilteredConsoleServer(compota)
+        server.start()
+      }
+    })
+  }
 
 }
 

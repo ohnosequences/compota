@@ -6,7 +6,7 @@ import ohnosequences.compota.{Namespace, AnyCompotaConfiguration}
 
 import scala.concurrent.duration.Duration
 
-abstract class LocalCompotaConfiguration extends AnyCompotaConfiguration {
+abstract class LocalCompotaConfiguration(val name: String) extends AnyCompotaConfiguration {
 
   def workingDirectory: File = new File("compota")
   def loggingDirectory: File = new File(workingDirectory, "logs")

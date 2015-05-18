@@ -5,12 +5,61 @@ import java.net.URL
 import ohnosequences.compota.graphs.NisperoGraph
 import ohnosequences.compota._
 import ohnosequences.compota.environment.{AnyEnvironment, InstanceId}
-import ohnosequences.compota.local.LocalEnvironment
 import ohnosequences.logging.Logger
 
 import scala.sys.process._
 import scala.util.{Success, Failure, Try}
 import scala.xml.{Node, NodeSeq}
+
+abstract class AnyConsole {
+
+  val logger: Logger
+
+  def password: String
+
+  def sshConfigTemplate: String
+
+  def compotaInfoPage: NodeSeq
+
+  def sidebar: NodeSeq
+
+  def terminateInstance(id: String): Try[Unit]
+
+  def sshInstance(id: String): Try[String]
+
+  def errorsPage: NodeSeq
+
+  def nisperoInfoPage(nisperoName: String): NodeSeq
+
+  def printErrorTable(lastToken: Option[String]): NodeSeq
+
+  def printErrorStackTrace(namespace: String, timestamp: String, instanceId: String): Try[String]
+
+  def printErrorMessage(namespace: String, timestamp: String, instanceId: String): Try[String]
+
+  def sendUndeployCommand(reason: String, force: Boolean): Unit
+
+  def printWorkers(nispero: String, lastToken: Option[String]): NodeSeq
+
+  def printMessages(queueName: String, lastToken: Option[String]): NodeSeq
+
+  def mainHTML: String
+
+  def mainCSS: String
+
+  def name: String
+
+  def shutdown(): Unit
+
+  def getInstanceLog(instanceId: String): Try[Either[URL, String]]
+
+  def printInstanceStackTrace(instanceId: String): Try[String]
+
+  def getNamespaceLog(id: String): Try[Either[URL, String]]
+
+  def getMessage(queue: String, id: String): Option[Either[URL, String]]
+
+}
 
 trait AnyWorkerInfo {
   def instanceId: InstanceId
@@ -35,25 +84,30 @@ trait AnyWorkerInfo {
       StackTrace</a>
   }
 
-  def printLink: Node = {
-    <a href={"/instanceLog/" + instanceId.id}>{instanceId.id}</a>
+  def viewLog: NodeSeq = {
+    <a class="btn btn-info viewLog" href="#" data-id={instanceId.id}>
+      <i class="icon-refresh icon-white"></i>
+      ViewLog</a>
   }
+
+  def printInstance: Node = {
+    <p>{instanceId.id}</p>
+  }
+
 }
 
 
-trait Loggable extends AnyWorkerInfo {
-  def viewLog: Node
-}
 
-abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compota[E, N, U]](compota: C, env: E, nisperoGraph: NisperoGraph) {
 
-  def password: String = compota.configuration.consolePassword
+abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compota[E, N, U]](compota: C, env: E, nisperoGraph: NisperoGraph) extends AnyConsole{
+
+  override def password: String = compota.configuration.consolePassword
 
   def sshConfigTemplate: String = {
     scala.io.Source.fromInputStream(getClass.getResourceAsStream("/console/keytoolConf.txt")).mkString
   }
 
-  val logger: Logger = env.logger
+  override val logger: Logger = env.logger
 
   def compotaInfoPage: NodeSeq = {
     compotaInfoPageHeader ++ compotaInfoPageDetails
@@ -82,7 +136,7 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
   }
 
   def nisperosLinks(): NodeSeq = {
-    val l = for {(name, nispero) <- compota.nisperos}
+    val l = for {(name, nispero) <- compota.nisperosNames}
     yield <li>
         <a href={"/nispero/" + name}>
           {name}
@@ -103,7 +157,7 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
           </tr>
         </thead>
         <tbody id ="errorsTableBody">
-          {listErrors(None)}
+          {printErrorTable(None)}
         </tbody>
       </table>
       <p><a class="btn btn-info loadMoreErrors" href="#">
@@ -121,9 +175,7 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
   def nisperoInfoPage(nisperoName: String): NodeSeq = {
     compota.nisperosNames.get(nisperoName) match {
       case None => {
-        <div class="alert alert-danger">
-          {nisperoName + " doesn't exist"}
-        </div>
+        errorDiv(nisperoName + " doesn't exist")
       }
       case Some(nispero) =>
         <div class="page-header">
@@ -149,7 +201,7 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
           </div>
           <table class="table table-striped topMargin20">
             <tbody id="workerInstances">
-              {printWorkers(nisperoName, None, Some(10))}
+              {printWorkers(nisperoName, None)}
             </tbody>
           </table>
     }
@@ -157,16 +209,27 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
 
   def nisperoInfoDetails(nispero: N): NodeSeq
 
-  def listErrorTable(lastToken: Option[(String, String)], limit: Option[Int]): Try[(Option[(String, String)], List[ErrorTableItem])] = {
+  def printErrorTable(lastToken: Option[String]): NodeSeq = {
+    listErrorTable(lastToken, Some(10)) match {
+      case Failure(t) => printErrorTableError(lastToken, t)
+      case Success((lToken, errors)) => {
+        errors.map { item =>
+          printErrorTableItem(lToken, item)
+        }
+      }
+    }
+  }
+
+  def listErrorTable(lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ErrorTableItem])] = {
     env.errorTable.listErrors(lastToken, limit)
   }
 
-  def printErrorTable(last: Option[(String, String)]): NodeSeq
+  def printErrorTableError(lastToken: Option[String], t: Throwable): NodeSeq = {
+    errorTr("error: " + t.toString, 3, lastToken)
+  }
 
-  def printErrorTableError(lastToken: Option[(String, String)], error: Throwable): NodeSeq
-
-  def printErrorTableItem(lastToken: Option[(String, String)], item: ErrorTableItem): Node = {
-    <tr data-lastHash={lastToken.getOrElse(("", ""))._1} data-lastRange={lastToken.getOrElse(("", ""))._2}>
+  def printErrorTableItem(lastToken: Option[String], item: ErrorTableItem): Node = {
+    <tr data-lastToken={lastToken.getOrElse("")}>
       <td>
         <a href={"/log/" + item.namespace.toString}>{item.namespace.toString}</a>
       </td>
@@ -189,7 +252,7 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
     env.errorTable.getError(Namespace(namespace), timestamp.toLong, InstanceId(instanceId)).map(_.stackTrace)
   }
 
-  def printStackErrorMessage(namespace: String, timestamp: String, instanceId: String): Try[String] = {
+  def printErrorMessage(namespace: String, timestamp: String, instanceId: String): Try[String] = {
     env.errorTable.getError(Namespace(namespace), timestamp.toLong, InstanceId(instanceId)).map(_.message)
   }
 
@@ -236,31 +299,21 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
   }
 
 
-  def shutdown(): Unit
-
-  def getInstanceLog(instanceId: String): Try[Either[URL, String]]
-
-  def getNamespaceLog(id: String): Try[Either[URL, String]]
-
   def getMessage(queue: String, id: String): Option[Either[URL, String]] = {
     nisperoGraph.queues.get(queue).flatMap { queueOp =>
       queueOp.getContent(id).toOption
     }
   }
 
-  def terminateInstance(id: String): Try[Unit]
 
-  def sshInstance(id: String): Try[Unit]
-
-  def printStackTrace(id: String): Try[String]
 
 
   type ListWorkerInfo <: AnyWorkerInfo
 
   def listWorkers(nispero: String, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ListWorkerInfo])]
 
-  def printWorkers(nispero: String, lastToken: Option[String], limit: Option[Int]): NodeSeq = {
-    listWorkers(nispero, lastToken, limit) match {
+  def printWorkers(nispero: String, lastToken: Option[String]): NodeSeq = {
+    listWorkers(nispero, lastToken, Some(10)) match {
       case Failure(t) => printWorkerError(t, lastToken)
 
       case Success((newLastToken, list)) => {
@@ -273,6 +326,7 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
     <tr class="danger" data-lastToken={lastToken.getOrElse("")}><td colspan={cols.toString}>{message}</td></tr>
   }
 
+
   def printWorkerError(t: Throwable, lastToken: Option[String]): NodeSeq = {
     errorTr("error: " + t.toString, 3, lastToken)
   }
@@ -280,13 +334,13 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
   def printWorker(workerInfo: ListWorkerInfo, lastToken: Option[String]): Node = {
     <tr data-lastToken={lastToken.getOrElse("")}>
       <td class="col-md-4">
-        {workerInfo.printLink}
+        {workerInfo.printInstance}
       </td>
       <td class="col-md-4">
         {workerInfo.printState}
       </td>
       <td class="col-md-4">
-        {workerInfo.printConnectAction ++ workerInfo.printTerminateAction ++ workerInfo.printStackTrace}
+        {workerInfo.printConnectAction ++ workerInfo.printTerminateAction ++ workerInfo.printStackTrace ++ workerInfo.viewLog}
       </td>
     </tr>
   }

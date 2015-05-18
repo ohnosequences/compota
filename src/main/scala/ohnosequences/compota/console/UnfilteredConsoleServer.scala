@@ -3,11 +3,10 @@ package ohnosequences.compota.console
 import java.io.ByteArrayInputStream
 
 import unfiltered.Cycle
-import unfiltered.netty.Https
+import unfiltered.netty.{SslContextProvider, Https, Secured, ServerErrorResponse}
 import unfiltered.response._
 import unfiltered.request.{BasicAuth, Path, Seg, GET}
 import unfiltered.netty.cycle.{Plan, SynchronousExecution}
-import unfiltered.netty.{Secured, ServerErrorResponse}
 
 import scala.util.{Failure, Success}
 
@@ -20,7 +19,7 @@ case class Auth(users: Users) {
   def apply[A, B](intent: Cycle.Intent[A, B]) =
     Cycle.Intent[A, B] {
       case req@BasicAuth(user, pass) if users.auth(user, pass) =>
-        println(req.uri)
+        //println(req.uri)
         Cycle.Intent.complete(intent)(req)
       case _ =>
         Unauthorized ~> WWWAuthenticate( """Basic realm="/"""")
@@ -29,9 +28,10 @@ case class Auth(users: Users) {
 
 case class HtmlCustom(s: String) extends ComposeResponse(HtmlContent ~> ResponseString(s))
 
-class ConsolePlan(users: Users, console: Console) extends Plan with Secured // also catches netty Ssl errors
-                                                                             with SynchronousExecution
-                                                                             with ServerErrorResponse {
+@io.netty.channel.ChannelHandler.Sharable
+class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
+                                                                  with SynchronousExecution
+                                                                  with ServerErrorResponse {
   val logger = console.logger
 
   def intent = Auth(users) {
@@ -58,12 +58,12 @@ class ConsolePlan(users: Users, console: Console) extends Plan with Secured // a
       HtmlCustom(mainPage)
     }
 
-    case GET(Path(Seg("failures" :: Nil))) => {
-      ResponseString(console.listErrors(None).toString())
+    case GET(Path(Seg("errors" :: Nil))) => {
+      ResponseString(console.printErrorTable(None).toString())
     }
 
-    case GET(Path(Seg("failures" :: lastHash :: lastRange :: Nil))) => {
-      ResponseString(console.listErrors(Some((lastHash, lastRange))).toString())
+    case GET(Path(Seg("errors" :: lastToken :: Nil))) => {
+      ResponseString(console.printErrorTable(Some(lastToken)).toString())
     }
 
     case GET(Path("/shutdown")) => {
@@ -72,26 +72,26 @@ class ConsolePlan(users: Users, console: Console) extends Plan with Secured // a
     }
 
     case GET(Path(Seg("queue" :: queueName ::  "messages" :: Nil))) => {
-      ResponseString(console.listMessages(queueName, None).toString())
+      ResponseString(console.printMessages(queueName, None).toString())
     }
 
-    case GET(Path(Seg("queue" :: queueName ::  "messages" :: lastKey :: Nil))) => {
-      ResponseString(console.listMessages(queueName, Some(lastKey)).toString())
+    case GET(Path(Seg("queue" :: queueName ::  "messages" :: lastToken :: Nil))) => {
+      ResponseString(console.printMessages(queueName, Some(lastToken)).toString())
     }
 
-    case GET(Path(Seg("instanceLog" :: instanceId :: Nil))) => {
+    case GET(Path(Seg("logging" :: "instance" :: instanceId :: Nil))) => {
       console.getInstanceLog(instanceId) match {
-        case Some(Left(url)) => Redirect(url.toString)
-        case Some(Right(log)) => ResponseString(log)
-        case None => NotFound
+        case Success(Left(url)) => Redirect(url.toString)
+        case Success(Right(log)) => ResponseString(log)
+        case Failure(t) => NotFound
       }
     }
 
-    case GET(Path(Seg("log" :: id :: Nil))) => {
-      console.getNamespaceLog(id) match {
-        case Some(Left(url)) => Redirect(url.toString)
-        case Some(Right(log)) => ResponseString(log)
-        case None => NotFound
+    case GET(Path(Seg("logging" :: "namespace" :: namespace :: Nil))) => {
+      console.getNamespaceLog(namespace) match {
+        case Success(Left(url)) => Redirect(url.toString)
+        case Success(Right(log)) => ResponseString(log)
+        case Failure(t) => NotFound
       }
     }
 
@@ -104,47 +104,77 @@ class ConsolePlan(users: Users, console: Console) extends Plan with Secured // a
       }
     }
 
-    case GET(Path(Seg("terminate" :: id ::  Nil))) => {
+    case GET(Path(Seg("instance" :: id :: "terminate" :: Nil))) => {
       console.terminateInstance(id) match {
         case Failure(t) => {
-          ResponseString( """<div class="alert alert-success">$error$</div>""".replace("$error$", t.toString))
+          ResponseString( """<div class="alert alert-danger">$error$</div>""".replace("$error$", t.toString))
         }
         case _ => {
-          ResponseString( """<div class="alert alert-danger">terminated</div>""")
+          ResponseString( """<div class="alert alert-success">terminated</div>""")
         }
       }
     }
 
-    case GET(Path(Seg("ssh" :: id ::  Nil))) => {
+    case GET(Path(Seg("instance" :: id :: "ssh" :: Nil))) => {
       console.sshInstance(id) match {
         case Failure(t) => {
-          ResponseString( """<div class="alert alert-success">$error$</div>""".replace("$error$", t.toString))
+          ResponseString( """<div class="alert alert-danger">$error$</div>""".replace("$error$", t.toString))
         }
-        case _ => {
-          ResponseString( """<div class="alert alert-danger">terminated</div>""")
+        case Success(s) => {
+          ResponseString( """<div class="alert alert-success">$result$</div>""".replace("result", s))
+        }
+      }
+    }
+
+    case GET(Path(Seg("instance" :: id :: "stackTrace" :: Nil))) => {
+      console.printInstanceStackTrace(id) match {
+        case Failure(t) => {
+          ResponseString( """<div class="alert alert-danger">$error$</div>""".replace("$error$", t.toString))
+        }
+        case Success(s) => {
+          ResponseString( """<div class="alert alert-success">$result$</div>""".replace("result", s))
         }
       }
     }
 
     case GET(Path(Seg("error" :: "message" :: namespase :: timestamp :: instanceId ::  Nil))) => {
-      console.printMessage(namespase, timestamp, instanceId) match {
+      console.printErrorMessage(namespase, timestamp, instanceId) match {
         case Success(s) => ResponseString(s)
         case Failure(t) => NotFound
       }
     }
 
     case GET(Path(Seg("error" :: "stackTrace" :: namespase :: timestamp :: instanceId ::  Nil))) => {
-      console.printStackTrace(namespase, timestamp, instanceId) match {
+      console.printErrorStackTrace(namespase, timestamp, instanceId) match {
         case Success(s) => ResponseString(s)
         case Failure(t) => NotFound
       }
     }
 
 
-    case GET(Path(Seg("nispero" :: nispero :: "workerInstances" ::  Nil))) => {
-      ResponseString(console.workersInfo(nispero).toString())
+    case GET(Path(Seg("nispero" :: nispero :: "workers" ::  Nil))) => {
+      ResponseString(console.printWorkers(nispero, None).toString())
     }
 
+    case GET(Path(Seg("nispero" :: nispero :: "workers" ::  lastToken :: Nil))) => {
+      ResponseString(console.printWorkers(nispero, Some(lastToken)).toString())
+    }
+
+
+    case GET(Path("/threads")) => {
+      val resp = new StringBuilder
+
+      import scala.collection.JavaConversions._
+
+      Thread.getAllStackTraces.foreach { case (thread, sts) =>
+        resp.append(thread + ":" + thread.getState)
+        sts.foreach { st =>
+          resp.append("      " + st.toString + System.lineSeparator())
+        }
+      }
+      ResponseString(resp.toString)
+
+    }
 
     case GET(Path(Seg("nispero" :: nispero :: Nil))) => {
 
@@ -166,7 +196,7 @@ class ConsolePlan(users: Users, console: Console) extends Plan with Secured // a
 }
 
 
-class UnfilteredConsoleServer(console: Console) {
+class UnfilteredConsoleServer(console: AnyConsole) {
 
 
   object users extends Users {
@@ -180,25 +210,34 @@ class UnfilteredConsoleServer(console: Console) {
 
 
   def start() {
-    import scala.sys.process._
-    val keyConf = console.sshConfigTemplate.replace("$password$", console.password)
-    val is = new ByteArrayInputStream(keyConf.getBytes("UTF-8"))
-    try {
-      ("keytool -keystore keystore -alias netty  -genkey -keyalg RSA -storepass $password$".replace("$password$", console.password) #< is).!
-    } catch {
-      case t: Throwable =>
-      ("keytool7 -keystore keystore -alias netty  -genkey -keyalg RSA -storepass $password$".replace("$password$", console.password) #< is).!
-    }
+   // import scala.sys.process._
+   // val keyConf = console.sshConfigTemplate.replace("$password$", console.password)
+   // val is = new ByteArrayInputStream(keyConf.getBytes("UTF-8"))
+//    try {
+//      ("keytool -keystore keystore -alias netty  -genkey -keyalg RSA -storepass $password$".replace("$password$", console.password) #< is).!
+//    } catch {
+//      case t: Throwable =>
+//      ("keytool7 -keystore keystore -alias netty  -genkey -keyalg RSA -storepass $password$".replace("$password$", console.password) #< is).!
+//    }
 
     console.logger.info("starting console server")
-    System.setProperty("netty.ssl.keyStore", "keystore")
-    System.setProperty("netty.ssl.keyStorePassword", console.password)
+  //  System.setProperty("netty.ssl.keyStore", "keystore")
+   // System.setProperty("netty.ssl.keyStorePassword", console.password)
+
+
     try {
-      Https(443).handler(new ConsolePlan(users, console)).start()
+      //io.netty.handler.ssl.util.SelfSignedCertificate
+      unfiltered.netty.Server.https(port = 443, ssl = SslContextProvider.selfSigned(new io.netty.handler.ssl.util.SelfSignedCertificate)).handler(new ConsolePlan(users, console)).run {s =>
+        console.logger.info("started: " + s.portBindings.head.url)
+      }
     } catch {
       case t: Throwable => {
         println("trying to bind to localhost")
-        Https(443, "localhost").handler(new ConsolePlan(users, console)).start()
+        unfiltered.netty.Server.https(443, "localhost", ssl = SslContextProvider.selfSigned(new io.netty.handler.ssl.util.SelfSignedCertificate)).handler(new ConsolePlan(users, console)).run {
+          s =>         console.logger.info("started: " + s.portBindings.head.url)
+        }
+
+        // Https(443, "localhost").handler(new ConsolePlan(users, console)).start()
       }
     }
   }

@@ -36,7 +36,7 @@ class LocalNisperoLocal[In, Out, InQueue <: Queue[In, LocalContext], OutQueue <:
                                                                                                                          instructions: Instructions[In, Out],
                                                                                                                          localConfiguration: LocalNisperoConfiguration
                                                                                                             )
-  extends LocalNispero[In, Out, LocalContext, LocalContext, InQueue, OutQueue](inputQueue, {e: LocalEnvironment => e.localContext}, outputQueue, {e: LocalEnvironment => e.localContext}, instructions, workers) with AnyLocalNispero {
+  extends LocalNispero[In, Out, LocalContext, LocalContext, InQueue, OutQueue](inputQueue, {e: LocalEnvironment => e.localContext}, outputQueue, {e: LocalEnvironment => e.localContext}, instructions, localConfiguration) with AnyLocalNispero {
 
 }
 

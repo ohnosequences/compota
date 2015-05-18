@@ -8,17 +8,18 @@ import ohnosequences.compota.environment.InstanceId
 import ohnosequences.compota.graphs.NisperoGraph
 import ohnosequences.logging.Logger
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 import scala.xml.{Node, NodeSeq}
 
 import scala.collection.JavaConversions._
 
 
-class LocalConsole[U](localCompota: LocalCompota[U], env: LocalEnvironment,  nisperoGraph: NisperoGraph) extends Console(localCompota, env) {
+class LocalConsole[U](localCompota: LocalCompota[U], env: LocalEnvironment,  nisperoGraph: NisperoGraph) extends
+  Console[LocalEnvironment, U, AnyLocalNispero, LocalCompota[U]](localCompota, env, nisperoGraph) {
 
   override def getNamespaceLog(id: String): Try[Either[URL, String]] = {
     Try {
-      val log = io.Source.fromFile(localCompota.localConfiguration.taskLogFile(new Namespace(id))).getLines().mkString
+      val log = scala.io.Source.fromFile(localCompota.localConfiguration.taskLogFile(new Namespace(id))).getLines().mkString
       Right(log)
     }
   }
@@ -54,7 +55,7 @@ class LocalConsole[U](localCompota: LocalCompota[U], env: LocalEnvironment,  nis
 
   override def listWorkers(nispero: String, lastWorkerToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ListWorkerInfo])] = {
     val workerInfo: List[ListWorkerInfoLocal] = localCompota.instancesEnvironments.filter { case (id, (nisp, e)) =>
-      nisp.name.equals(nispero)
+      nisp.configuration.name.equals(nispero)
     }.map { case (id, (nisp, e)) =>
       ListWorkerInfoLocal(e)
     }.toList
@@ -101,14 +102,64 @@ class LocalConsole[U](localCompota: LocalCompota[U], env: LocalEnvironment,  nis
   }
 
 
-  override def listErrors(last: Option[(String, String)]): NodeSeq = ???
+  override def sshInstance(id: String): Try[String] = {
+    Failure(new Error("ssh is not supported by local nispero"))
+  }
 
-  override def sshInstance(id: String): Try[Unit] = ???
+  override def compotaInfoPageDetails: NodeSeq = {
+    <table class="table table-striped topMargin20">
+      <tbody>
+        <tr>
+          <td class="col-md-6">working directory</td>
+          <td class="col-md-6">
+            {localCompota.localConfiguration.workingDirectory.getAbsolutePath}
+          </td>
+        </tr>
+        <tr>
+          <td class="col-md-6">error threshold</td>
+          <td class="col-md-6">
+            {localCompota.localConfiguration.errorThreshold}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  }
 
-  override def compotaInfoPageDetails: NodeSeq = ???
+  override def queueStatus(name: String): NodeSeq = {
+    nisperoGraph.queues.get(name) match {
+      case None => {
+        errorDiv("queue " + name + " doesn't exist")
+      }
+      case Some(queueOp: LocalQueueOp[_])  => {
+        <table class="table table-striped topMargin20">
+          <tbody>
+            <tr>
+              <td class="col-md-6">messages</td>
+              <td class="col-md-6">
+                {queueOp.queue.rawQueue.size()}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      }
+    }
+  }
 
-  override def mainHTML: String = ???
-
-  override def queueStatus(name: String): NodeSeq = ???
-
+  override def printInstanceStackTrace(instanceId: String): Try[String] = {
+    Option(localCompota.instancesEnvironments.get(InstanceId(instanceId))) match {
+      case None => Failure(new Error("instance " + instanceId + " does not exist"))
+      case Some((n, e)) => {
+        e.getThreadInfo match {
+          case None => Failure(new Error("couldn't get stack trace for " + instanceId))
+          case Some((t, a)) => {
+            val stackTrace = new StringBuffer()
+            a.foreach { s =>
+              stackTrace.append("    at " + s.toString)
+            }
+            Success(stackTrace.toString)
+          }
+        }
+      }
+    }
+  }
 }

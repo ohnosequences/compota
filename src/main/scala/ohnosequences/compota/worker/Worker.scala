@@ -15,6 +15,8 @@ trait AnyWorker {
   type InputQueue <: AnyQueue
   type OutputQueue <: AnyQueue
 
+  val nisperoName: String
+
   def start(instance: WorkerEnvironment): Unit
 }
 
@@ -24,7 +26,8 @@ trait AnyWorker {
 class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[In, InContext], OQ <: Queue[Out, OutContext]](
    val inputQueue: IQ, val inContext: Env => InContext,
    val outputQueue: OQ, val outContext: Env => OutContext,
-   instructions: Instructions[In, Out]
+   instructions: Instructions[In, Out],
+   val nisperoName: String
 ) extends AnyWorker {
 
    type InputQueue = IQ
@@ -40,7 +43,7 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
     */
    def start(env: Env): Unit = {
      val logger = env.logger
-     logger.info("worker for instructions " + instructions.name + " started on instance " + env.instanceId)
+     logger.info("worker of mispero " + nisperoName + " started on instance " + env.instanceId)
      //all fail fast
      while (!env.isStopped) {
        logger.debug("create context for queue " + inputQueue.name)
@@ -60,7 +63,7 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
            }
          }
        }.recover { case t =>
-         env.reportError(Namespace.worker / instructions.name / "init", t)
+         env.reportError(Namespace.worker / nisperoName / "init", t)
        }
      }
 
@@ -88,7 +91,7 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
       } else {
         logger.debug("receiving message from queue " + inputQueue.name)
         queueReader.waitForMessage(logger, {env.isStopped}).recoverWith { case t =>
-          env.reportError(Namespace.worker / instructions.name / "receive_message", new Error("couldn't receive message", t))
+          env.reportError(Namespace.worker / nisperoName / "receive_message", new Error("couldn't receive message", t))
           Failure(t)
         }.foreach {
           case None => ()
@@ -103,21 +106,22 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
               logger.debug("cleaning working directory: " + env.workingDirectory)
               FileUtils.cleanDirectory(env.workingDirectory)
 
-              logger.debug("running " + instructions.name + " instructions")
+              logger.debug("running " + nisperoName + " instructions")
               Try {instructions.solve(logger, instructionsContext, input)}.flatMap{e=>e}.recoverWith { case t =>
                 env.reportError(new Namespace(message.id), new Error("instructions error", t))
                 Failure(t)
               }.flatMap { output =>
                 logger.info("result: " + output.toString().take(100))
-                logger.debug("writing result to queue " + outputQueue.name + " with message id " + message.id + "." + instructions.name)
-                val newId = message.id + "." + instructions.name
+                val newId = message.id + "." + nisperoName
+                logger.debug("writing result to queue " + outputQueue.name + " with message id " + newId)
+
                 queueWriter.writeMessages(newId, output).recoverWith { case t =>
-                  env.reportError(Namespace.worker / instructions.name / "write_message" / newId, new Error("couldn't write message", t))
+                  env.reportError(Namespace.worker / nisperoName / "write_message" / newId, new Error("couldn't write message", t))
                   Failure(t)
                 }.flatMap { written =>
                   logger.debug("deleting message with id " + message.id + " from queue " + inputQueue.name)
                   inputQueueOp.deleteMessage(message).recoverWith { case t =>
-                    env.reportError(Namespace.worker / instructions.name / "delete_message" / newId, new Error("couldn't delete message", t))
+                    env.reportError(Namespace.worker / nisperoName / "delete_message" / newId, new Error("couldn't delete message", t))
                     Failure(t)
                   }
                 }

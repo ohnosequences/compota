@@ -21,7 +21,6 @@ object wordLengthInstructions extends Instructions[String, Int] {
 
   override def prepare(logger: Logger) = Success(())
 
-  override val name: String = "wordLength"
 }
 
 object splitInstructions extends Instructions[String, String] {
@@ -29,12 +28,12 @@ object splitInstructions extends Instructions[String, String] {
   override type Context = Unit
 
   override def solve(logger: Logger, context: Unit, input: String): Try[List[String]] = {
+    Thread.sleep(10000)
     Success(input.split("\\s+").toList)
   }
 
   override def prepare(logger: Logger) = Success(())
 
-  override val name: String = "split"
 }
 
 object textQueue extends LocalQueue[String]("text", visibilityTimeout = Duration(5, SECONDS))
@@ -45,18 +44,19 @@ object splitNispero extends LocalNisperoLocal (
   textQueue,
   wordsQueue,
   splitInstructions,
-  1
+  new LocalNisperoConfiguration("split", 5)
 )
 
 object wordLengthNispero extends LocalNisperoLocal (
   wordsQueue,
   countsQueue,
   wordLengthInstructions,
-  1
+  new LocalNisperoConfiguration("lenght", 5)
 )
 
-object wordCountCompotaConfiguration extends LocalCompotaConfiguration {
-  override val loggerDebug: Boolean = true
+object wordCountCompotaConfiguration extends LocalCompotaConfiguration("wordCount") {
+
+  override val loggerDebug: Boolean = false
 
   override val timeout= Duration(100, SECONDS)
   override val terminationDaemonIdleTime =  Duration(10, SECONDS)
@@ -90,9 +90,10 @@ object wordCountCompota extends LocalCompota[Int](List(splitNispero, wordLengthN
 class LocalCompotaTest {
 
 
-  //@Test
+  @Test
   def localCompotaTest(): Unit = {
     wordCountCompota.launch()
+
     wordCountCompota.waitForFinished()
 
   //  wordCountCompota.main(Array("add", "tasks"))

@@ -14,7 +14,7 @@ abstract class AwsCompotaConfiguration(val metadata: AnyMetadata) extends AnyCom
 
   val globalErrorThresholdPerNameSpace: Int = 10
 
-  def name = metadata.artifact
+  val name = metadata.artifact
 
   def amiId = "ami-5256b825"
 

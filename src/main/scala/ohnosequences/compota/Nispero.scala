@@ -29,8 +29,10 @@ trait AnyNispero {
 
   val instructions: Instructions[Input, Output]
 
+  val configuration: AnyNisperoConfiguration
 
-  def name: String = instructions.name
+
+ // def name: String = instructions.name
 
 
   type W <: AnyWorker {type WorkerEnvironment = NisperoEnvironment}
@@ -81,7 +83,12 @@ extends AnyNispero { nispero =>
   type Output = Out
 
   type W = Worker[In, Out, Env, InContext, OutContext, InQueue, OutQueue]
-  def createWorker() = new Worker[In, Out, Env, InContext, OutContext, InQueue, OutQueue](inputQueue, inContext, outputQueue, outContext, instructions)
+  def createWorker() = new Worker[In, Out, Env, InContext, OutContext, InQueue, OutQueue](inputQueue,
+    inContext,
+    outputQueue,
+    outContext,
+    instructions,
+    configuration.name)
 
 
 

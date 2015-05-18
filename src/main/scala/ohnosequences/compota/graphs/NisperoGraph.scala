@@ -17,10 +17,10 @@ object NisperoGraph {
 
     Try {
       nisperos.foreach { nispero =>
-        nisperoNames.put(nispero.name, nispero)
+        nisperoNames.put(nispero.configuration.name, nispero)
         queuesNames.put(nispero.inputQueue.name, nispero.inputQueue.create(nispero.inContext(env)).get)
         queuesNames.put(nispero.outputQueue.name, nispero.outputQueue.create(nispero.outContext(env)).get)
-        edges += Edge(nispero.name, Node(nispero.inputQueue.name), Node(nispero.outputQueue.name))
+        edges += Edge(nispero.configuration.name, Node(nispero.inputQueue.name), Node(nispero.outputQueue.name))
       }
       new NisperoGraph(new Graph(edges.toList), nisperoNames.toMap, queuesNames.toMap)
     }

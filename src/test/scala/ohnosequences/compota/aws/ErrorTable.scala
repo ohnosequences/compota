@@ -17,7 +17,7 @@ class ErrorTableTest {
       case Some(aws) => {
         val logger = new ConsoleLogger(prefix = "errorTableTest()", debug = true)
         aws.ddb.deleteTable(tableName)
-        ErrorTable.apply(logger, tableName, aws).recoverWith { case t=>
+        AwsErrorTable.apply(logger, tableName, aws).recoverWith { case t=>
           val error = new Error("failed to create error table", t)
           logger.error(error)
           fail(error.toString)
@@ -31,9 +31,9 @@ class ErrorTableTest {
             val errorMessage = new StringBuilder()
             logger.printThrowable(testError, {s => errorMessage.append(s + System.lineSeparator())})
             logger.debug("reporting error " + testError + " to error table")
-            table.fail(namespace, instance, errorMessage.toString()).get
+            table.reportError(namespace, System.currentTimeMillis(),  instance, errorMessage.toString(), "stackTrace").get
           }
-          assertEquals(count, table.getNameSpaceErrorsCount(namespace).get)
+          assertEquals(count, table.getNamespaceErrorCount(namespace).get)
         }
       }
     }

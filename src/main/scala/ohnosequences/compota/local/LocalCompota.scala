@@ -5,11 +5,13 @@ import java.net.URL
 import java.util.concurrent.{TimeUnit, Executors, ConcurrentHashMap}
 import java.util.concurrent.atomic.AtomicBoolean
 
+import ohnosequences.compota.console.AnyConsole
 import ohnosequences.compota.environment.InstanceId
+import ohnosequences.compota.graphs.NisperoGraph
 import ohnosequences.compota.local.metamanager.{LocalMetaManager}
 import ohnosequences.compota.metamanager.{UnDeploy, BaseMetaManagerCommand}
 import ohnosequences.compota.queues.{AnyQueueReducer, AnyQueueOp}
-import ohnosequences.compota.{TerminationDaemon, Compota}
+import ohnosequences.compota.{AnyCompota, TerminationDaemon, Compota}
 import ohnosequences.logging.FileLogger
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
@@ -28,12 +30,15 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
 
   val executor = Executors.newCachedThreadPool()
 
+  val errorTable = new LocalErrorTable
+
   def waitForFinished(): Unit = {
     while(!isFinished.get()) {
       Thread.sleep(5000)
      // printThreads()
     }
   }
+
 
 
 
@@ -61,7 +66,7 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
       case None => Failure(new Error("instance " + instanceId.id + " not found"))
       case Some((nispero, env)) => {
         Try {
-          val log = io.Source.fromFile(env.instanceLogFile).getLines().mkString
+          val log = scala.io.Source.fromFile(env.instanceLogFile).getLines().mkString
           Right(log)
         }
       }
@@ -70,9 +75,11 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
 
   override def launchWorker(nispero: AnyLocalNispero): Unit = {
 
-    val workerDirectory = new File(localConfiguration.workingDirectory, "worker_" + nispero.name)
+    val workerDirectory = new File(localConfiguration.workingDirectory, "worker_" + nispero.configuration.name)
 
-    LocalEnvironment.execute(executor, "worker_" + nispero.name,
+    LocalEnvironment.execute(executor,
+      errorTable,
+      "worker_" + nispero.configuration.name,
       localConfiguration.workingDirectory,
       workerDirectory,
       localConfiguration,
@@ -86,12 +93,13 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
 
   def launchWorker(nispero: AnyLocalNispero, i: Int): Unit = {
 
-    val prefix = "worker_" + nispero.name + "_" + i
+    val prefix = "worker_" + nispero.configuration.name + "_" + i
 
     val workerDirectory = new File(localConfiguration.workingDirectory, prefix)
 
     val env = LocalEnvironment.execute(
       executor,
+      errorTable,
       prefix,
       localConfiguration.workingDirectory,
       workerDirectory,
@@ -108,6 +116,7 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
   def launchMetaManager(): Unit = {
     LocalEnvironment.execute(
       executor,
+      errorTable,
       "metamanager",localConfiguration.workingDirectory,
       localConfiguration.workingDirectory,
       localConfiguration,
@@ -123,6 +132,7 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
   override def launchTerminationDaemon(terminationDaemon: TerminationDaemon[CompotaEnvironment]): Try[Unit] = {
     LocalEnvironment.execute(
       executor,
+      errorTable,
       "termination daemon",
       localConfiguration.workingDirectory,
       localConfiguration.workingDirectory,
@@ -160,11 +170,11 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
 
   override def deleteNisperoWorkers(env: CompotaEnvironment, nispero: Nispero): Try[Unit] = {
 
-    env.logger.info("stopping " + nispero.name + " nispero")
+    env.logger.info("stopping " + nispero.configuration.name + " nispero")
     //logger.debug("envs: " + )
     Try {
       instancesEnvironments.foreach { case (id, (n, e)) =>
-        if (n.name.equals(nispero.name)) {
+        if (n.configuration.name.equals(nispero.configuration.name)) {
           env.logger.debug("stopping environment: " + id)
           e.stop()
         }
@@ -213,8 +223,18 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
 
   def finishUnDeploy(env: LocalEnvironment, reason: String, message: String): Try[Unit] = {
 
-    Success(isFinished.set(true))
+    //Success(isFinished.set(true))
+    Success(())
   }
 
+
+
+
+
   //override def unDeployActions(force: Boolean): Try[Unit] = ???
+  override def getConsoleInstance(nisperoGraph: NisperoGraph, env: CompotaEnvironment): AnyConsole = {
+    new LocalConsole[U](LocalCompota.this, env, nisperoGraph)
+  }
+
+
 }

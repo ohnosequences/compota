@@ -1,7 +1,7 @@
 package ohnosequences.compota.aws
 
 import java.io.File
-import java.util.concurrent.ExecutorService
+import java.util.concurrent.{Executors, ExecutorService}
 import java.util.concurrent.atomic.{AtomicInteger, AtomicBoolean}
 
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
@@ -22,13 +22,13 @@ class AwsEnvironment(val awsClients: AWSClients,
                      val logger0: Logger,
                      val workingDirectory: File,
                      val awsInstanceId: String,
-                     val errorTable: ErrorTable,
+                     val errorTable: AwsErrorTable,
                      val sendUnDeployCommand0: (AwsEnvironment, String, Boolean) => Try[Unit],
                      val isMetaManager: Boolean
                       ) extends AnyEnvironment { awsEnvironment =>
 
 
-  override val executor: ExecutorService = ???
+  override val executor: ExecutorService = Executors.newCachedThreadPool()
 
   def createDynamoDBContext(): DynamoDBContext = {
     DynamoDBContext(awsClients, awsCompotaConfiguration.metadata, logger)
@@ -63,10 +63,10 @@ class AwsEnvironment(val awsClients: AWSClients,
   override def reportError(namespace: Namespace, t: Throwable): Unit = {
 
     logger.error(t)
-    val message = new StringBuilder()
-    logger.printThrowable(t, {s => message.append(s + System.lineSeparator())})
+    val stackTrace = new StringBuilder()
+    logger.printThrowable(t, {s => stackTrace.append(s + System.lineSeparator())})
 
-    errorTable.getNameSpaceErrorsCount(namespace).flatMap { globalCount =>
+    errorTable.getNamespaceErrorCount(namespace).flatMap { globalCount =>
       if (globalCount > awsCompotaConfiguration.globalErrorThresholdPerNameSpace) {
         sendUnDeployCommand("reached error threshold for " + namespace.toString, force = true)
         if(!isMetaManager) {
@@ -80,13 +80,13 @@ class AwsEnvironment(val awsClients: AWSClients,
         }
         Success(())
       } else {
-        errorTable.fail(namespace, instanceId, message.toString())
+        errorTable.reportError(namespace, System.currentTimeMillis(), instanceId, t.toString, stackTrace.toString())
       }
     }.recover { case tt => {
         //something really bad happened
         val message = new StringBuilder()
         logger.printThrowable(t, {s => message.append(s + System.lineSeparator())})
-        sendUnDeployCommand(ErrorTable.errorTableError + message.toString(), force = true)
+        sendUnDeployCommand(AwsErrorTable.errorTableError + message.toString(), force = true)
         if(!isMetaManager) {
           stop()
         }

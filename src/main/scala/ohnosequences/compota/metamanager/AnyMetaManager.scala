@@ -149,12 +149,15 @@ trait AnyMetaManager {
             Failure(t)
           }.flatMap { startedTime =>
 
+            val console = compota.getConsoleInstance(graph, env)
+            compota.launchConsole(console, env)
+
             val terminationDaemon = new TerminationDaemon[MetaManagerEnvironment](
               nisperoGraph = graph,
               sendUnDeployCommand = compota.sendUnDeployCommand,
               startedTime = startedTime,
-              timeout = compota.baseConfiguration.timeout,
-              terminationDaemonIdleTime = compota.baseConfiguration.terminationDaemonIdleTime
+              timeout = compota.configuration.timeout,
+              terminationDaemonIdleTime = compota.configuration.terminationDaemonIdleTime
             )
             logger.debug("creating control queue context")
             val qContext = context(env)

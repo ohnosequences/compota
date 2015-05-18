@@ -28,7 +28,6 @@ class AwsWordCount {
 
     override def prepare(logger: Logger) = Success(())
 
-    override val name: String = "wordLength"
   }
 
   object splitInstructions extends Instructions[String, String] {
@@ -41,7 +40,6 @@ class AwsWordCount {
 
     override def prepare(logger: Logger) = Success(())
 
-    override val name: String = "split"
   }
 
   val textQueue = new DynamoDBQueue[String](
@@ -70,6 +68,7 @@ class AwsWordCount {
     override val loggerDebug: Boolean = true
     override val deleteErrorQueue: Boolean = false
     override val timeout: Duration = Duration(1, HOURS)
+
   }
 
 
@@ -107,7 +106,7 @@ class AwsWordCount {
 
     override def configurationChecks(env: CompotaEnvironment): Try[Boolean] = {
       Try{
-        configuration.metadata.testJarUrl.exists { s =>
+        awsConfiguration.metadata.testJarUrl.exists { s =>
           ObjectAddress(s).map { obj =>
             env.awsClients.s3.objectExists(obj, Some(env.logger))
           }.getOrElse(false)
@@ -132,7 +131,7 @@ class AwsWordCount {
   @Test
   def localCompotaTest(): Unit = {
 
-    wordCountCompota()
+    //wordCountCompota()
 
 
 

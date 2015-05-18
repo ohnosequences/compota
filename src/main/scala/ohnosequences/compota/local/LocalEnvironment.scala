@@ -2,7 +2,7 @@ package ohnosequences.compota.local
 
 import java.io.File
 import java.util.concurrent.{ExecutorService, ConcurrentHashMap}
-import ohnosequences.compota.Namespace
+import ohnosequences.compota.{ErrorTable, Namespace}
 import ohnosequences.compota.environment.{AnyEnvironment, InstanceId}
 import ohnosequences.logging.{FileLogger, Logger}
 
@@ -12,6 +12,8 @@ import scala.collection.JavaConversions._
 
 
 class LocalEnvironment(val executor: ExecutorService,
+                       val localErrorTable: LocalErrorTable,
+                       val prefix: String,
                         val logger: FileLogger,
                         val workingDirectory: File,
                         val errorCounts: ConcurrentHashMap[String, Int],
@@ -22,6 +24,8 @@ class LocalEnvironment(val executor: ExecutorService,
   //type
 
 
+  override val errorTable: ErrorTable = localErrorTable
+
   def instanceLogFile: File = {
     logger.logFile
   }
@@ -31,7 +35,7 @@ class LocalEnvironment(val executor: ExecutorService,
 
   override def sendUnDeployCommand(reason: String, force: Boolean): Try[Unit] = sendUnDeployCommand0(localEnvironment, reason, force)
 
-  override val instanceId: InstanceId = InstanceId(Thread.currentThread().getName)
+  override val instanceId: InstanceId = InstanceId(prefix)
 
   //when fatal error occurs
   override def isStopped: Boolean = isStoppedFlag.get()
@@ -76,6 +80,7 @@ class LocalEnvironment(val executor: ExecutorService,
 
 object LocalEnvironment {
   def execute(executor: ExecutorService,
+              localErrorTable: LocalErrorTable,
               prefix: String,
               loggingDirectory: File,
               workingDirectory: File,
@@ -86,11 +91,12 @@ object LocalEnvironment {
     workingDirectory.mkdir()
 
     val envLogger = new FileLogger(prefix, new File(loggingDirectory, prefix + ".log"), configuration.loggerDebug, printToConsole = true)
-    val env: LocalEnvironment = new LocalEnvironment(executor, envLogger, workingDirectory, errorCount, configuration, sendUnDeployCommand)
+    val env: LocalEnvironment = new LocalEnvironment(executor, localErrorTable, prefix, envLogger, workingDirectory, errorCount, configuration, sendUnDeployCommand)
 
     executor.execute(new Runnable {
       override def run(): Unit = {
-        Thread.currentThread().setName(env.instanceId.id)
+        Thread.currentThread().setName(prefix)
+        env.logger.info("changing thread to " + prefix)
         statement(env)
       }
     })

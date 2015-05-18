@@ -4,11 +4,6 @@ import java.io.File
 
 import ohnosequences.compota.AnyNisperoConfiguration
 
-trait LocalNisperoConfiguration extends AnyNisperoConfiguration {
-
-  val workers: Int
-
-  def workingDirectory: File
-
+class LocalNisperoConfiguration(val name: String, val workers: Int, val workingDirectory: File = new File(".")) extends AnyNisperoConfiguration {
 
 }

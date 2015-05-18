@@ -32,8 +32,20 @@ class AwsErrorTable(logger: Logger, tableName: String, aws: AWSClients) extends 
   }
 
 
+  override def getError(namespace: Namespace, timestamp: Long, instanceId: InstanceId): Try[ErrorTableItem] = {
+    DynamoDBUtils.getItem(
+      aws.ddb,
+      Some(logger),
+      tableName,
+      marshallKey((namespace, (timestamp, instanceId))),
+      Seq(hashKeyName, rangeKeyName, message, stackTrace),
+      RepeatConfiguration(attemptThreshold = 10)
+    ).map { item =>
+      unMarshallErrorTableItem(item)
+    }
+  }
 
-//  override def listErrorsPerNamespace(namespace: Namespace, lastToken: Option[(String, String)], limit: Option[Int]): Try[(Option[(String, String)], List[ErrorTableItem])] = {
+  //  override def listErrorsPerNamespace(namespace: Namespace, lastToken: Option[(String, String)], limit: Option[Int]): Try[(Option[(String, String)], List[ErrorTableItem])] = {
 //    DynamoDBUtils.queryPerHash(
 //      aws.ddb,
 //      Some(logger),
@@ -46,12 +58,15 @@ class AwsErrorTable(logger: Logger, tableName: String, aws: AWSClients) extends 
 //      (None, )
 //    }
 //  }
-  override def listErrors(lastToken: Option[(String, String)], limit: Option[Int]): Try[(Option[(String, String)], List[ErrorTableItem])] = {
+  override def listErrors(lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ErrorTableItem])] = {
+    val lastKey = lastToken.map { token =>
+      marshallKey(ErrorTableItem.parseToken(token))
+    }
     DynamoDBUtils.list(
       aws.ddb,
       Some(logger),
       tableName,
-      lastKey = lastToken.map(marshallLastToken),
+      lastKey = lastKey,
       attributesToGet = Seq(hashKeyName, rangeKeyName, message, stackTrace),
       limit,
       RepeatConfiguration(attemptThreshold = 10)
@@ -73,52 +88,56 @@ object AwsErrorTable {
   val hashAttribute = new AttributeDefinition().withAttributeName(hashKeyName).withAttributeType(ScalarAttributeType.S)
   val rangeAttribute = new AttributeDefinition().withAttributeName(rangeKeyName).withAttributeType(ScalarAttributeType.S)
 
-  def marshallLastToken(lastToken: (String, String)): Map[String, AttributeValue] = {
-    Map(
-      hashKeyName -> new AttributeValue().withS(lastToken._1),
-      rangeKeyName -> new AttributeValue().withS(lastToken._2)
-    )
-  }
 
-  def unMarshallLastToken(lastKey: Map[String, AttributeValue]): (String, String) = {
-    (lastKey.get(hashKeyName).map(_.getS).getOrElse(""), lastKey.get(rangeKeyName).map(_.getS).getOrElse(""))
+
+  def unMarshallLastToken(lastKey: Map[String, AttributeValue]): String = {
+    lastKey.get(hashKeyName).map(_.getS).getOrElse("") + "#" + lastKey.get(rangeKeyName).map(_.getS).getOrElse("")
   }
 
 
   def marshallErrorTableItem(item: ErrorTableItem): Map[String, AttributeValue] = {
     Map[String, AttributeValue](
-      hashKeyName -> hashKey(item.namespace),
-      rangeKeyName -> rangeKey(item.timestamp, item.instanceId),
+      hashKeyName -> hashKey(item.pairToken),
+      rangeKeyName -> rangeKey(item.pairToken),
       message ->  new AttributeValue().withS(item.message),
       stackTrace -> new AttributeValue().withS(item.stackTrace)
     )
   }
 
-  def unMarshallErrorTableItem(item: Map[String, AttributeValue]): ErrorTableItem = {
-    val (timestamp: Long, instanceId: String) = item.get(rangeKeyName).map { s =>
-      s.getS.split('#').toList match {
-        case t :: i :: Nil => (t.toLong, i)
-        case _ => (0, "")
-      }
-    }.getOrElse((0, ""))
 
-
-    ErrorTableItem(
-      namespace = new Namespace(item.get(hashKeyName).map(_.getS).getOrElse("")),
-      instanceId = InstanceId(instanceId),
-      timestamp = timestamp,
-      message = item.get(message).map(_.getS).getOrElse(""),
-      stackTrace = item.get(stackTrace).map(_.getS).getOrElse("")
+  def marshallKey(key: (Namespace, (Long, InstanceId))): Map[String, AttributeValue] = {
+    val token = ErrorTableItem.keyToPairToken(key)
+    Map(
+      hashKeyName -> hashKey(token),
+      rangeKeyName -> rangeKey(token)
     )
   }
 
+
+  def unMarshallErrorTableItem(item: Map[String, AttributeValue]): ErrorTableItem = {
+
+    val token = unMarshallLastToken(item)
+    val key = ErrorTableItem.parseToken(token)
+
+    ErrorTableItem(
+      key = key,
+      value = (
+        item.get(message).map(_.getS).getOrElse(""),
+        item.get(stackTrace).map(_.getS).getOrElse("")
+      )
+    )
+  }
 
   def hashKey(namespace: Namespace): AttributeValue = {
     new AttributeValue().withS(namespace.toString)
   }
 
-  def rangeKey(timestamp: Long, instanceId: InstanceId): AttributeValue = {
-    new AttributeValue().withS(System.currentTimeMillis() + "#" + instanceId.id)
+  def hashKey(token: (String, String)): AttributeValue = {
+    new AttributeValue().withS(token._1)
+  }
+
+  def rangeKey(token: (String, String)): AttributeValue = {
+    new AttributeValue().withS(token._2)
   }
 
   def apply(logger: Logger, tableName: String, aws: AWSClients): Try[AwsErrorTable] = {
@@ -138,6 +157,4 @@ object AwsErrorTable {
         }
       }
   }
-
-
 }

@@ -1,12 +1,11 @@
 package ohnosequences.compota.aws.queues
 
 
-import java.util.concurrent.atomic.AtomicBoolean
-
+import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model._
 import ohnosequences.awstools.AWSClients
 import ohnosequences.awstools.dynamodb.DynamoDBUtils
-import ohnosequences.awstools.utils.SQSUtils
+import ohnosequences.awstools.utils.{SQSQueueInfo, SQSUtils}
 import ohnosequences.benchmark.Bench
 import ohnosequences.compota.aws.deployment.{AnyMetadata, Metadata}
 import ohnosequences.logging.{Logger, ConsoleLogger}
@@ -18,16 +17,12 @@ import ohnosequences.compota.aws.Resources
 import ohnosequences.compota.queues._
 import ohnosequences.compota.serialization.Serializer
 
-import scala.annotation.tailrec
-import scala.collection.mutable.ListBuffer
+
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration._
 
 import scala.util.{Failure, Success, Try}
 
-class SQSMessage[E](val id: String, val body: E, val handle: String) extends QueueMessage[E] {
-  def getBody: Try[E] = Success(body)
-}
 
 class RawItem(val id: String, val value: String) {
   def makeDBWriteRequest = {
@@ -69,7 +64,7 @@ class DynamoDBQueueWriter[T](queueOp: DynamoDBQueueOP[T], serializer: Serializer
 }
 
 class DynamoDBMessage[T](val sqsMessage: Message, queueOp: DynamoDBQueueOP[T], bench: Option[Bench]) extends QueueMessage[T] {
-  override def getBody: Try[T] = {
+  override def getBody: Try[Option[T]] = {
     val itemWrap = queueOp.logger.benchExecute("DynamoDB read", bench) {
       DynamoDBUtils.getItem(
         ddb = queueOp.aws.ddb,
@@ -80,13 +75,15 @@ class DynamoDBMessage[T](val sqsMessage: Message, queueOp: DynamoDBQueueOP[T], b
       )
     }
 
-    itemWrap.flatMap { item =>
-      item.get(DynamoDBQueue.valueAttr) match {
-        case None => Failure(new Error(DynamoDBQueue.valueAttr + " is empty"))
-        case Some(s) => {
-          queueOp.serializer.fromString(s.getS)
+    itemWrap.flatMap {
+      case None => Success(None)
+      case Some(item) =>
+        item.get(DynamoDBQueue.valueAttr) match {
+          case None => Failure(new Error(DynamoDBQueue.valueAttr + " is empty"))
+          case Some(s) => {
+            queueOp.serializer.fromString(s.getS).map(Some(_))
+          }
         }
-      }
     }
   }
 
@@ -116,14 +113,15 @@ case class DynamoDBContext (
   logger: Logger
 )
 
+
+
 class DynamoDBQueueOP[T](val queue: DynamoDBQueue[T], val tableName: String, val sqsUrl: String, val aws: AWSClients, val serializer: Serializer[T], val bench: Option[Bench])
   extends QueueOp[T, DynamoDBMessage[T], DynamoDBQueueReader[T], DynamoDBQueueWriter[T]] {
 
   val logger = new ConsoleLogger("DynamoDB OP")
 
-
+  //this operation is not atomic
   override def deleteMessage(message: DynamoDBMessage[T]): Try[Unit] = {
-
 
     logger.benchExecute("DynamoDB delete", bench){DynamoDBUtils.deleteItem(
       aws.ddb,
@@ -131,8 +129,6 @@ class DynamoDBQueueOP[T](val queue: DynamoDBQueue[T], val tableName: String, val
       tableName,
       Map(DynamoDBQueue.idAttr -> new AttributeValue().withS(message.id))
     )}
-
-    //todo think about that!
 
     logger.benchExecute("SQS delete", bench) {
       SQSUtils.deleteMessage(aws.sqs.sqs, sqsUrl, message.sqsMessage.getReceiptHandle)
@@ -145,6 +141,10 @@ class DynamoDBQueueOP[T](val queue: DynamoDBQueue[T], val tableName: String, val
     DynamoDBUtils.deleteTable(aws.ddb, tableName).flatMap { res =>
       SQSUtils.deleteQueue(aws.sqs.sqs, sqsUrl)
     }
+  }
+
+  def sqsInfo(): Try[SQSQueueInfo] = {
+    SQSUtils.getSQSInfo(aws.sqs.sqs, sqsUrl)
   }
 
   override def writer: Try[DynamoDBQueueWriter[T]] = Success(new DynamoDBQueueWriter[T](DynamoDBQueueOP.this, serializer))
@@ -161,8 +161,9 @@ class DynamoDBQueueOP[T](val queue: DynamoDBQueue[T], val tableName: String, val
       tableName = tableName,
       Map(DynamoDBQueue.idAttr -> new AttributeValue().withS(key)),
       attributesToGet = Seq(DynamoDBQueue.valueAttr)
-    ).flatMap { item =>
-      serializer.fromString(item(DynamoDBQueue.valueAttr).getS)
+    ).flatMap {
+      case None => Failure(new Error("item with key " + key + " doesn't exist in " + tableName))
+      case Some(item )=> serializer.fromString(item(DynamoDBQueue.valueAttr).getS)
     }
   }
 

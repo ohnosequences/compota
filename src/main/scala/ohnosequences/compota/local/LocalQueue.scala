@@ -34,8 +34,8 @@ case class MonkeyAppearanceProbability(
                                         )
 
 case class LocalMessage[T](id: String, body: T, monkeyAppearanceProbability: MonkeyAppearanceProbability) extends QueueMessage[T] {
-  override def getBody: Try[T] = {
-    Monkey.call(Success(body), monkeyAppearanceProbability.getBody)
+  override def getBody: Try[Option[T]] = {
+    Monkey.call(Success(Some(body)), monkeyAppearanceProbability.getBody)
   }
 
   val deleted = new AtomicBoolean(false)
@@ -59,6 +59,7 @@ class LocalQueue[T](name: String,
   extends Queue[T, LocalContext](name) { queue =>
 
   val rawQueue = new ConcurrentSkipListMap[String, T]()
+  val rawQueueP = new ConcurrentSkipListMap[String, T]()
 
   type Msg = LocalMessage[T]
 
@@ -74,7 +75,11 @@ class LocalQueueOp[T](val queue: LocalQueue[T], val ctx: LocalContext) extends Q
 
   override def deleteMessage(message: LocalMessage[T]): Try[Unit] = {
 
-    Monkey.call(Try {message.deleted.set(true); queue.rawQueue.remove(message.id); }, queue.monkeyAppearanceProbability.deleteMessage)
+    Monkey.call(Try {
+      message.deleted.set(true)
+      queue.rawQueueP.remove(message.id)
+      queue.rawQueue.remove(message.id)
+    }, queue.monkeyAppearanceProbability.deleteMessage)
   }
 
   override def reader: Try[LocalQueueReader[T]] = {
@@ -86,7 +91,7 @@ class LocalQueueOp[T](val queue: LocalQueue[T], val ctx: LocalContext) extends Q
   }
 
   override def isEmpty: Try[Boolean] = {
-    Monkey.call(Success(queue.rawQueue.isEmpty), queue.monkeyAppearanceProbability.isEmpty)
+    Monkey.call(Success(queue.rawQueueP.isEmpty), queue.monkeyAppearanceProbability.isEmpty)
   }
 
   override def delete(): Try[Unit] = {
@@ -95,15 +100,22 @@ class LocalQueueOp[T](val queue: LocalQueue[T], val ctx: LocalContext) extends Q
 
   //todo add limit support
   override def list(lastKey: Option[String], limit: Option[Int]): Try[(Option[String], List[String])] = {
-    Monkey.call(Success((None, queue.rawQueue.keySet().toList)), queue.monkeyAppearanceProbability.list)
+    Monkey.call(Success((None, queue.rawQueueP.keySet().toList)), queue.monkeyAppearanceProbability.list)
   }
 
   override def size: Try[Int] = {
-    Monkey.call(Success(queue.rawQueue.size()), queue.monkeyAppearanceProbability.size)
+    Monkey.call(Success(queue.rawQueueP.size()), queue.monkeyAppearanceProbability.size)
   }
 
   override def get(key: String): Try[T] = {
-    Monkey.call(Success(queue.rawQueue.get(key)), queue.monkeyAppearanceProbability.read)
+    ctx.logger.info("getting " + key)
+    Monkey.call(
+      Option(queue.rawQueueP.get(key)) match {
+        case None => Failure(new Error("key " + key + " doesn't exist in " + queue.name))
+        case Some(v) => Success(v)
+      },
+      queue.monkeyAppearanceProbability.read
+    )
   }
 }
 
@@ -145,6 +157,7 @@ class LocalQueueWriter[T](queueOp: LocalQueueOp[T]) extends QueueWriter[T] {
     Monkey.call(Try {
       values.foreach { case (key, value) =>
         queueOp.queue.rawQueue.put(key, value)
+        queueOp.queue.rawQueueP.put(key, value)
       }
     }, queueOp.queue.monkeyAppearanceProbability.writeRaw)
   }

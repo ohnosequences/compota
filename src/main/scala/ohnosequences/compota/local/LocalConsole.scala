@@ -40,14 +40,18 @@ class LocalConsole[U](localCompota: LocalCompota[U], env: LocalEnvironment,  nis
     logger.info("shutdown")
   }
 
-  override def terminateInstance(id: String): Try[Unit] = {
-    localCompota.terminateInstance(InstanceId(id))
+  override def getTerminateInstance(id: InstanceId): Try[String] = {
+    localCompota.terminateInstance(id).map(_ => "instance " + id.id  + " terminated")
   }
 
-  override def getInstanceLog(instanceId: String): Try[Either[URL, String]] = {
-    localCompota.getInstanceLog(InstanceId(instanceId))
+  override def getInstanceLogRaw(instanceId: String): Try[Either[URL, String]] = {
+    localCompota.getInstanceLog(InstanceId(instanceId)).map(Right(_))
   }
 
+
+  override def getInstanceLog(instanceId: InstanceId): Try[String] = {
+    localCompota.getInstanceLog(instanceId)
+  }
 
   case class ListWorkerInfoLocal(env: LocalEnvironment) extends AnyWorkerInfo {
 
@@ -114,7 +118,7 @@ class LocalConsole[U](localCompota: LocalCompota[U], env: LocalEnvironment,  nis
   }
 
 
-  override def sshInstance(id: String): Try[String] = {
+  override def getSSHInstance(id: InstanceId): Try[String] = {
     Failure(new Error("ssh is not supported by local nispero"))
   }
 
@@ -137,28 +141,9 @@ class LocalConsole[U](localCompota: LocalCompota[U], env: LocalEnvironment,  nis
     </table>
   }
 
-  override def queueStatus(name: String): NodeSeq = {
-    nisperoGraph.queues.get(name) match {
-      case None => {
-        errorDiv("queue " + name + " doesn't exist")
-      }
-      case Some(queueOp: LocalQueueOp[_])  => {
-        <table class="table table-striped topMargin20">
-          <tbody>
-            <tr>
-              <td class="col-md-6">messages</td>
-              <td class="col-md-6">
-                {queueOp.queue.rawQueue.size()}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      }
-    }
-  }
 
-  override def printInstanceStackTrace(instanceId: String): Try[String] = {
-    Option(localCompota.instancesEnvironments.get(InstanceId(instanceId))) match {
+  override def getInstanceStackTrace(instanceId: InstanceId): Try[String] = {
+    Option(localCompota.instancesEnvironments.get(instanceId)) match {
       case None => Failure(new Error("instance " + instanceId + " does not exist"))
       case Some((n, e)) => {
         e.getThreadInfo match {
@@ -166,7 +151,7 @@ class LocalConsole[U](localCompota: LocalCompota[U], env: LocalEnvironment,  nis
           case Some((t, a)) => {
             val stackTrace = new StringBuffer()
             a.foreach { s =>
-              stackTrace.append("    at " + s.toString)
+              stackTrace.append("at " + s.toString + System.lineSeparator())
             }
             Success(stackTrace.toString)
           }

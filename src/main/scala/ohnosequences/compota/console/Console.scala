@@ -2,9 +2,13 @@ package ohnosequences.compota.console
 
 import java.net.URL
 
+import ohnosequences.awstools.utils.SQSUtils
+import ohnosequences.compota.aws.queues.DynamoDBQueueOP
 import ohnosequences.compota.graphs.NisperoGraph
 import ohnosequences.compota._
 import ohnosequences.compota.environment.{AnyEnvironment, InstanceId}
+import ohnosequences.compota.local.LocalQueueOp
+import ohnosequences.compota.queues.{AnyQueueOp, AnyQueue}
 import ohnosequences.logging.Logger
 
 import scala.sys.process._
@@ -17,15 +21,11 @@ abstract class AnyConsole {
 
   def password: String
 
-  def sshConfigTemplate: String
-
   def compotaInfoPage: NodeSeq
 
   def sidebar: NodeSeq
 
-  def terminateInstance(id: String): Try[Unit]
 
-  def sshInstance(id: String): Try[String]
 
   def errorsPage: NodeSeq
 
@@ -51,17 +51,24 @@ abstract class AnyConsole {
 
   def shutdown(): Unit
 
-  def getInstanceLog(instanceId: String): Try[Either[URL, String]]
+  def getInstanceLogRaw(instanceId: String): Try[Either[URL, String]]
 
-  def printInstanceStackTrace(instanceId: String): Try[String]
+  def printInstanceLog(instanceId: String): NodeSeq
+
+  def printInstanceStackTrace(instanceId: String): NodeSeq
+
+  def terminateInstance(id: String): NodeSeq
+
+  def sshInstance(id: String): NodeSeq
 
   def getNamespaceLog(id: String): Try[Either[URL, String]]
 
-  def getMessage(queue: String, id: String): Option[Either[URL, String]]
+  def getMessage(queue: String, id: String): Try[Either[URL, String]]
 
 }
 
 trait AnyWorkerInfo {
+
   def instanceId: InstanceId
 
   def printState: String = ""
@@ -81,13 +88,13 @@ trait AnyWorkerInfo {
   def printStackTrace: NodeSeq = {
     <a class="btn btn-info instanceStackTrace" href="#" data-id={instanceId.id}>
       <i class="icon-refresh icon-white"></i>
-      StackTrace</a>
+      Stack trace</a>
   }
 
   def viewLog: NodeSeq = {
-    <a class="btn btn-info instanceLog" href="#" data-id={instanceId.id}>
+    <a class="btn btn-info viewInstanceLog" href="#" data-id={instanceId.id}>
       <i class="icon-refresh icon-white"></i>
-      ViewLog</a>
+      View Log</a>
   }
 
   def printInstance: Node = {
@@ -103,15 +110,41 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
 
   override def password: String = compota.configuration.consolePassword
 
-  def sshConfigTemplate: String = {
-    scala.io.Source.fromInputStream(getClass.getResourceAsStream("/console/keytoolConf.txt")).mkString
-  }
-
-  override val logger: Logger = env.logger
+  override val logger: Logger = env.logger.fork("console")
 
   def compotaInfoPage: NodeSeq = {
     compotaInfoPageHeader ++ compotaInfoPageDetails
   }
+
+
+
+  def getInstanceLog(instanceId: InstanceId): Try[String]
+
+  override def printInstanceLog(instanceId: String): NodeSeq = {
+    preResult(getInstanceLog(InstanceId(instanceId)))
+  }
+
+
+  def getSSHInstance(id: InstanceId): Try[String]
+
+  override def sshInstance(id: String): NodeSeq = {
+    preResult(getSSHInstance(InstanceId(id)))
+  }
+
+
+  def getTerminateInstance(id: InstanceId): Try[String]
+
+  override def terminateInstance(id: String): NodeSeq = {
+    preResult(getTerminateInstance(InstanceId(id)))
+  }
+
+
+  def getInstanceStackTrace(id: InstanceId): Try[String]
+
+  override def printInstanceStackTrace(instanceId: String): NodeSeq = {
+    preResult(getInstanceStackTrace(InstanceId(instanceId)))
+  }
+
 
   def compotaInfoPageHeader: NodeSeq = {
     <div class="page-header">
@@ -121,7 +154,53 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
     </div>
   }
 
-  def queueStatus(name: String): NodeSeq
+  def queueStatus(queueOp: AnyQueueOp): NodeSeq = {
+    <h3>{queueOp.queue.name}</h3>
+    <table class="table table-striped topMargin20">
+      <tbody>
+        {queueOp match {
+          case localQueueOp: LocalQueueOp[_] => {
+            <tr>
+              <td class="col-md-6">queue size</td>
+              <td class="col-md-6">
+                {localQueueOp.queue.rawQueue.size()}
+              </td>
+            </tr>
+              <tr>
+                <td class="col-md-6">persistant queue size</td>
+                <td class="col-md-6">
+                  {localQueueOp.queue.rawQueueP.size()}
+                </td>
+              </tr>
+          }
+          case dynamoQueueOp: DynamoDBQueueOP[_] => {
+            dynamoQueueOp.sqsInfo() match {
+              case Failure(t) =>  xml.NodeSeq.Empty
+              case Success(sqsInfo) => {
+                <tr>
+                  <td class="col-md-6">SQS queue messages (approx)</td>
+                  <td class="col-md-6">
+                    {sqsInfo.approx}
+                  </td>
+                </tr>
+                <tr>
+                    <td class="col-md-6">SQS messages in flight (approx)</td>
+                    <td class="col-md-6">
+                      {sqsInfo.inFlight}
+                    </td>
+                </tr>
+              }
+            }
+          }
+        }}
+      </tbody>
+    </table>
+    <a class="btn btn-info showQueueMessages" href="#" data-queue={queueOp.queue.name}>
+      <i class="icon-refresh icon-white"></i>
+      Show messages
+    </a>
+  }
+
 
   def compotaInfoPageDetails: NodeSeq
 
@@ -172,6 +251,17 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
     </div>
   }
 
+  def preResult(res: Try[String]): NodeSeq = {
+    res match {
+      case Failure(t) => {
+        <pre class="alert alert-danger pre-scrollable">{t.toString}</pre>
+      }
+      case Success(s) => {
+        <pre class="alert alert-success pre-scrollable">{s}</pre>
+      }
+    }
+  }
+
   def nisperoInfoPage(nisperoName: String): NodeSeq = {
     compota.nisperosNames.get(nisperoName) match {
       case None => {
@@ -191,11 +281,13 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
           <div class="page-header">
             <h2>input</h2>
           </div>
-          <div> {queueStatus(nispero.inputQueue.name)} </div>
+          <div> {
+            nisperoGraph.queueOps(nispero.inputQueue).map(queueStatus)
+            } </div>
           <div class="page-header">
             <h2>output</h2>
           </div>
-          <div> {queueStatus(nispero.outputQueue.name)} </div>
+          <div> {nisperoGraph.queueOps(nispero.outputQueue).map(queueStatus)} </div>
           <div class="page-header">
             <h2>instances</h2>
           </div>
@@ -231,10 +323,10 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
   def printErrorTableItem(lastToken: Option[String], item: ErrorTableItem): Node = {
     <tr data-lastToken={lastToken.getOrElse("")}>
       <td>
-        <a href={"/log/" + item.namespace.toString}>{item.namespace.toString}</a>
+        <a href={"/logging/namespace/" + item.namespace.toString}>{item.namespace.toString}</a>
       </td>
       <td>
-        <a href={"/instanceLog/" + item.instanceId.id}>{item.instanceId.id}</a>
+        <a href={"/instance/" + item.instanceId.id + "/log"}>{item.instanceId.id}</a>
       </td>
       <td>
         {item.formattedTime()}
@@ -259,7 +351,7 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
 
 
   def listMessages(queueName: String, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[String])] = {
-    nisperoGraph.queues.get(queueName) match {
+    nisperoGraph.queueOpNames.get(queueName) match {
       case None => Failure(new Error("queue " + queueName + " not found"))
       case Some(queueOp) => {
         queueOp.list(lastToken, limit)
@@ -274,7 +366,7 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
       }
       case Success((newLastToken, list)) => {
         list.map { id =>
-          printMessage(id, newLastToken)
+          printMessage(queueName, id, newLastToken)
         }
       }
     }
@@ -284,28 +376,27 @@ abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compo
     errorTr("error: " + t.toString, 3, lastToken)
   }
 
-  def printMessage(id: String, lastToken: Option[String]): Node = {
+  def printMessage(queueName: String, id: String, lastToken: Option[String]): Node = {
     <tr data-lastToken={lastToken.getOrElse("")}>
       <td class="col-md-4">
         {id}
       </td>
       <td class="col-md-4">
-        <a href={"/queue/" + name + "/message/" + id}>download</a>
+        <a href={"/queue/" + queueName + "/message/" + id}>download</a>
       </td>
       <td class="col-md-4">
-        <a href={"/log/" + id}>log</a>
+        <a href={"/logging/namespace/" + id}>log</a>
       </td>
     </tr>
   }
 
 
-  def getMessage(queue: String, id: String): Option[Either[URL, String]] = {
-    nisperoGraph.queues.get(queue).flatMap { queueOp =>
-      queueOp.getContent(id).toOption
+  def getMessage(queue: String, id: String): Try[Either[URL, String]] = {
+    nisperoGraph.queueOpNames.get(queue) match {
+      case None => Failure(new Error("queue " + queue + " doesn't exists"))
+      case Some(queueOp) =>  queueOp.getContent(id)
     }
   }
-
-
 
 
   type ListWorkerInfo <: AnyWorkerInfo

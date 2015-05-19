@@ -80,7 +80,7 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
     }
 
     case GET(Path(Seg("logging" :: "instance" :: instanceId :: Nil))) => {
-      console.getInstanceLog(instanceId) match {
+      console.getInstanceLogRaw(instanceId) match {
         case Success(Left(url)) => Redirect(url.toString)
         case Success(Right(log)) => ResponseString(log)
         case Failure(t) => NotFound
@@ -98,43 +98,36 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
 
     case GET(Path(Seg("queue" :: queueName ::  "message" :: id :: Nil))) => {
       console.getMessage(queueName, id) match {
-        case None => NotFound
-        case Some(Left(url)) => Redirect(url.toString)
-        case Some(Right(log)) => ResponseString(log)
+        case Failure(t) => ResponseString(t.toString)
+        case Success(Left(url)) => Redirect(url.toString)
+        case Success(Right(log)) => ResponseString(log)
       }
     }
 
     case GET(Path(Seg("instance" :: id :: "terminate" :: Nil))) => {
-      console.terminateInstance(id) match {
-        case Failure(t) => {
-          ResponseString( """<div class="alert alert-danger">$error$</div>""".replace("$error$", t.toString))
-        }
-        case _ => {
-          ResponseString( """<div class="alert alert-success">terminated</div>""")
-        }
+      ResponseString(console.terminateInstance(id).toString)
+    }
+
+
+    case GET(Path(Seg("instance" :: instanceId :: "log" :: "raw" :: Nil))) => {
+      console.getInstanceLogRaw(instanceId) match {
+        case Success(Left(url)) => Redirect(url.toString)
+        case Success(Right(log)) => ResponseString(log)
+        case Failure(t) => NotFound
       }
     }
 
+    case GET(Path(Seg("instance" :: instanceId :: "log" :: Nil))) => {
+      ResponseString(console.printInstanceLog(instanceId).toString)
+    }
+
+
     case GET(Path(Seg("instance" :: id :: "ssh" :: Nil))) => {
-      console.sshInstance(id) match {
-        case Failure(t) => {
-          ResponseString( """<div class="alert alert-danger">$error$</div>""".replace("$error$", t.toString))
-        }
-        case Success(s) => {
-          ResponseString( """<div class="alert alert-success">$result$</div>""".replace("result", s))
-        }
-      }
+      ResponseString(console.sshInstance(id).toString)
     }
 
     case GET(Path(Seg("instance" :: id :: "stackTrace" :: Nil))) => {
-      console.printInstanceStackTrace(id) match {
-        case Failure(t) => {
-          ResponseString( """<div class="alert alert-danger">$error$</div>""".replace("$error$", t.toString))
-        }
-        case Success(s) => {
-          ResponseString( """<div class="alert alert-success">$result$</div>""".replace("result", s))
-        }
-      }
+      ResponseString(console.printInstanceStackTrace(id).toString)
     }
 
     case GET(Path(Seg("error" :: "message" :: namespase :: timestamp :: instanceId ::  Nil))) => {
@@ -210,23 +203,10 @@ class UnfilteredConsoleServer(console: AnyConsole) {
 
 
   def start() {
-   // import scala.sys.process._
-   // val keyConf = console.sshConfigTemplate.replace("$password$", console.password)
-   // val is = new ByteArrayInputStream(keyConf.getBytes("UTF-8"))
-//    try {
-//      ("keytool -keystore keystore -alias netty  -genkey -keyalg RSA -storepass $password$".replace("$password$", console.password) #< is).!
-//    } catch {
-//      case t: Throwable =>
-//      ("keytool7 -keystore keystore -alias netty  -genkey -keyalg RSA -storepass $password$".replace("$password$", console.password) #< is).!
-//    }
+
 
     console.logger.info("starting console server")
-  //  System.setProperty("netty.ssl.keyStore", "keystore")
-   // System.setProperty("netty.ssl.keyStorePassword", console.password)
-
-
     try {
-      //io.netty.handler.ssl.util.SelfSignedCertificate
       unfiltered.netty.Server.https(port = 443, ssl = SslContextProvider.selfSigned(new io.netty.handler.ssl.util.SelfSignedCertificate)).handler(new ConsolePlan(users, console)).run {s =>
         console.logger.info("started: " + s.portBindings.head.url)
       }
@@ -236,8 +216,6 @@ class UnfilteredConsoleServer(console: AnyConsole) {
         unfiltered.netty.Server.https(443, "localhost", ssl = SslContextProvider.selfSigned(new io.netty.handler.ssl.util.SelfSignedCertificate)).handler(new ConsolePlan(users, console)).run {
           s =>         console.logger.info("started: " + s.portBindings.head.url)
         }
-
-        // Https(443, "localhost").handler(new ConsolePlan(users, console)).start()
       }
     }
   }

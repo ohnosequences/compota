@@ -19,14 +19,27 @@ import scala.util.{Success, Failure, Try}
 
 class AwsEnvironment(val awsClients: AWSClients,
                      val awsCompotaConfiguration: AwsCompotaConfiguration,
-                     val logger0: Logger,
+                     val logger: S3Logger,
                      val workingDirectory: File,
                      val awsInstanceId: String,
                      val errorTable: AwsErrorTable,
                      val sendUnDeployCommand0: (AwsEnvironment, String, Boolean) => Try[Unit],
                      val isMetaManager: Boolean
-                      ) extends AnyEnvironment { awsEnvironment =>
+                      ) extends AnyEnvironment[AwsEnvironment] { awsEnvironment =>
 
+
+  override def subEnvironment(suffix: String): AwsEnvironment = {
+    new AwsEnvironment(
+      awsClients,
+      awsCompotaConfiguration,
+      logger.subLogger(suffix),
+      new File(workingDirectory, suffix),
+      awsInstanceId,
+      errorTable,
+      sendUnDeployCommand0,
+      isMetaManager
+    )
+  }
 
   override val executor: ExecutorService = Executors.newCachedThreadPool()
 
@@ -94,8 +107,6 @@ class AwsEnvironment(val awsClients: AWSClients,
     }
     ()
   }
-
-  override val logger: Logger = logger0
 }
 
 

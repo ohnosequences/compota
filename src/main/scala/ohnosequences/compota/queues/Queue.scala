@@ -11,30 +11,11 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 
-//trait AnyMessage {
-//
-//  type Body
-//  def getBody: Try[Body]
-//  // TODO: a better id type
-//  def getId: Try[String] //parse id error?
-//}
-
-
-object QueueMessage {
-  val terminateID = "terminate-id"
-}
-
 abstract class QueueMessage[B] {
-  def getBody: Try[B]
-  //  // TODO: a better id type
+  def getBody: Try[Option[B]]
   val id: String
 }
-// TODO: they should be defined for queues, not for messages
-//trait AnyQueueReader {
-//
-//  type Message <: QueueMessage
-//  def receiveMessage: Try[Message]
-//}
+
 
 abstract class QueueReader[E, M <: QueueMessage[E]] {
 
@@ -120,6 +101,8 @@ object AnyQueue {
 
 
 trait AnyQueueOp {
+
+  def subOps(): List[AnyQueueOp] = List(AnyQueueOp.this)
 
   type QElement
   type QMessage <: QueueMessage[QElement]

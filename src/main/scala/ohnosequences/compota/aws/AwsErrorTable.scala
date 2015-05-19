@@ -40,8 +40,9 @@ class AwsErrorTable(logger: Logger, tableName: String, aws: AWSClients) extends 
       marshallKey((namespace, (timestamp, instanceId))),
       Seq(hashKeyName, rangeKeyName, message, stackTrace),
       RepeatConfiguration(attemptThreshold = 10)
-    ).map { item =>
-      unMarshallErrorTableItem(item)
+    ).flatMap {
+      case Some(item) => Success(unMarshallErrorTableItem(item))
+      case None => Failure(new Error("couldn't find error with namespace: " + namespace.toString))
     }
   }
 

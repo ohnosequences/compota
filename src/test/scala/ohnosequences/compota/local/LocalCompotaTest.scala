@@ -28,7 +28,7 @@ object splitInstructions extends Instructions[String, String] {
   override type Context = Unit
 
   override def solve(logger: Logger, context: Unit, input: String): Try[List[String]] = {
-    Thread.sleep(100000)
+    Thread.sleep(200000)
     Success(input.split("\\s+").toList)
   }
 
@@ -36,8 +36,8 @@ object splitInstructions extends Instructions[String, String] {
 
 }
 
-object textQueue extends LocalQueue[String]("text", visibilityTimeout = Duration(5, SECONDS))
-object wordsQueue extends LocalQueue[String]("words", visibilityTimeout = Duration(5, SECONDS))
+object textQueue extends LocalQueue[String]("text", visibilityTimeout = Duration(60, SECONDS))
+object wordsQueue extends LocalQueue[String]("words", visibilityTimeout = Duration(60, SECONDS))
 object countsQueue extends LocalQueue[Int]("counts")
 
 object splitNispero extends LocalNisperoLocal (

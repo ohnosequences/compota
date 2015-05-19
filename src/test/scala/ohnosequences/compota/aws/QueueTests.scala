@@ -80,7 +80,10 @@ class QueueTests {
                 Failure(t)
               }
             }
-            case Success(value) => {
+            case Success(None) => {
+              Success(None)
+            }
+            case Success(Some(value)) => {
               reader.queueOp.deleteMessage(message)
               Success(Some((message.id, value)))
             }

@@ -93,15 +93,7 @@ trait AnyCompota {
 
   def getConsoleInstance(nisperoGraph: NisperoGraph, env: CompotaEnvironment): AnyConsole
 
-  def launchConsole(compota: AnyConsole, env: CompotaEnvironment): Unit = {
-    env.executor.submit(new Runnable {
-      override def run() {
-        val server = new UnfilteredConsoleServer(compota)
-        server.start()
-      }
-    })
-  }
-
+  def launchConsole(compota: AnyConsole, env: CompotaEnvironment): Unit
 }
 
 object AnyCompota {

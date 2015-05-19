@@ -91,41 +91,52 @@ class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[
       } else {
         logger.debug("receiving message from queue " + inputQueue.name)
         queueReader.waitForMessage(logger, {env.isStopped}).recoverWith { case t =>
-          env.reportError(Namespace.worker / nisperoName / "receive_message", new Error("couldn't receive message", t))
+          env.reportError(Namespace.worker / nisperoName / "receive_message", new Error("couldn't receive message from the queue " + inputQueue.name, t))
           Failure(t)
         }.foreach {
           case None => ()
           case Some(message) =>
             logger.debug("parsing the message " + message.id)
             message.getBody.recoverWith { case t =>
-              env.reportError(new Namespace(message.id), new Error("couldn't parse the message", t))
+              env.reportError(new Namespace(message.id), new Error("couldn't parse the message " + message.id + " from the queue " + inputQueue.name, t))
               Failure(t)
-            }.flatMap { input =>
-              logger.info("received: " + input.toString.take(100) + " id: " + message.id)
-
-              logger.debug("cleaning working directory: " + env.workingDirectory)
-              FileUtils.cleanDirectory(env.workingDirectory)
-
-              logger.debug("running " + nisperoName + " instructions")
-              Try {instructions.solve(logger, instructionsContext, input)}.flatMap{e=>e}.recoverWith { case t =>
-                env.reportError(new Namespace(message.id), new Error("instructions error", t))
-                Failure(t)
-              }.flatMap { output =>
-                logger.info("result: " + output.toString().take(100))
-                val newId = message.id + "." + nisperoName
-                logger.debug("writing result to queue " + outputQueue.name + " with message id " + newId)
-
-                queueWriter.writeMessages(newId, output).recoverWith { case t =>
-                  env.reportError(Namespace.worker / nisperoName / "write_message" / newId, new Error("couldn't write message", t))
+            }.flatMap {
+              case None => {
+                logger.warn("message " + message.id + " deleted")
+                inputQueueOp.deleteMessage(message).recoverWith { case t =>
+                  env.reportError(Namespace.worker / nisperoName / "delete_message" / message.id, new Error("couldn't delete message " + message.id + " from the queue " + inputQueue.name, t))
                   Failure(t)
-                }.flatMap { written =>
-                  logger.debug("deleting message with id " + message.id + " from queue " + inputQueue.name)
-                  inputQueueOp.deleteMessage(message).recoverWith { case t =>
-                    env.reportError(Namespace.worker / nisperoName / "delete_message" / newId, new Error("couldn't delete message", t))
-                    Failure(t)
-                  }
                 }
               }
+              case Some(input) =>
+                logger.info("received: " + input.toString.take(100) + " id: " + message.id)
+
+                val taskEnv = env.subEnvironment(message.id)
+                taskEnv.logger.debug("running " + nisperoName + " instructions")
+                Try {instructions.solve(taskEnv.logger, instructionsContext, input)}.flatMap{e=>e}.recoverWith { case t =>
+                  taskEnv.reportError(new Namespace(message.id), new Error("instructions error", t))
+                  Failure(t)
+                }.flatMap { output =>
+                  taskEnv.logger.info("result: " + output.toString().take(100))
+                  val newId = message.id + "." + nisperoName
+                  taskEnv.logger.debug("writing result to queue " + outputQueue.name + " with message id " + newId)
+
+                  queueWriter.writeMessages(newId, output).recoverWith { case t =>
+                    taskEnv.reportError(Namespace.worker / nisperoName / "write_message" / newId, new Error("couldn't write message " + newId + " to the queue " + outputQueue.name, t))
+                    Failure(t)
+                  }.flatMap { written =>
+                    taskEnv.logger.debug("deleting message with id " + message.id + " from queue " + inputQueue.name)
+                    inputQueueOp.deleteMessage(message).recoverWith { case t =>
+                      taskEnv.reportError(Namespace.worker / nisperoName / "delete_message" / message.id, new Error("couldn't delete message " + message.id + " from the queue " + inputQueue.name, t))
+                      Failure(t)
+                    }
+                    taskEnv.logger.debug("cleaning working directory: " + taskEnv.workingDirectory)
+                    FileUtils.cleanDirectory(taskEnv.workingDirectory)
+                    Success(())
+                  }
+                }
+
+
             }
         }
         messageLoopRec()

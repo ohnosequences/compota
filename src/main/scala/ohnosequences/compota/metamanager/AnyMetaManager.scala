@@ -88,36 +88,45 @@ trait AnyMetaManager {
             message.getBody.recoverWith { case t =>
               env.reportError(metaManager / controlQueue, new Error("couldn't parse message " + message.id + " from control queue", t))
               Failure(t)
-            }.flatMap { body =>
-              Try{env.executor.execute (  new Runnable {
-                override def toString: String = body.prefix + " executor"
-                override def run(): Unit = {
-                  runingTasks.putIfAbsent(body.prefix, new AtomicInteger())
-                  runingTasks.get(body.prefix).incrementAndGet()
+            }.flatMap {
+              case None => {
+                logger.warn("message " + message.id + " is deleted")
+                queueOp.deleteMessage(message).recoverWith { case t =>
+                  env.reportError(metaManager / controlQueue, new Error("couldn't delete message " + message.id + " from control queue", t))
+                  Failure(t)
+                }
+                Success(())
+              }
+              case Some(body) =>
+                Try{env.executor.execute (  new Runnable {
+                  override def toString: String = body.prefix + " executor"
+                  override def run(): Unit = {
+                    runingTasks.putIfAbsent(body.prefix, new AtomicInteger())
+                    runingTasks.get(body.prefix).incrementAndGet()
 
-                  logger.debug("processing message " + body)
-                  process(body, env, unDeployingActionsContext, queueOp, queueOps, terminationDaemon) match {
-                    case Failure(t) => {
-                      //command processing failure
-                      env.reportError(metaManager / body.prefix, t)
-                    }
-                    case Success(commands) => {
-                      logger.debug("writing result: " + commands)
-                      writer.writeRaw(commands.map { c => (c.prefix, c)}).recoverWith { case t =>
-                        env.reportError(metaManager / controlQueue, new Error("couldn't write message to control queue", t))
-                        Failure(t)
-                      }.flatMap { written =>
-                        logger.debug("deleting message: " + message.id)
-                        queueOp.deleteMessage(message).recoverWith { case t =>
-                          env.reportError(metaManager / controlQueue, new Error("couldn't delete message " + message.id + " from control queue", t))
+                    logger.debug("processing message " + body)
+                    process(body, env, unDeployingActionsContext, queueOp, queueOps, terminationDaemon) match {
+                      case Failure(t) => {
+                        //command processing failure
+                        env.reportError(metaManager / body.prefix, t)
+                      }
+                      case Success(commands) => {
+                        logger.debug("writing result: " + commands)
+                        writer.writeRaw(commands.map { c => (c.prefix, c)}).recoverWith { case t =>
+                          env.reportError(metaManager / controlQueue, new Error("couldn't write message to control queue", t))
                           Failure(t)
+                        }.flatMap { written =>
+                          logger.debug("deleting message: " + message.id)
+                          queueOp.deleteMessage(message).recoverWith { case t =>
+                            env.reportError(metaManager / controlQueue, new Error("couldn't delete message " + message.id + " from control queue", t))
+                            Failure(t)
+                          }
                         }
                       }
                     }
+                    runingTasks.get(body.prefix).decrementAndGet()
                   }
-                  runingTasks.get(body.prefix).decrementAndGet()
-                }
-              })}
+                })}
             }
           }
         }
@@ -149,7 +158,8 @@ trait AnyMetaManager {
             Failure(t)
           }.flatMap { startedTime =>
 
-            val console = compota.getConsoleInstance(graph, env)
+            val console = compota.getConsoleInstance(graph, env.subEnvironment("console"))
+
             compota.launchConsole(console, env)
 
             val terminationDaemon = new TerminationDaemon[MetaManagerEnvironment](
@@ -170,7 +180,7 @@ trait AnyMetaManager {
                   logger.info("writing init message")
                   writer.writeRaw(List(("init", initMessage()))).flatMap { res =>
                     logger.debug("starting message loop")
-                    messageLoop(queueOp, reader, writer, unDeployActionsContext, graph.queueOps, terminationDaemon)
+                    messageLoop(queueOp, reader, writer, unDeployActionsContext, graph.queueOpNames.toList.map{_._2}, terminationDaemon)
                     Success(())
                   }
                 }

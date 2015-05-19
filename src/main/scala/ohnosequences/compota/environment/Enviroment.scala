@@ -12,7 +12,9 @@ import scala.util.{Try}
 
 case class InstanceId(id: String)
 
-abstract class AnyEnvironment {
+abstract class AnyEnvironment[E <: AnyEnvironment] {
+
+  def subEnvironment(suffix: String): E
 
   def instanceId: InstanceId
 

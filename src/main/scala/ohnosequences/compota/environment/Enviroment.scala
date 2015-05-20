@@ -14,7 +14,9 @@ case class InstanceId(id: String)
 
 abstract class AnyEnvironment[E <: AnyEnvironment[E]] {
 
-  def subEnvironment(suffix: String): E
+  def subEnvironmentSync[R](suffix: String)(statement: E => R): Try[(E, R)]
+
+  def subEnvironment(suffix: String)(statement: E => Unit): Try[E]
 
   def instanceId: InstanceId
 

@@ -17,6 +17,52 @@ import scala.concurrent.ExecutionContext
 import scala.util.{Success, Failure, Try}
 
 
+object AwsEnvironment {
+  def execute(executor: ExecutorService,
+              prefix: String,
+              awsClients: AWSClients,
+              workingDirectory: File,
+              loggingDirectory: File,
+              awsConfiguration: AwsCompotaConfiguration,
+              sendUnDeployCommand: (AwsEnvironment, String, Boolean) => Try[Unit],
+              isMetaManager: Boolean
+               )(statement: AwsEnvironment => Unit): Try[AwsEnvironment] = {
+
+    Success(()).flatMap { u =>
+      val instanceID = awsClients.ec2.getCurrentInstanceId match {
+        case None => prefix + "_unknown_" + System.currentTimeMillis()
+        case Some(id) => prefix + "_id"
+      }
+      workingDirectory.mkdir()
+      S3Logger(awsClients.s3, prefix, loggingDirectory, "log.txt", awsConfiguration.loggerBucket, awsConfiguration.loggingDebug).flatMap { envLogger =>
+        AwsErrorTable.apply(envLogger, awsConfiguration.errorTable, awsClients).recoverWith { case t =>
+          envLogger.error(t)
+          Failure(t)
+        }.flatMap { errorTable =>
+
+          val env = new AwsEnvironment(
+            awsClients = awsClients,
+            awsCompotaConfiguration = awsConfiguration,
+            logger = envLogger,
+            workingDirectory = workingDirectory,
+            awsInstanceId = instanceID,
+            errorTable = errorTable,
+            sendUnDeployCommand,
+            isMetaManager
+          )
+
+          executor.execute(new Runnable {
+            override def run(): Unit = {
+              statement(env)
+            }
+          })
+          Success(env)
+        }
+      }
+    }
+  }
+}
+
 class AwsEnvironment(val awsClients: AWSClients,
                      val awsCompotaConfiguration: AwsCompotaConfiguration,
                      val logger: S3Logger,
@@ -28,17 +74,38 @@ class AwsEnvironment(val awsClients: AWSClients,
                       ) extends AnyEnvironment[AwsEnvironment] { awsEnvironment =>
 
 
-  override def subEnvironment(suffix: String): AwsEnvironment = {
-    new AwsEnvironment(
-      awsClients,
-      awsCompotaConfiguration,
-      logger.subLogger(suffix),
-      new File(workingDirectory, suffix),
-      awsInstanceId,
-      errorTable,
-      sendUnDeployCommand0,
-      isMetaManager
-    )
+  override def subEnvironmentSync[R](suffix: String)(statement: AwsEnvironment => R) : Try[(AwsEnvironment, R)] = {
+    Try {
+      val env = new AwsEnvironment(
+        awsClients,
+        awsCompotaConfiguration,
+        logger.subLogger(suffix, true),
+        new File(workingDirectory, suffix),
+        awsInstanceId,
+        errorTable,
+        sendUnDeployCommand0,
+        isMetaManager
+      )
+      (env, statement(env))
+    }
+  }
+
+
+  override def subEnvironment(suffix: String)(statement: (AwsEnvironment) => Unit): Try[AwsEnvironment] = {
+    subEnvironmentSync(suffix) { env =>
+      executor.execute(new Runnable {
+        override def run(): Unit = {
+
+          val oldName = Thread.currentThread().getName
+          Thread.currentThread().setName(instanceId.id)
+          env.logger.debug("changing thread to " + instanceId.id)
+
+          statement(env)
+
+          Thread.currentThread().setName(oldName)
+        }
+      })
+    }.map(_._1)
   }
 
   override val executor: ExecutorService = Executors.newCachedThreadPool()

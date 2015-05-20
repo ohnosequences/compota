@@ -92,6 +92,7 @@ class LocalCompotaTest {
 
   @Test
   def localCompotaTest(): Unit = {
+    println("test")
     wordCountCompota.launch()
 
     wordCountCompota.waitForFinished()

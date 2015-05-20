@@ -2,6 +2,7 @@ package ohnosequences.compota.metamanager
 
 import java.util.concurrent.atomic.AtomicBoolean
 
+import ohnosequences.compota.console.AnyConsole
 import ohnosequences.compota.{TerminationDaemon, Namespace}
 import ohnosequences.compota.queues.AnyQueueOp
 
@@ -23,7 +24,8 @@ trait BaseMetaManager extends AnyMetaManager {
                        unDeployContext: MetaManagerUnDeployingActionContext,
                        controlQueueOp: AnyQueueOp,
                        queueOps: List[AnyQueueOp],
-                       terminationDaemon: TerminationDaemon[MetaManagerEnvironment]
+                       launchTerminationDaemon: MetaManagerEnvironment => Try[TerminationDaemon[MetaManagerEnvironment]],
+                       launchConsole: MetaManagerEnvironment => Try[AnyConsole]
                        ): Try[List[BaseMetaManagerCommand]] = {
     val logger = env.logger
     logger.info("processing tasks " + command)
@@ -50,13 +52,25 @@ trait BaseMetaManager extends AnyMetaManager {
             compota.addTasks(env).flatMap { r =>
               compota.setTasksAdded()
             }.map { res =>
-              List(LaunchTerminationDaemon)
+              List(LaunchConsole)
             }
           }
         }
       }
+      case LaunchConsole => {
+        env.subEnvironment("console") { env =>
+          launchConsole(env)
+        }.map { tEnv =>
+          List[BaseMetaManagerCommand](LaunchTerminationDaemon)
+        }
+      }
       case LaunchTerminationDaemon => {
-        compota.launchTerminationDaemon(terminationDaemon).map { t =>
+        env.subEnvironment("terminationDaemon") { env =>
+          launchTerminationDaemon(env).recoverWith { case t =>
+            env.logger.error(t)
+            Success(())
+          }
+        }.map { tEnv =>
           List[BaseMetaManagerCommand]()
         }
       }

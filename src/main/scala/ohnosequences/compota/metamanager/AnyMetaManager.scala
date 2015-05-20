@@ -3,6 +3,7 @@ package ohnosequences.compota.metamanager
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentHashMap, Executors, ExecutorService}
 
+import ohnosequences.compota.console.AnyConsole
 import ohnosequences.compota.environment.AnyEnvironment
 import ohnosequences.compota.graphs.NisperoGraph
 import ohnosequences.compota.queues.{AnyQueueOp, Queue, QueueOp}
@@ -49,13 +50,16 @@ trait AnyMetaManager {
               unDeployActionsContext: MetaManagerUnDeployingActionContext,
               controlQueueOp: AnyQueueOp,
               queues: List[AnyQueueOp],
-              terminationDaemon: TerminationDaemon[MetaManagerEnvironment]
+              launchTerminationDaemon: MetaManagerEnvironment => Try[TerminationDaemon[MetaManagerEnvironment]],
+              launchConsole: MetaManagerEnvironment => Try[AnyConsole]
                ): Try[List[MetaManagerCommand]]
 
   def launchMetaManager[QContext](
                                    env: MetaManagerEnvironment,
                                    queue: Queue[MetaManagerCommand, QContext],
-                                   context: MetaManagerEnvironment => QContext
+                                   context: MetaManagerEnvironment => QContext,
+                                   launchTerminationDaemon: (NisperoGraph, MetaManagerEnvironment) => Try[TerminationDaemon[MetaManagerEnvironment]],
+                                   launchConsole: (NisperoGraph, MetaManagerEnvironment) => Try[AnyConsole]
 
   ): Unit = {
 
@@ -66,7 +70,8 @@ trait AnyMetaManager {
                     writer: queue.Writer,
                     unDeployingActionsContext: MetaManagerUnDeployingActionContext,
                     queueOps: List[AnyQueueOp],
-                    terminationDaemon: TerminationDaemon[MetaManagerEnvironment]): Unit = {
+                    launchTerminationDaemon: MetaManagerEnvironment => Try[TerminationDaemon[MetaManagerEnvironment]],
+                    launchConsole: MetaManagerEnvironment => Try[AnyConsole]): Unit = {
 
       val executor = Executors.newCachedThreadPool()
       implicit val executionContext: ExecutionContext = ExecutionContext.fromExecutor(executor)
@@ -105,7 +110,7 @@ trait AnyMetaManager {
                     runingTasks.get(body.prefix).incrementAndGet()
 
                     logger.debug("processing message " + body)
-                    process(body, env, unDeployingActionsContext, queueOp, queueOps, terminationDaemon) match {
+                    process(body, env, unDeployingActionsContext, queueOp, queueOps, launchTerminationDaemon, launchConsole) match {
                       case Failure(t) => {
                         //command processing failure
                         env.reportError(metaManager / body.prefix, t)
@@ -130,7 +135,7 @@ trait AnyMetaManager {
             }
           }
         }
-        messageLoop(queueOp, reader, writer, unDeployingActionsContext, queueOps, terminationDaemon)
+        messageLoop(queueOp, reader, writer, unDeployingActionsContext, queueOps, launchTerminationDaemon, launchConsole)
       } else {
         Success(())
       }
@@ -158,17 +163,8 @@ trait AnyMetaManager {
             Failure(t)
           }.flatMap { startedTime =>
 
-            val console = compota.getConsoleInstance(graph, env.subEnvironment("console"))
 
-            compota.launchConsole(console, env)
 
-            val terminationDaemon = new TerminationDaemon[MetaManagerEnvironment](
-              nisperoGraph = graph,
-              sendUnDeployCommand = compota.sendUnDeployCommand,
-              startedTime = startedTime,
-              timeout = compota.configuration.timeout,
-              terminationDaemonIdleTime = compota.configuration.terminationDaemonIdleTime
-            )
             logger.debug("creating control queue context")
             val qContext = context(env)
             logger.debug("creating control queue " + queue.name)
@@ -180,7 +176,11 @@ trait AnyMetaManager {
                   logger.info("writing init message")
                   writer.writeRaw(List(("init", initMessage()))).flatMap { res =>
                     logger.debug("starting message loop")
-                    messageLoop(queueOp, reader, writer, unDeployActionsContext, graph.queueOpNames.toList.map{_._2}, terminationDaemon)
+                    messageLoop(queueOp,
+                      reader, writer, unDeployActionsContext, graph.queueOpNames.toList.map{_._2},
+                      {env => launchTerminationDaemon(graph, env)},
+                      {env => launchConsole(graph, env)}
+                    )
                     Success(())
                   }
                 }

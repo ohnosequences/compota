@@ -2,6 +2,7 @@ package ohnosequences.compota.aws.metamanager
 
 import java.util.concurrent.atomic.AtomicBoolean
 
+import ohnosequences.compota.console.AnyConsole
 import ohnosequences.compota.{TerminationDaemon, AnyCompota}
 import ohnosequences.compota.aws._
 import ohnosequences.compota.local.LocalCompota
@@ -19,7 +20,8 @@ class AwsMetaManager[U](val compota: AwsCompota[U]) extends BaseMetaManager {
   override type MetaManagerCompota = AwsCompota[U]
 
   override def process(command: BaseMetaManagerCommand, env: AwsEnvironment, unDeployContext: MetaManagerUnDeployingActionContext, controlQueueOp: AnyQueueOp, queueOps: List[AnyQueueOp],
-                       terminationDaemon: TerminationDaemon[AwsEnvironment]): Try[List[BaseMetaManagerCommand]] = {
+                       launchTerminationDaemon: MetaManagerEnvironment => Try[TerminationDaemon[MetaManagerEnvironment]],
+                       launchConsole: MetaManagerEnvironment => Try[AnyConsole]): Try[List[BaseMetaManagerCommand]] = {
     command match {
       case UnDeploy(reason, force) if reason.startsWith(AwsErrorTable.errorTableError) => {
         env.errorTable.recover() match {
@@ -33,7 +35,7 @@ class AwsMetaManager[U](val compota: AwsCompota[U]) extends BaseMetaManager {
           }
         }
       }
-      case c => super.process(c, env, unDeployContext, controlQueueOp, queueOps, terminationDaemon)
+      case c => super.process(c, env, unDeployContext, controlQueueOp, queueOps, launchTerminationDaemon, launchConsole)
     }
   }
 }

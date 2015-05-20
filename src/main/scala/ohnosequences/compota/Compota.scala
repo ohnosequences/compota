@@ -26,7 +26,7 @@ trait AnyCompota {
     (nispero.configuration.name, nispero)
   }.toMap
 
-  def launchMetaManager(): Unit
+  def launchMetaManager(): Try[CompotaEnvironment]
 
   def configurationChecks(env: CompotaEnvironment): Try[Boolean] = {
     //sinks are leafs
@@ -43,13 +43,14 @@ trait AnyCompota {
     Success(true)
   }
 
-  def launchWorker(nispero: Nispero): Unit
+  def launchWorker(nispero: Nispero): Try[CompotaEnvironment]
 
-  def launchWorker(name: String) {
+  def launchWorker(name: String): Try[CompotaEnvironment] = {
 
     nisperosNames.get(name) match {
       case None => {
         //report error
+        Failure(new Error("nispero " + name + " doesn't exist"))
       }
       case Some(nispero) => launchWorker(nispero)
     }
@@ -58,7 +59,7 @@ trait AnyCompota {
   def launch(): Try[Unit]
 
   def main(args: Array[String]): Unit = {
-    val logger = new ConsoleLogger("compotaCLI")
+    val logger = new ConsoleLogger("compotaCLI", false, None)
     args.toList match {
       case "run" :: "worker" :: name :: Nil => launchWorker(name)
       case "run" :: "metamanager" :: Nil => launchMetaManager()
@@ -88,13 +89,21 @@ trait AnyCompota {
 
   def deleteManager(env: CompotaEnvironment): Try[Unit]
 
-  def launchTerminationDaemon(terminationDaemon: TerminationDaemon[CompotaEnvironment]): Try[Unit]
+  def launchTerminationDaemon(graph: NisperoGraph, env: CompotaEnvironment): Try[TerminationDaemon[CompotaEnvironment]] = {
+    startedTime().flatMap { t =>
+      val td = new TerminationDaemon[CompotaEnvironment](
+        nisperoGraph = graph,
+        sendUnDeployCommand = sendUnDeployCommand,
+        startedTime = t,
+        timeout = configuration.timeout,
+        terminationDaemonIdleTime = configuration.terminationDaemonIdleTime
+      )
+      td.start(env).map{ u => td}
 
-  def getConsoleInstance(nisperoGraph: NisperoGraph, env: CompotaEnvironment): AnyConsole
-
-  def launchConsole(console: AnyConsole, env: CompotaEnvironment): Unit = {
-    new UnfilteredConsoleServer(console).start()
+    }
   }
+
+  def launchConsole(nisperoGraph: NisperoGraph, env: CompotaEnvironment): Try[AnyConsole]
 }
 
 object AnyCompota {

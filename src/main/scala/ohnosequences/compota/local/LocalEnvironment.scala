@@ -7,7 +7,7 @@ import ohnosequences.compota.environment.{AnyEnvironment, InstanceId}
 import ohnosequences.logging.{FileLogger, Logger}
 
 import scala.concurrent.ExecutionContext
-import scala.util.Try
+import scala.util.{Success, Try}
 import scala.collection.JavaConversions._
 
 
@@ -19,34 +19,60 @@ class LocalEnvironment(val instanceId: InstanceId,
                        val errorCounts: ConcurrentHashMap[String, Int],
                        val configuration: LocalCompotaConfiguration,
                        val sendUnDeployCommand0: (LocalEnvironment, String, Boolean) => Try[Unit],
-                       val isStoppedFlag: java.util.concurrent.atomic.AtomicBoolean
+                       val isStoppedFlag: java.util.concurrent.atomic.AtomicBoolean,
+                       val instancesEnvironments: ConcurrentHashMap[InstanceId, (AnyLocalNispero, LocalEnvironment)],
+                       val origin: Option[LocalEnvironment]
                        ) extends AnyEnvironment[LocalEnvironment] { localEnvironment =>
 
 
 
 
-  override def subEnvironment(suffix: String): LocalEnvironment = {
-    new LocalEnvironment(
-      instanceId,
-      new File(workingDirectory, suffix),
-      executor,
-      localErrorTable,
-      logger.subLogger(suffix),
-      errorCounts,
-      configuration,
-      sendUnDeployCommand0,
-      isStoppedFlag
-    )
+  override def subEnvironmentSync[R](suffix: String)(statement: LocalEnvironment => R): Try[(LocalEnvironment, R)] = {
+    Try {
+      val env = new LocalEnvironment(
+        instanceId,
+        new File(workingDirectory, suffix),
+        executor,
+        localErrorTable,
+        logger.subLogger(suffix, true),
+        errorCounts,
+        configuration,
+        sendUnDeployCommand0,
+        isStoppedFlag,
+        instancesEnvironments,
+        Some(LocalEnvironment.this)
+      )
+      (env, statement(env))
+    }
+  }
+
+
+  override def subEnvironment(suffix: String)(statement: (LocalEnvironment) => Unit): Try[LocalEnvironment] = {
+    subEnvironmentSync(suffix) { env =>
+      executor.execute(new Runnable {
+        override def run(): Unit = {
+
+          val oldName = Thread.currentThread().getName
+          Thread.currentThread().setName(suffix)
+          env.logger.debug("changing thread to " + instanceId.id)
+
+          statement(env)
+
+          Thread.currentThread().setName(oldName)
+          env.instancesEnvironments.remove(env.instanceId)
+        }
+      })
+    }.map(_._1)
   }
 
   def localContext: LocalContext = new LocalContext(executor, logger)
 
   override val errorTable: ErrorTable = localErrorTable
 
-
   override def isStopped: Boolean = isStoppedFlag.get()
 
   override def stop(): Unit ={
+    origin.foreach(_.stop())
     isStoppedFlag.set(true)
  //   thread.stop()
   }
@@ -78,6 +104,7 @@ class LocalEnvironment(val instanceId: InstanceId,
 }
 
 object LocalEnvironment {
+
   def execute(instanceId: InstanceId,
               workingDirectory: File,
               instancesEnvironments: ConcurrentHashMap[InstanceId, (AnyLocalNispero, LocalEnvironment)],
@@ -86,52 +113,56 @@ object LocalEnvironment {
               localErrorTable: LocalErrorTable,
               configuration: LocalCompotaConfiguration,
               errorCount: ConcurrentHashMap[String, Int],
-              sendUnDeployCommand: (LocalEnvironment, String, Boolean) => Try[Unit])(statement: LocalEnvironment => Unit): LocalEnvironment = {
+              sendUnDeployCommand: (LocalEnvironment, String, Boolean) => Try[Unit])(statement: LocalEnvironment => Unit): Try[LocalEnvironment] = {
 
-    val envLogger = new FileLogger(
-      instanceId.id,
-      new File(configuration.loggingDirectory, instanceId.id),
-      "log.txt",
-      configuration.loggerDebug,
-      printToConsole = true
-    )
+    Success(()).flatMap { u =>
 
-    configuration.loggingDirectory.mkdir()
+      configuration.loggingDirectory.mkdir()
+      val loggerDirectory = new File(configuration.loggingDirectory, instanceId.id)
+      FileLogger.apply(
+        instanceId.id,
+        new File(configuration.loggingDirectory, instanceId.id),
+        "log.txt",
+        configuration.loggerDebug,
+        printToConsole = true
+      ).map { envLogger =>
 
-    val workingDirectory = new File(configuration.workingDirectory, instanceId.id)
-    workingDirectory.mkdir()
+        val workingDirectory = new File(configuration.workingDirectory, instanceId.id)
+        workingDirectory.mkdir()
 
 
-    val env: LocalEnvironment = new LocalEnvironment(
-      instanceId,
-      workingDirectory,
-      executor,
-      localErrorTable,
-      envLogger,
-      errorCount,
-      configuration,
-      sendUnDeployCommand,
-      new java.util.concurrent.atomic.AtomicBoolean(false)
-    )
+        val env: LocalEnvironment = new LocalEnvironment(
+          instanceId,
+          workingDirectory,
+          executor,
+          localErrorTable,
+          envLogger,
+          errorCount,
+          configuration,
+          sendUnDeployCommand,
+          new java.util.concurrent.atomic.AtomicBoolean(false),
+          instancesEnvironments,
+          None
+        )
 
-    executor.execute(new Runnable {
-      override def run(): Unit = {
-        nispero.foreach { nispero =>
-          instancesEnvironments.put(env.instanceId, (nispero, env))
-        }
+        executor.execute(new Runnable {
+          override def run(): Unit = {
+            nispero.foreach { nispero =>
+              instancesEnvironments.put(env.instanceId, (nispero, env))
+            }
 
-        val oldName = Thread.currentThread().getName
-        Thread.currentThread().setName(instanceId.id)
-        env.logger.debug("changing thread to " + instanceId.id)
+            val oldName = Thread.currentThread().getName
+            Thread.currentThread().setName(instanceId.id)
+            env.logger.debug("changing thread to " + instanceId.id)
 
-        statement(env)
+            statement(env)
 
-        Thread.currentThread().setName(oldName)
-        instancesEnvironments.remove(env.instanceId)
+            Thread.currentThread().setName(oldName)
+            instancesEnvironments.remove(env.instanceId)
+          }
+        })
+        env
       }
-    })
-    env
+    }
   }
-
-
 }

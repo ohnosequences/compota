@@ -1,5 +1,7 @@
 package ohnosequences.compota.aws
 
+import java.io.File
+
 import ohnosequences.awstools.autoscaling._
 import ohnosequences.awstools.ec2.{InstanceType, InstanceSpecs}
 import ohnosequences.awstools.s3.ObjectAddress
@@ -16,6 +18,8 @@ abstract class AwsCompotaConfiguration(val metadata: AnyMetadata) extends AnyCom
 
   val name = metadata.artifact
 
+  val loggingDebug: Boolean = false
+
   def amiId = "ami-5256b825"
 
   def securityGroups = List("compota")
@@ -26,7 +30,9 @@ abstract class AwsCompotaConfiguration(val metadata: AnyMetadata) extends AnyCom
 
   def deviceMapping = Map("/dev/xvdb" -> "ephemeral0")
 
-  def workingDirectory = "/media/ephemeral0/compota"
+  def workingDirectory = new File("/media/ephemeral0/compota")
+
+  def loggingDirectory =  new File(workingDirectory, "logs")
 
   def managerInstanceType = InstanceType.c1_medium
 
@@ -41,7 +47,7 @@ abstract class AwsCompotaConfiguration(val metadata: AnyMetadata) extends AnyCom
     instanceProfile = instanceProfile,
     deviceMapping = deviceMapping,
     amiId = amiId,
-    userData = userScriptGenerator.generate("manager", "manager", metadata.jarUrl, metadata.testJarUrl, metadata.mainClass, workingDirectory)
+    userData = userScriptGenerator.generate("manager", "manager", metadata.jarUrl, metadata.testJarUrl, metadata.mainClass, workingDirectory.getAbsolutePath)
   )
 
   def managerPurchaseModel: PurchaseModel = OnDemand
@@ -87,7 +93,7 @@ abstract class AwsNisperoConfiguration(val name: String, val compotaConfiguratio
     instanceProfile = compotaConfiguration.instanceProfile,
     deviceMapping = compotaConfiguration.deviceMapping,
     amiId = compotaConfiguration.amiId,
-    userData = userScriptGenerator.generate(name, "worker", compotaConfiguration.metadata.jarUrl, compotaConfiguration.metadata.testJarUrl, compotaConfiguration.metadata.mainClass, workerWorkingDirectory)
+    userData = userScriptGenerator.generate(name, "worker", compotaConfiguration.metadata.jarUrl, compotaConfiguration.metadata.testJarUrl, compotaConfiguration.metadata.mainClass, workerWorkingDirectory.getAbsolutePath)
   )
 
   def workerLaunchConfiguration = LaunchConfiguration(

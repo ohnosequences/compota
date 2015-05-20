@@ -40,8 +40,9 @@ case class Command0(component: String, action: String, args: List[String]) { com
       case Command0(UnDeployMetaManger.component, UnDeployMetaManger.action, Nil) => Try{ UnDeployMetaManger }
       case Command0(AddTasks.component, AddTasks.action, Nil) => Try{ AddTasks }
       case Command0(LaunchTerminationDaemon.component, LaunchTerminationDaemon.action, Nil) => Try{ LaunchTerminationDaemon }
+      case Command0(LaunchConsole.component, LaunchConsole.action, Nil) => Try{ LaunchConsole }
       case Command0(finishCompota.component, finishCompota.action, reason :: message :: Nil) => Try{ FinishCompota(reason, message) }
-      case _ => Failure(new Error("can't parse AwsCommand encoded with " + command0))
+      case _ => Failure(new Error("can't parse BaseManagerCommand encoded with " + command0))
     }
   }
 }
@@ -75,6 +76,12 @@ case object AddTasks extends BaseMetaManagerCommand {
 
 case object LaunchTerminationDaemon extends BaseMetaManagerCommand {
   override val component: String = "termination_daemon"
+  override val action: String = "start"
+  override val args: List[String] = List()
+}
+
+case object LaunchConsole extends BaseMetaManagerCommand {
+  override val component: String = "console"
   override val action: String = "start"
   override val args: List[String] = List()
 }

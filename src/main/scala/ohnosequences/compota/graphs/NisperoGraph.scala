@@ -10,7 +10,7 @@ import scala.util.Try
 
 //todo add product queue
 object NisperoGraph {
-  def apply[E <: AnyEnvironment](env: E, nisperos: List[AnyNispero.of[E]]): Try[NisperoGraph] = {
+  def apply[E <: AnyEnvironment[E]](env: E, nisperos: List[AnyNispero.of[E]]): Try[NisperoGraph] = {
     val nisperoNames = new mutable.HashMap[String, AnyNispero]()
     val queueOpNames = new mutable.HashMap[String, AnyQueueOp]()
     val queueOps = new mutable.HashMap[AnyQueue, List[AnyQueueOp]]()
@@ -65,7 +65,7 @@ class NisperoGraph(
 //  }
 
   //return either first not empty queue, either all not-leafs (to delete them)
-  def checkQueues(env: AnyEnvironment): Try[Either[AnyQueueOp, List[AnyQueueOp]]] = Try {
+  def checkQueues[E <: AnyEnvironment[E]](env: E): Try[Either[AnyQueueOp, List[AnyQueueOp]]] = Try {
 
     notLeafsQueues.find { queue => !queue.isEmpty.get  } match {
       case None =>  Right(notLeafsQueues)

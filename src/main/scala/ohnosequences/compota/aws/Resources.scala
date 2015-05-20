@@ -14,6 +14,8 @@ object Resources {
 
   def errorTable(metadata: AnyMetadata): String = dynamodbTable(metadata, "errors")
 
+  def loggerBucket(metadata: AnyMetadata): String = "compota-" + metadata.artifact + "-logs"
+
   def controlQueue(metadata: AnyMetadata): String = dynamodbTable(metadata, "controlQueue")
 
   def dynamodbTable(metadata: AnyMetadata, name: String) = "compota_" + metadata.artifact + "_" + name

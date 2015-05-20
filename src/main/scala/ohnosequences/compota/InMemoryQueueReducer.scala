@@ -9,7 +9,7 @@ import ohnosequences.compota.queues.{QueueReducer, AnyQueueReducer, Queue}
 
 import scala.util.Try
 
-class InMemoryQueueReducer[E <: AnyEnvironment, I, C, Q <: Queue[I, C]](queue: Q, context: E => C, monoid: Monoid[I],
+class InMemoryQueueReducer[E <: AnyEnvironment[E], I, C, Q <: Queue[I, C]](queue: Q, context: E => C, monoid: Monoid[I],
                                           val monkeyAppearanceProbability: MonkeyAppearanceProbability = MonkeyAppearanceProbability())
   extends QueueReducer[E, I, C, Q](queue, context) {
 

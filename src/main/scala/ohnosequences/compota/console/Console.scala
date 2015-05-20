@@ -106,11 +106,12 @@ trait AnyWorkerInfo {
 
 
 
-abstract class Console[E <: AnyEnvironment, U, N <: AnyNispero.of[E], C <: Compota[E, N, U]](compota: C, env: E, nisperoGraph: NisperoGraph) extends AnyConsole{
+abstract class Console[E <: AnyEnvironment[E], U, N <: AnyNispero.of[E], C <: Compota[E, N, U]](compota: C, env: E, nisperoGraph: NisperoGraph) extends AnyConsole{
+
+  override val logger: Logger = env.logger
 
   override def password: String = compota.configuration.consolePassword
 
-  override val logger: Logger = env.logger.fork("console")
 
   def compotaInfoPage: NodeSeq = {
     compotaInfoPageHeader ++ compotaInfoPageDetails

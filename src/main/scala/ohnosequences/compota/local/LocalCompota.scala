@@ -108,15 +108,14 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
 
 
   override def launchTerminationDaemon(terminationDaemon: TerminationDaemon[CompotaEnvironment]): Try[Unit] = {
-    
+    val prefix = "terminationDaemon"
     LocalEnvironment.execute(
+      InstanceId(prefix),
+      new File(localConfiguration.workingDirectory, prefix),
       instancesEnvironments,
       None,
       executor,
       errorTable,
-      "termination daemon",
-      localConfiguration.workingDirectory,
-      localConfiguration.workingDirectory,
       localConfiguration,
       errorCounts,
       sendUnDeployCommand
@@ -126,6 +125,7 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
     }
     Success(())
   }
+
 
 
   override def startedTime(): Try[Long] = Success(System.currentTimeMillis())
@@ -175,18 +175,8 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
   }
 
 
-
-
   override def deleteManager(env: CompotaEnvironment): Try[Unit] = {
-
     env.executor.awaitTermination(10, TimeUnit.SECONDS)
-
-//    val g = Thread.currentThread().getThreadGroup
-//    val threads = Array.ofDim[Thread](g.activeCount())
-//    g.enumerate(threads)
-
-   // println(threads.toList)
-
     Success(())
   }
 
@@ -205,18 +195,14 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
   }
 
   def finishUnDeploy(env: LocalEnvironment, reason: String, message: String): Try[Unit] = {
-
     //Success(isFinished.set(true))
     Success(())
   }
 
 
 
-
-
-  //override def unDeployActions(force: Boolean): Try[Unit] = ???
   override def getConsoleInstance(nisperoGraph: NisperoGraph, env: CompotaEnvironment): AnyConsole = {
-    new LocalConsole[U](LocalCompota.this, env.fork("console"), nisperoGraph)
+    new LocalConsole[U](LocalCompota.this, env, nisperoGraph)
   }
 
 

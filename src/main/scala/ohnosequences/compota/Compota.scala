@@ -11,7 +11,7 @@ import ohnosequences.logging.ConsoleLogger
 import scala.util.{Failure, Success, Try}
 
 trait AnyCompota {
-  type CompotaEnvironment <: AnyEnvironment
+  type CompotaEnvironment <: AnyEnvironment[CompotaEnvironment]
   type Nispero <: AnyNispero.of[CompotaEnvironment]
   type MetaManager <:  AnyMetaManager.of[CompotaEnvironment]
 
@@ -90,17 +90,18 @@ trait AnyCompota {
 
   def launchTerminationDaemon(terminationDaemon: TerminationDaemon[CompotaEnvironment]): Try[Unit]
 
-
   def getConsoleInstance(nisperoGraph: NisperoGraph, env: CompotaEnvironment): AnyConsole
 
-  def launchConsole(compota: AnyConsole, env: CompotaEnvironment): Unit
+  def launchConsole(console: AnyConsole, env: CompotaEnvironment): Unit = {
+    new UnfilteredConsoleServer(console).start()
+  }
 }
 
 object AnyCompota {
-  type of[E <: AnyEnvironment, U] = AnyCompota { type CompotaEnvironment = E ; type CompotaUnDeployActionContext = U  }
+  type of[E <: AnyEnvironment[E], U] = AnyCompota { type CompotaEnvironment = E ; type CompotaUnDeployActionContext = U  }
 }
 
-abstract class Compota[E <: AnyEnvironment, N <: AnyNispero.of[E], U](
+abstract class Compota[E <: AnyEnvironment[E], N <: AnyNispero.of[E], U](
                                                                     override val nisperos: List[N],
                                                                     override val reducers: List[AnyQueueReducer.of[E]],
                                                                     val configuration: AnyCompotaConfiguration)

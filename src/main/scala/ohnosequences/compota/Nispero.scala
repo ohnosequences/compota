@@ -8,7 +8,7 @@ import scala.util.Try
 
 trait AnyNispero {
 
-  type NisperoEnvironment <: AnyEnvironment
+  type NisperoEnvironment <: AnyEnvironment[NisperoEnvironment]
 
   type Input
   type Output
@@ -55,13 +55,13 @@ trait AnyNispero {
 }
 
 object AnyNispero {
-  type of[E <: AnyEnvironment] = AnyNispero { type NisperoEnvironment = E}
+  type of[E <: AnyEnvironment[E]] = AnyNispero { type NisperoEnvironment = E}
 
 
 }
 
 
-abstract class Nispero[In, Out, Env <: AnyEnvironment, InCtx, OutCtx, InQueue <: Queue[In, InCtx], OutQueue <: Queue[Out, OutCtx]](
+abstract class Nispero[In, Out, Env <: AnyEnvironment[Env], InCtx, OutCtx, InQueue <: Queue[In, InCtx], OutQueue <: Queue[Out, OutCtx]](
   val inputQueue: InQueue,
   val inContext: Env => InCtx,
   val outputQueue: OutQueue,

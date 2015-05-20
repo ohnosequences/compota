@@ -6,7 +6,7 @@ import scala.util.Try
 
 
 trait AnyQueueReducer {
-  type Environment <: AnyEnvironment
+  type Environment <: AnyEnvironment[Environment]
 
   type QueueContext
 
@@ -19,11 +19,11 @@ trait AnyQueueReducer {
 }
 
 object AnyQueueReducer {
-  type of[E <: AnyEnvironment] = AnyQueueReducer { type Environment = E}
+  type of[E <: AnyEnvironment[E]] = AnyQueueReducer { type Environment = E}
 }
 
 
-abstract class QueueReducer[Env <: AnyEnvironment, In, Ctx, Q <: Queue[In, Ctx]](val queue: Q, val context:  Env => Ctx) extends AnyQueueReducer {
+abstract class QueueReducer[Env <: AnyEnvironment[Env], In, Ctx, Q <: Queue[In, Ctx]](val queue: Q, val context:  Env => Ctx) extends AnyQueueReducer {
   type Environment = Env
   type QueueContext = Ctx
   type QQ = Q

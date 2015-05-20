@@ -23,7 +23,7 @@ trait AnyMetaManager {
 
   type MetaManagerUnDeployingActionContext
 
-  type MetaManagerEnvironment <: AnyEnvironment
+  type MetaManagerEnvironment <: AnyEnvironment[MetaManagerEnvironment]
 
   type MetaManagerCompota <: AnyCompota.of[MetaManagerEnvironment, MetaManagerUnDeployingActionContext]
 
@@ -197,6 +197,6 @@ trait AnyMetaManager {
 }
 
 object AnyMetaManager {
-  type of[E <: AnyEnvironment] = AnyMetaManager { type MetaManagerEnvironment = E }
+  type of[E <: AnyEnvironment[E]] = AnyMetaManager { type MetaManagerEnvironment = E }
 }
 

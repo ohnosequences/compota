@@ -9,7 +9,7 @@ import scala.annotation.tailrec
 import scala.concurrent.duration.Duration
 import scala.util.{Try, Success, Failure}
 
-class TerminationDaemon[E <: AnyEnvironment](nisperoGraph: NisperoGraph,
+class TerminationDaemon[E <: AnyEnvironment[E]](nisperoGraph: NisperoGraph,
                         sendUnDeployCommand: (E, String, Boolean) => Try[Unit],
                         startedTime: Long,
                         timeout: Duration,

@@ -40,8 +40,10 @@ abstract class AwsCompota[U] (
   }
 
 
-  def logger(prefix: String, workingDir: File, logFile: File) = {
-    new S3Logger(awsClients.s3, prefix, configuration.loggerDebug, workingDir, logFile)
+  def logger(prefix: String, workingDir: File) = {
+
+    //todo fix
+    new S3Logger(awsClients.s3, prefix, workingDir, "log.txt", awsConfiguration.loggerBucket, configuration.loggerDebug)
   }
 
   def executeLocal(prefix: String)(statement: AwsEnvironment => Unit): Unit = {
@@ -57,7 +59,7 @@ abstract class AwsCompota[U] (
 
     workingDirectory.mkdir()
     var env: Option[AwsEnvironment] = None
-    val envLogger = logger(prefix, workingDirectory, logFile)
+    val envLogger = logger(prefix, workingDirectory)
     AwsErrorTable.apply(envLogger, awsConfiguration.errorTable, awsClients).recoverWith { case t =>
       envLogger.error(t)
       Failure(t)
@@ -66,7 +68,7 @@ abstract class AwsCompota[U] (
         env = Some(new AwsEnvironment(
           awsClients = awsClients,
           awsCompotaConfiguration = awsConfiguration,
-          logger0 = envLogger,
+          logger = envLogger,
           workingDirectory = workingDirectory,
           awsInstanceId = instanceID,
           errorTable = errorTable,
@@ -171,4 +173,6 @@ abstract class AwsCompota[U] (
   override def tasksAdded(): Try[Boolean] = ???
 
   override def setTasksAdded(): Try[Unit] = ???
+
+  override def launchConsole(compota: AnyConsole, env: CompotaEnvironment): Unit = ???
 }

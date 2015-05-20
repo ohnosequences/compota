@@ -32,6 +32,8 @@ abstract class AwsCompotaConfiguration(val metadata: AnyMetadata) extends AnyCom
 
   def errorTable: String = Resources.errorTable(metadata)
 
+  def loggerBucket: String = Resources.loggerBucket(metadata)
+
   def controlQueue: String = Resources.controlQueue(metadata)
 
   def managerInstanceSpecs = new InstanceSpecs(

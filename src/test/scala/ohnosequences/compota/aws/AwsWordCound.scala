@@ -69,6 +69,7 @@ class AwsWordCount {
     override val deleteErrorQueue: Boolean = false
     override val timeout: Duration = Duration(1, HOURS)
 
+
   }
 
 

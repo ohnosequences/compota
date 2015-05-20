@@ -10,7 +10,7 @@ import scala.util.{Try, Success, Failure}
 
 //instructions executor
 trait AnyWorker {
-  type WorkerEnvironment
+  type WorkerEnvironment <: AnyEnvironment[WorkerEnvironment]
 
   type InputQueue <: AnyQueue
   type OutputQueue <: AnyQueue
@@ -23,7 +23,7 @@ trait AnyWorker {
 /**
   * Worker class execute instructions in an environment: EC2 instance, local thread.
   */
-class Worker[In, Out, Env <: AnyEnvironment, InContext, OutContext, IQ <: Queue[In, InContext], OQ <: Queue[Out, OutContext]](
+class Worker[In, Out, Env <: AnyEnvironment[Env], InContext, OutContext, IQ <: Queue[In, InContext], OQ <: Queue[Out, OutContext]](
    val inputQueue: IQ, val inContext: Env => InContext,
    val outputQueue: OQ, val outContext: Env => OutContext,
    instructions: Instructions[In, Out],

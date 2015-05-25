@@ -137,6 +137,7 @@ trait AnyMetaManager {
         }
         messageLoop(queueOp, reader, writer, unDeployingActionsContext, queueOps, launchTerminationDaemon, launchConsole)
       } else {
+        env.logger.info("environment stopped")
         Success(())
       }
     }

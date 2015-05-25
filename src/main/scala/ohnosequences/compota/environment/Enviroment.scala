@@ -12,7 +12,17 @@ import scala.util.{Try}
 
 case class InstanceId(id: String)
 
-abstract class AnyEnvironment[E <: AnyEnvironment[E]] {
+trait Env {
+
+  val logger: Logger
+
+  def isStopped: Boolean
+
+  val workingDirectory: File
+
+}
+
+abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env {
 
   def subEnvironmentSync[R](suffix: String)(statement: E => R): Try[(E, R)]
 
@@ -20,17 +30,11 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] {
 
   def instanceId: InstanceId
 
-  val logger: Logger
-
   val errorTable: ErrorTable
 
   val executor: ExecutorService
 
-  def terminate(): Unit
-
   def sendUnDeployCommand(reason: String, force: Boolean): Try[Unit]
-
-  def isStopped: Boolean
 
   def stop(): Unit
 
@@ -40,7 +44,6 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] {
    */
   def reportError(nameSpace: Namespace, t: Throwable)
 
-  val workingDirectory: File
 
 
 }

@@ -72,14 +72,11 @@ class LocalEnvironment(val instanceId: InstanceId,
   override def isStopped: Boolean = isStoppedFlag.get()
 
   override def stop(): Unit ={
-    origin.foreach(_.stop())
+    //origin.foreach(_.stop())
     isStoppedFlag.set(true)
  //   thread.stop()
   }
 
-  override def terminate(): Unit = {
-
-  }
 
   override def sendUnDeployCommand(reason: String, force: Boolean): Try[Unit] = sendUnDeployCommand0(localEnvironment, reason, force)
 

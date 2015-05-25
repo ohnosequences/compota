@@ -21,27 +21,26 @@ class TerminationDaemon[E <: AnyEnvironment[E]](nisperoGraph: NisperoGraph,
     }
 
     @tailrec
-    def startRec(): Try[Unit] = {
-
+    def messageLoop(): Try[Unit] = {
+      Thread.sleep(terminationDaemonIdleTime.toMillis)
       if (isTimeoutReached) {
         environment.logger.info("reached compota timeout: " + timeout.toMinutes + " mins")
         environment.logger.info("sending undeploy command")
         sendUnDeployCommand(environment, "timeout", true).recoverWith[Unit] { case t =>
           environment.reportError(terminationDaemon / "send_undeploy_command", new Error("couldn't send undeploy command", t))
-          Failure[Unit](t)
+          Success(())
         }
-        environment.logger.info("stopping termination daemon")
-        environment.stop()
-        Success[Unit](())
       } else if (environment.isStopped) {
         Success(())
       } else {
         nisperoGraph.checkQueues(environment) match {
           case Failure(t) => {
             environment.reportError(terminationDaemon / "check_queues", new Error("couldn't check queues", t))
+            Success(())
           }
           case Success(Left(queueOp)) => {
             environment.logger.debug("queue " + queueOp.queue.name + " isn't empty")
+            messageLoop()
           }
           case Success(Right(queues)) => {
             environment.logger.info("all queues are empty")
@@ -49,17 +48,21 @@ class TerminationDaemon[E <: AnyEnvironment[E]](nisperoGraph: NisperoGraph,
             environment.logger.info("sending undeploy command")
             sendUnDeployCommand(environment, "terminated", false).recoverWith { case t =>
               environment.reportError(terminationDaemon / "send_undeploy_command", new Error("couldn't send undeploy command", t))
-              Failure(t)
+              Success(())
             }
-            environment.logger.info("stopping termination daemon")
-            environment.stop()
           }
         }
-        Thread.sleep(terminationDaemonIdleTime.toMillis)
-        startRec()
       }
     }
-
-    startRec()
+    messageLoop() match {
+      case Failure(t) => {
+        environment.logger.info ("stopping termination daemon")
+        Failure(t)
+      }
+      case Success(u) => {
+        environment.logger.info ("stopping termination daemon")
+        Success(u)
+      }
+    }
   }
 }

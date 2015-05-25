@@ -1,19 +1,19 @@
 package ohnosequences.compota
 
+import ohnosequences.compota.environment.{Env}
 import ohnosequences.logging.Logger
 
 import scala.util.Try
 
-//can't return an error?
 trait AnyInstructions {
 
   type Input
   type Output
   type Context
 
-  def prepare(logger: Logger): Try[Context]
+  def prepare(env: Env): Try[Context]
 
-  def solve(logger: Logger, context: Context, input: Input): Try[List[Output]]
+  def solve(env: Env, context: Context, input: Input): Try[List[Output]]
 
 }
 
@@ -29,13 +29,13 @@ abstract class MapInstructions[I, O] extends Instructions[I, O] {
 
   //val arity = 1
 
-  final def solve(logger: Logger, context: Context, input: Input): Try[List[Output]] = {
+  final def solve(env: Env, context: Context, input: Input): Try[List[Output]] = {
 
     //println(apply(logger, context, input).map(List(_)))
-    apply(logger, context, input).map(List(_))
+    apply(env, context, input).map(List(_))
   }
 
-  def apply(logger: Logger, context: Context, input: Input): Try[Output]
+  def apply(env: Env, context: Context, input: Input): Try[Output]
 
 }
 

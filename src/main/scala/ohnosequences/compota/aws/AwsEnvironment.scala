@@ -131,13 +131,9 @@ class AwsEnvironment(val awsClients: AWSClients,
   override def isStopped: Boolean = isTerminatedFlag.get()
 
 
-  override def terminate(): Unit = {
-    stop()
-    awsClients.ec2.terminateInstance(awsInstanceId)
-  }
-
   override def stop(): Unit ={
     isTerminatedFlag.set(true)
+    awsClients.ec2.terminateInstance(awsInstanceId)
   }
 
   override def reportError(namespace: Namespace, t: Throwable): Unit = {
@@ -150,13 +146,13 @@ class AwsEnvironment(val awsClients: AWSClients,
       if (globalCount > awsCompotaConfiguration.globalErrorThresholdPerNameSpace) {
         sendUnDeployCommand("reached error threshold for " + namespace.toString, force = true)
         if(!isMetaManager) {
-          terminate()
+          stop()
         }
         Success(())
       } else if (localErrorCount.get() > awsCompotaConfiguration.localErrorThreshold) {
         sendUnDeployCommand("reached error threshold for instance " + instanceId.id, force = true)
         if(!isMetaManager) {
-          terminate()
+          stop()
         }
         Success(())
       } else {

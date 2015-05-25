@@ -172,8 +172,8 @@ abstract class LocalCompota[U](nisperos: List[AnyLocalNispero],
   }
 
   def finishUnDeploy(env: LocalEnvironment, reason: String, message: String): Try[Unit] = {
-    //Success(isFinished.set(true))
-    Success(())
+    Success(isFinished.set(true))
+    //Success(())
   }
 
 

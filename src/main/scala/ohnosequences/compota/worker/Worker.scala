@@ -2,7 +2,7 @@ package ohnosequences.compota.worker
 
 import ohnosequences.compota.{Namespace, Instructions}
 import ohnosequences.compota.environment.{AnyEnvironment}
-import ohnosequences.compota.queues.{QueueOp, Queue, AnyQueue}
+import ohnosequences.compota.queues.{AnyQueueOp, QueueOp, Queue, AnyQueue}
 import org.apache.commons.io.FileUtils
 
 import scala.annotation.tailrec
@@ -51,7 +51,7 @@ class Worker[In, Out, Env <: AnyEnvironment[Env], InContext, OutContext, IQ <: Q
          logger.debug("create context for queue " + outputQueue.name)
          outputQueue.create(outContext(env)).flatMap { outputQueue =>
            logger.debug("preparing instructions")
-           instructions.prepare(logger).flatMap { context =>
+           instructions.prepare(env).flatMap { context =>
              logger.debug("creating reader for queue " + inputQueue.queue.name)
              inputQueue.reader.flatMap { queueReader =>
                logger.debug("creating writer for queue " + outputQueue.queue.name)
@@ -75,9 +75,9 @@ class Worker[In, Out, Env <: AnyEnvironment[Env], InContext, OutContext, IQ <: Q
 //    Try { action }.flatMap {_}
 //  }
 
-  def messageLoop(inputQueueOp: QueueOp[In, inputQueue.Msg, inputQueue.Reader, inputQueue.Writer],
-                  queueReader: inputQueue.Reader,
-                  queueWriter: outputQueue.Writer,
+  def messageLoop(inputQueueOp: AnyQueueOp.of[In, inputQueue.QueueQueueMessage, inputQueue.QueueQueueReader, inputQueue.QueueQueueWriter],
+                  queueReader: inputQueue.QueueQueueReader,
+                  queueWriter: outputQueue.QueueQueueWriter,
                   env: Env,
                   instructionsContext: instructions.Context): Unit = {
 
@@ -116,7 +116,7 @@ class Worker[In, Out, Env <: AnyEnvironment[Env], InContext, OutContext, IQ <: Q
 
                   logger.debug("running " + nisperoName + " instructions")
                   Try {
-                    instructions.solve(logger, instructionsContext, input)
+                    instructions.solve(env, instructionsContext, input)
                   }.flatMap { e => e }.recoverWith { case t =>
                     env.reportError(new Namespace(message.id), new Error("instructions error", t))
                     Failure(t)

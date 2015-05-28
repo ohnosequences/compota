@@ -3,6 +3,7 @@ package ohnosequences.compota.aws
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.compota.aws.deployment.Metadata
 import ohnosequences.compota.aws.queues.DynamoDBQueue
+import ohnosequences.compota.environment.Env
 import ohnosequences.compota.local.LocalNispero
 import ohnosequences.compota.serialization.{intSerializer, stringSerializer}
 import ohnosequences.compota.{InMemoryQueueReducer, Instructions}
@@ -21,12 +22,12 @@ class AwsWordCount {
 
     override type Context = Unit
 
-    override def solve(logger: Logger, context: Unit, input: String): Try[List[Int]] = {
+    override def solve(env: Env, context: Unit, input: String): Try[List[Int]] = {
       throw new Error("uuu!")
       Success(List(input.length))
     }
 
-    override def prepare(logger: Logger) = Success(())
+    override def prepare(env: Env) = Success(())
 
   }
 
@@ -34,11 +35,11 @@ class AwsWordCount {
 
     override type Context = Unit
 
-    override def solve(logger: Logger, context: Unit, input: String): Try[List[String]] = {
+    override def solve(env: Env, context: Unit, input: String): Try[List[String]] = {
       Success(input.split("\\s+").toList)
     }
 
-    override def prepare(logger: Logger) = Success(())
+    override def prepare(env: Env) = Success(())
 
   }
 
@@ -102,12 +103,12 @@ class AwsWordCount {
 
     val s = System.currentTimeMillis()
 
-    override def prepareUnDeployActions(env: wordCountCompota.CompotaEnvironment): Try[Int] = Success(1000)
+    override def prepareUnDeployActions(env: AwsEnvironment): Try[Int] = Success(1000)
 
 
-    override def configurationChecks(env: CompotaEnvironment): Try[Boolean] = {
+    override def configurationChecks(env: AwsEnvironment): Try[Boolean] = {
       Try{
-        awsConfiguration.metadata.testJarUrl.exists { s =>
+        configuration.metadata.testJarUrl.exists { s =>
           ObjectAddress(s).map { obj =>
             env.awsClients.s3.objectExists(obj, Some(env.logger))
           }.getOrElse(false)

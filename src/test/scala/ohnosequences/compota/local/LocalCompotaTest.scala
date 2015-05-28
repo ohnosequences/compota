@@ -2,6 +2,7 @@ package ohnosequences.compota.local
 
 import java.util.concurrent.atomic.AtomicReference
 
+import ohnosequences.compota.environment.Env
 import ohnosequences.compota.{InMemoryQueueReducerLocal, InMemoryQueueReducer, Instructions}
 import ohnosequences.compota.monoid.{stringMonoid, intMonoid}
 import ohnosequences.logging.{ConsoleLogger, Logger}
@@ -16,11 +17,11 @@ object wordLengthInstructions extends Instructions[String, Int] {
 
   override type Context = Unit
 
-  override def solve(logger: Logger, context: Unit, input: String): Try[List[Int]] = {
+  override def solve(env: Env, context: Unit, input: String): Try[List[Int]] = {
     Success(List(input.length))
   }
 
-  override def prepare(logger: Logger) = Success(())
+  override def prepare(env: Env) = Success(())
 
 }
 
@@ -28,12 +29,12 @@ object splitInstructions extends Instructions[String, String] {
 
   override type Context = Unit
 
-  override def solve(logger: Logger, context: Unit, input: String): Try[List[String]] = {
+  override def solve(env: Env, context: Unit, input: String): Try[List[String]] = {
    // Thread.sleep(200000)
     Success(input.split("\\s+").toList)
   }
 
-  override def prepare(logger: Logger) = Success(())
+  override def prepare(env: Env) = Success(())
 
 }
 

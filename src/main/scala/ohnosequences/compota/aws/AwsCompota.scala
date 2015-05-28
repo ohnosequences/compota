@@ -1,6 +1,5 @@
 package ohnosequences.compota.aws
 
-import java.io.File
 import java.util.concurrent.Executors
 
 import com.amazonaws.auth.{InstanceProfileCredentialsProvider, AWSCredentialsProvider}
@@ -11,21 +10,29 @@ import ohnosequences.compota.console.AnyConsole
 import ohnosequences.compota.graphs.NisperoGraph
 import ohnosequences.compota.metamanager.{BaseCommandSerializer, BaseMetaManagerCommand}
 import ohnosequences.compota.queues._
-import ohnosequences.compota.{TerminationDaemon, Compota}
+import ohnosequences.compota.{AnyCompota}
 
-import scala.util.{Success, Failure, Try}
+import scala.util.{Try}
 
+object AnyAwsCompota {
+  type of[U] = AnyAwsCompota { type CompotaUnDeployActionContext = U}
+}
 
-abstract class AwsCompota[U] (
-   nisperos: List[AnyAwsNispero],
-   reducers: List[AnyQueueReducer.of[AwsEnvironment]],
-   val awsConfiguration: AwsCompotaConfiguration
-                               )
-  extends Compota[AwsEnvironment, AnyAwsNispero, U](nisperos, reducers, awsConfiguration) {
+trait AnyAwsCompota extends AnyCompota {
+  type CompotaEnvironment = AwsEnvironment
+  type Nispero <: AnyAwsNispero
+  type MetaManager = AwsMetaManager[CompotaUnDeployActionContext]
+
+  type CompotaConfiguration <: AwsCompotaConfiguration
+
 
   def awsCredentialsProvider: AWSCredentialsProvider = {
     new InstanceProfileCredentialsProvider()
   }
+
+
+
+ // val awsConfiguration: AwsCompotaConfiguration
 
   val executor = Executors.newCachedThreadPool()
 
@@ -41,21 +48,18 @@ abstract class AwsCompota[U] (
     case Some(aws) => aws
   }
 
-
-
-  override def launchConsole(nisperoGraph: NisperoGraph, env: CompotaEnvironment): Try[AnyConsole] = ???
-
+  def launchConsole(nisperoGraph: NisperoGraph, env: CompotaEnvironment): Try[AnyConsole] = ???
 
   override def launchMetaManager(): Try[CompotaEnvironment] = {
-    val metaManager = new AwsMetaManager[U](AwsCompota.this)
+    val metaManager = new AwsMetaManager[CompotaUnDeployActionContext](AnyAwsCompota.this)
 
     AwsEnvironment.execute(
       executor,
       "metamanager",
       awsClients,
-      awsConfiguration.workingDirectory,
-      awsConfiguration.loggingDirectory,
-      awsConfiguration,
+      configuration.workingDirectory,
+      configuration.loggingDirectory,
+      configuration,
       sendUnDeployCommand,
       isMetaManager = true) { env =>
 
@@ -64,28 +68,28 @@ abstract class AwsCompota[U] (
           env.awsClients,
           env.awsCompotaConfiguration.metadata,
           env.logger)},
-        launchTerminationDaemon,
-        launchConsole
+      launchTerminationDaemon,
+      launchConsole
       )
     }
   }
 
 
-
-  override def launchWorker(nispero: AnyAwsNispero): Try[CompotaEnvironment] = {
+  override def launchWorker(nispero: Nispero): Try[CompotaEnvironment] = {
     val prefix = "worker_" + nispero.configuration.name
     AwsEnvironment.execute(
       executor,
       prefix,
       awsClients,
-      awsConfiguration.workingDirectory,
-      awsConfiguration.loggingDirectory,
-      awsConfiguration,
+      configuration.workingDirectory,
+      configuration.loggingDirectory,
+      configuration,
       sendUnDeployCommand,
       isMetaManager = false) {
       env => nispero.createWorker().start(env)
     }
   }
+
 
   override def createNisperoWorkers(env: CompotaEnvironment, nispero: Nispero): Try[Unit] = {
     Try {
@@ -106,27 +110,41 @@ abstract class AwsCompota[U] (
 
   override def deleteManager(env: CompotaEnvironment): Try[Unit] = {
     Try {
-      val group = awsConfiguration.managerAutoScalingGroup
+      val group = configuration.managerAutoScalingGroup
       env.logger.info("deleting auto scaling group: " + group.name)
       env.awsClients.as.deleteAutoScalingGroup(group)
       ()
     }
   }
 
-
-
   override def launch(): Try[Unit] = ???
 
-  override def finishUnDeploy(env: AwsEnvironment,  reason: String, message: String): Try[Unit] = ???
+  override def unDeployActions(force: Boolean, env: CompotaEnvironment, context: CompotaUnDeployActionContext): Try[String] = ???
 
-  override def sendUnDeployCommand(env: AwsEnvironment, reason: String, force: Boolean): Try[Unit] = ???
+  override def finishUnDeploy(env: CompotaEnvironment, reason: String, message: String): Try[Unit] = ???
 
-  override def addTasks(environment: CompotaEnvironment): Try[Unit] = ???
+  override def prepareUnDeployActions(env: CompotaEnvironment): Try[CompotaUnDeployActionContext] = ???
+
+  override def sendUnDeployCommand(env: CompotaEnvironment, reason: String, force: Boolean): Try[Unit] = ???
 
   override def startedTime(): Try[Long] = ???
 
   override def tasksAdded(): Try[Boolean] = ???
 
   override def setTasksAdded(): Try[Unit] = ???
+}
+
+
+abstract class AwsCompota[U] (
+   val nisperos: List[AnyAwsNispero],
+   val reducers: List[AnyQueueReducer.of[AwsEnvironment]],
+   val configuration: AwsCompotaConfiguration)
+  extends AnyAwsCompota {
+
+  type CompotaUnDeployActionContext = U
+
+  type Nispero = AnyAwsNispero
+
+  override type CompotaConfiguration = AwsCompotaConfiguration
 
 }

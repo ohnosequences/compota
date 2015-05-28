@@ -8,19 +8,19 @@ import ohnosequences.compota.queues.{AnyQueueOp, AnyQueueReducer}
 
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
-import ohnosequences.compota.local.{LocalEnvironment, LocalCompota, AnyLocalNispero}
+import ohnosequences.compota.local.{AnyLocalCompota, LocalEnvironment, LocalCompota, AnyLocalNispero}
 
 import scala.util.{Failure, Success, Try}
 
 
 class LocalMetaManager[U](
-                        val compota: LocalCompota[U],
+                        val compota: AnyLocalCompota.of[U],
                         nisperoEnvironments: ConcurrentHashMap[InstanceId, (AnyLocalNispero, LocalEnvironment)]
                         ) extends BaseMetaManager {
 
   override type MetaManagerEnvironment = LocalEnvironment
   override type MetaManagerUnDeployingActionContext = U
-  override type MetaManagerCompota = LocalCompota[U]
+  override type MetaManagerCompota = AnyLocalCompota.of[U]
 
 
 

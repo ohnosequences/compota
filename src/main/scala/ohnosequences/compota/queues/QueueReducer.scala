@@ -10,8 +10,8 @@ trait AnyQueueReducer {
 
   type QueueContext
 
-  type QQ <: AnyQueue { type Context = QueueContext }
-  val queue: QQ
+  type QueueReducerQueue <: AnyQueue.of[QueueContext]
+  val queue: QueueReducerQueue
 
   val context: Environment => QueueContext
 
@@ -26,6 +26,6 @@ object AnyQueueReducer {
 abstract class QueueReducer[Env <: AnyEnvironment[Env], In, Ctx, Q <: Queue[In, Ctx]](val queue: Q, val context:  Env => Ctx) extends AnyQueueReducer {
   type Environment = Env
   type QueueContext = Ctx
-  type QQ = Q
+  type QueueReducerQueue = Q
 
 }

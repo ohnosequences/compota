@@ -15,12 +15,12 @@ import scala.xml.{Node, NodeSeq}
 import scala.collection.JavaConversions._
 
 
-class LocalConsole[U](localCompota: LocalCompota[U], env: LocalEnvironment,  nisperoGraph: NisperoGraph) extends
-  Console[LocalEnvironment, U, AnyLocalNispero, LocalCompota[U]](localCompota, env, nisperoGraph) {
+class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N], env: LocalEnvironment,  nisperoGraph: NisperoGraph) extends
+  Console[LocalEnvironment, N, AnyLocalCompota.of2[N]](localCompota, env, nisperoGraph) {
 
   override def getNamespaceLog(id: String): Try[Either[URL, String]] = {
     Try {
-      val log = scala.io.Source.fromFile(localCompota.localConfiguration.taskLogFile(new Namespace(id))).getLines().mkString
+      val log = scala.io.Source.fromFile(localCompota.configuration.taskLogFile(new Namespace(id))).getLines().mkString
       Right(log)
     }
   }
@@ -98,7 +98,7 @@ class LocalConsole[U](localCompota: LocalCompota[U], env: LocalEnvironment,  nis
   }
 
 
-  override def nisperoInfoDetails(nispero: AnyLocalNispero): NodeSeq = {
+  override def nisperoInfoDetails(nispero: N): NodeSeq = {
     <table class="table table-striped topMargin20">
       <tbody>
         <tr>
@@ -128,13 +128,13 @@ class LocalConsole[U](localCompota: LocalCompota[U], env: LocalEnvironment,  nis
         <tr>
           <td class="col-md-6">working directory</td>
           <td class="col-md-6">
-            {localCompota.localConfiguration.workingDirectory.getAbsolutePath}
+            {localCompota.configuration.workingDirectory.getAbsolutePath}
           </td>
         </tr>
         <tr>
           <td class="col-md-6">error threshold</td>
           <td class="col-md-6">
-            {localCompota.localConfiguration.errorThreshold}
+            {localCompota.configuration.errorThreshold}
           </td>
         </tr>
       </tbody>

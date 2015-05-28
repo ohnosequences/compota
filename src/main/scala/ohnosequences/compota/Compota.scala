@@ -20,7 +20,9 @@ trait AnyCompota {
   val nisperos: List[Nispero]
   val reducers: List[AnyQueueReducer.of[CompotaEnvironment]]
 
-  val configuration: AnyCompotaConfiguration
+
+  type CompotaConfiguration <: AnyCompotaConfiguration
+  val configuration: CompotaConfiguration
 
   def nisperosNames: Map[String, Nispero] =  nisperos.map { nispero =>
     (nispero.configuration.name, nispero)
@@ -107,17 +109,21 @@ trait AnyCompota {
 }
 
 object AnyCompota {
-  type of[E <: AnyEnvironment[E], U] = AnyCompota { type CompotaEnvironment = E ; type CompotaUnDeployActionContext = U  }
+  type of2[E <: AnyEnvironment[E], U] = AnyCompota { type CompotaEnvironment = E ; type CompotaUnDeployActionContext = U  }
+  type of[E <: AnyEnvironment[E], N <: AnyNispero.of[E]] = AnyCompota {
+    type CompotaEnvironment = E ;
+    type Nispero = N  }
 }
 
-abstract class Compota[E <: AnyEnvironment[E], N <: AnyNispero.of[E], U](
-                                                                    override val nisperos: List[N],
-                                                                    override val reducers: List[AnyQueueReducer.of[E]],
-                                                                    val configuration: AnyCompotaConfiguration)
-  extends AnyCompota {
-
-  type Nispero = N
-  type CompotaEnvironment = E
-  type CompotaUnDeployActionContext = U
-
-}
+//abstract class Compota[E <: AnyEnvironment[E], N <: AnyNispero.of[E], U, C <: AnyCompotaConfiguration](
+//                                                                    override val nisperos: List[N],
+//                                                                    override val reducers: List[AnyQueueReducer.of[E]],
+//                                                                    val configuration: C)
+//  extends AnyCompota {
+//
+//  type Nispero = N
+//  type CompotaEnvironment = E
+//  type CompotaUnDeployActionContext = U
+//  type CompotaConfiguration = C
+//
+//}

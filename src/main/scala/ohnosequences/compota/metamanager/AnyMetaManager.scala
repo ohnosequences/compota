@@ -26,7 +26,7 @@ trait AnyMetaManager {
 
   type MetaManagerEnvironment <: AnyEnvironment[MetaManagerEnvironment]
 
-  type MetaManagerCompota <: AnyCompota.of[MetaManagerEnvironment, MetaManagerUnDeployingActionContext]
+  type MetaManagerCompota <: AnyCompota.of2[MetaManagerEnvironment, MetaManagerUnDeployingActionContext]
 
   val compota: MetaManagerCompota
 
@@ -65,9 +65,9 @@ trait AnyMetaManager {
 
 
     @tailrec
-    def messageLoop(queueOp: QueueOp[MetaManagerCommand, queue.Msg, queue.Reader, queue.Writer],
-                    reader: queue.Reader,
-                    writer: queue.Writer,
+    def messageLoop(queueOp: AnyQueueOp.of[MetaManagerCommand, queue.QueueQueueMessage, queue.QueueQueueReader, queue.QueueQueueWriter],
+                    reader: queue.QueueQueueReader,
+                    writer: queue.QueueQueueWriter,
                     unDeployingActionsContext: MetaManagerUnDeployingActionContext,
                     queueOps: List[AnyQueueOp],
                     launchTerminationDaemon: MetaManagerEnvironment => Try[TerminationDaemon[MetaManagerEnvironment]],

@@ -12,12 +12,12 @@ import ohnosequences.compota.queues.{AnyQueueOp, Queue}
 import scala.util.{Success, Failure, Try}
 
 
-class AwsMetaManager[U](val compota: AwsCompota[U]) extends BaseMetaManager {
+class AwsMetaManager[U](val compota: AnyAwsCompota.of[U]) extends BaseMetaManager {
 
   override type MetaManagerEnvironment = AwsEnvironment
 
   override type MetaManagerUnDeployingActionContext = U
-  override type MetaManagerCompota = AwsCompota[U]
+  override type MetaManagerCompota = AnyAwsCompota.of[U]
 
   override def process(command: BaseMetaManagerCommand, env: AwsEnvironment, unDeployContext: MetaManagerUnDeployingActionContext, controlQueueOp: AnyQueueOp, queueOps: List[AnyQueueOp],
                        launchTerminationDaemon: MetaManagerEnvironment => Try[TerminationDaemon[MetaManagerEnvironment]],

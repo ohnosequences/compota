@@ -106,7 +106,7 @@ trait AnyWorkerInfo {
 
 
 
-abstract class Console[E <: AnyEnvironment[E], U, N <: AnyNispero.of[E], C <: Compota[E, N, U]](compota: C, env: E, nisperoGraph: NisperoGraph) extends AnyConsole{
+abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCompota.of[E, N]](compota: C, env: E, nisperoGraph: NisperoGraph) extends AnyConsole{
 
   override val logger: Logger = env.logger
 

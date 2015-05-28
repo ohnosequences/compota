@@ -33,7 +33,7 @@ dependencyOverrides += "org.scala-lang.modules" % "scala-xml_2.11" % "1.0.2"
 testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-maxSize", "40", "-minSuccessfulTests", "10", "-workers", "1", "-verbosity", "1")
 
 
-fatArtifactSettings
+//fatArtifactSettings
 
 mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) => {
   case "log4j.properties" => MergeStrategy.first

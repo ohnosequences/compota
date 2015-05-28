@@ -10,26 +10,38 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-
-abstract class QueueMessage[B] {
-  def getBody: Try[Option[B]]
+trait AnyQueueMessage {
+  type QueueMessageElement
+  def getBody: Try[Option[QueueMessageElement]]
   val id: String
 }
 
+object AnyQueueMessage {
+  type of[E] = AnyQueueMessage{ type QueueMessageElement = E}
+}
 
-abstract class QueueReader[E, M <: QueueMessage[E]] {
+abstract class QueueMessage[E] extends AnyQueueMessage {
+  override type QueueMessageElement = E
+}
+
+
+trait AnyQueueReader {
+
+  type QueueReaderElement
+
+  type QueueReaderMessage <: AnyQueueMessage.of[QueueReaderElement]
 
   val queueOp: AnyQueueOp
 
-  def receiveMessage(logger: Logger): Try[Option[M]]
+  def receiveMessage(logger: Logger): Try[Option[QueueReaderMessage]]
 
   def waitForMessage(logger: Logger,
                      isStopped: => Boolean = {false},
                      initialTimeout: Duration = Duration(100, MILLISECONDS)
-                      ): Try[Option[M]] = {
+                      ): Try[Option[QueueReaderMessage]] = {
 
     @tailrec
-    def waitForMessageRep(timeout: Long): Try[Option[M]] = {
+    def waitForMessageRep(timeout: Long): Try[Option[QueueReaderMessage]] = {
       if(isStopped) {
         Success(None)
       } else {
@@ -54,49 +66,93 @@ abstract class QueueReader[E, M <: QueueMessage[E]] {
 
     waitForMessageRep(initialTimeout.toMillis)
   }
-
 }
 
-abstract class QueueWriter[E] {
 
-  //def write(originId: String, writer: String, values: List[Element]): Try[Unit]
-  def writeRaw(values: List[(String, E)]): Try[Unit]
+object AnyQueueReader {
+  type of[E, M <: AnyQueueMessage.of[E]] = AnyQueueReader {
+    type QueueReaderElement = E
+    type QueueReaderMessage = M
+  }
+}
 
-  def writeMessages(prefixId: String, values: List[E]): Try[Unit] = {
+abstract class QueueReader[E, M <: AnyQueueMessage.of[E]] extends AnyQueueReader {
+  override type QueueReaderElement = E
+  override type QueueReaderMessage = M
+}
+
+trait AnyQueueWriter {
+  type QueueWriterElement
+  def writeRaw(values: List[(String, QueueWriterElement)]): Try[Unit]
+
+  def writeMessages(prefixId: String, values: List[QueueWriterElement]): Try[Unit] = {
     writeRaw(values.zipWithIndex.map { case (value, i) =>
-    //  println("zip generated " + prefixId + "." + i)
+      //  println("zip generated " + prefixId + "." + i)
       (prefixId + "_" + i, value)
     })
   }
+}
 
+object AnyQueueWriter {
+  type of[E] = AnyQueueWriter { type QueueWriterElement = E }
+}
+
+abstract class QueueWriter[E] extends AnyQueueWriter {
+  override type QueueWriterElement = E
 }
 
 trait AnyQueue { queue =>
   
-  type Context
+  type QueueContext
 
   val name: String
 
-  // not needed here
-  type Elmnt
+  type QueueElement
 
-  type Msg <: QueueMessage[Elmnt]
+  type QueueQueueMessage <: AnyQueueMessage.of[QueueElement]
 
+  type QueueQueueReader <: AnyQueueReader.of[QueueElement, QueueQueueMessage]
+  type QueueQueueWriter <: AnyQueueWriter.of[QueueElement]
 
+  type QueueQueueOp <: AnyQueueOp.of[QueueElement, QueueQueueMessage, QueueQueueReader, QueueQueueWriter]
 
-  type Reader <: QueueReader[Elmnt, Msg]
-  type Writer <: QueueWriter[Elmnt]
+   def create(ctx: QueueContext): Try[QueueQueueOp]
 
-  // why?? put it somewhere else, not here. At the nispero level, for example
-   def create(ctx: Context): Try[QueueOp[Elmnt, Msg, Reader, Writer]]
-
-   def delete(ctx: Context): Try[Unit] = {
+   def delete(ctx: QueueContext): Try[Unit] = {
      create(ctx).flatMap(_.delete())
    }
 }
 
 object AnyQueue {
-  type of[Ctx] = AnyQueue { type Context = Ctx}
+  type of[Ctx] = AnyQueue { type QueueContext = Ctx}
+
+    type of2[E, Ctx] = AnyQueue {
+      type QueueContext = Ctx
+      type QueueElement = E
+    }
+
+
+//  type of2[E, Ctx, M <: AnyQueueMessage.of[E], R <: AnyQueueReader.of[E, M], W <: AnyQueueWriter.of[E]] = AnyQueue {
+//    type QueueContext = Ctx
+//    type QueueElement = E
+//    type QueueQueueMessage = M
+//    type QueueQueueReader = R
+//    type QueueQueueWriter = W
+//  }
+
+  type of3[E, Ctx, M <: AnyQueueMessage.of[E], R <: AnyQueueReader.of[E, M], W <: AnyQueueWriter.of[E], O <: AnyQueueOp.of[E, M, R, W]] = AnyQueue {
+    type QueueContext = Ctx
+    type QueueElement = E
+    type QueueQueueMessage = M
+    type QueueQueueReader = R
+    type QueueQueueWriter = W
+    type QueueQueueOp = O
+  }
+}
+
+abstract class Queue[E, Ctx](val name: String) extends AnyQueue {
+  override type QueueElement = E
+  override type QueueContext = Ctx
 }
 
 
@@ -104,18 +160,16 @@ trait AnyQueueOp {
 
   def subOps(): List[AnyQueueOp] = List(AnyQueueOp.this)
 
-  type QElement
-  type QMessage <: QueueMessage[QElement]
-  type Reader <: QueueReader[QElement, QMessage]
-  type Writer <: QueueWriter[QElement]
+  type QueueOpElement
+  type QueueOpQueueMessage <:  AnyQueueMessage.of[QueueOpElement]   // QueueMessage[QueueOpElement]
+  type QueueOpQueueReader <:  AnyQueueReader.of[QueueOpElement, QueueOpQueueMessage]  // QueueReader[QElement, QMessage]
+  type QueueOpQueueWriter <: AnyQueueWriter.of[QueueOpElement] //QueueWriter[QElement]
 
   val queue: AnyQueue
 
   def isEmpty: Try[Boolean]
 
-  def delete(): Try[Unit]
-
-  def get(key: String): Try[QElement]
+  def get(key: String): Try[QueueOpElement]
 
   def getContent(key: String): Try[Either[URL, String]] = {
     get(key).map { r =>
@@ -125,28 +179,12 @@ trait AnyQueueOp {
 
   def list(lastKey: Option[String], limit: Option[Int] = None): Try[(Option[String], List[String])]
 
-}
+  def deleteMessage(message: QueueOpQueueMessage): Try[Unit]
 
-// all these types are here just for convenience
-abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: QueueWriter[E]] extends AnyQueueOp { queueOp =>
-
-  type QElement = E
-  type QMessage = M
-  type Reader = QR
-  type Writer = QW
-
-  def deleteMessage(message: M): Try[Unit]
-
-  def reader: Try[QR]
-  def writer: Try[QW]
-
-
+  def reader: Try[QueueOpQueueReader]
+  def writer: Try[QueueOpQueueWriter]
 
   def delete(): Try[Unit]
-
-
-
-
 
   def forEachId[T](f: String => T): Try[Unit] = {
 
@@ -169,7 +207,7 @@ abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: Q
 
   }
 
-  def forEach[T](f: (String, E) => T): Try[Unit] = {
+  def forEach[T](f: (String, QueueOpElement) => T): Try[Unit] = {
     Try {
       forEachId { id =>
         f(id, get(id).get)
@@ -178,12 +216,40 @@ abstract class QueueOp[E, M <: QueueMessage[E], QR <: QueueReader[E, M], QW <: Q
   }
 
   def size: Try[Int]
+
 }
 
-abstract class Queue[E, Ctx](val name: String) extends AnyQueue {
-  type Elmnt = E
-  type Context = Ctx
+object AnyQueueOp {
+  type of[E, M <: AnyQueueMessage.of[E], QR <: AnyQueueReader.of[E, M], QW <: AnyQueueWriter.of[E]] = AnyQueueOp {
+    type QueueOpElement = E
+    type QueueOpQueueMessage = M
+    type QueueOpQueueReader = QR
+    type QueueOpQueueWriter = QW
+  }
 }
+
+
+abstract class QueueOp[E, M <: AnyQueueMessage.of[E], QR <: AnyQueueReader.of[E, M], QW <: AnyQueueWriter.of[E]] extends AnyQueueOp {
+
+  override type QueueOpElement = E
+  override type QueueOpQueueMessage = M
+  override type QueueOpQueueReader = QR
+  override type QueueOpQueueWriter = QW
+
+}
+
+//abstract class Queue[E, Ctx](val name: String) extends AnyQueue {
+//  type Elmnt = E
+//  type Context = Ctx
+//}
+
+//object Queue {
+//  type of[E, Ctx, M <: QueueMessage[E], R <: QueueReader[E, M], W <: QueueWriter[E]] = Queue[E, Ctx] {
+//    type Msg = M
+//    type Reader = R
+//    type Writer = W
+//  }
+//}
 
 //trait AnyReducibleQueue extends AnyQueue {
 //  val monoid: Monoid[Elmnt]

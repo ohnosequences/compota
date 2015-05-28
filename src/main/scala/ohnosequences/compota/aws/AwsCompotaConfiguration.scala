@@ -10,15 +10,17 @@ import ohnosequences.compota.aws.deployment.{AnyMetadata, Metadata, userScriptGe
 
 
 
-abstract class AwsCompotaConfiguration(val metadata: AnyMetadata) extends AnyCompotaConfiguration {
+trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
-  val localErrorThreshold: Int = 100
+  def metadata: AnyMetadata
 
-  val globalErrorThresholdPerNameSpace: Int = 10
+  def localErrorThreshold: Int = 100
 
-  val name = metadata.artifact
+  def globalErrorThresholdPerNameSpace: Int = 10
 
-  val loggingDebug: Boolean = false
+  def name = metadata.artifact
+
+  def loggingDebug: Boolean = false
 
   def amiId = "ami-5256b825"
 
@@ -74,13 +76,16 @@ abstract class AwsCompotaConfiguration(val metadata: AnyMetadata) extends AnyCom
 
   def workerPurchaseModel: PurchaseModel = SpotAuto
 
-
 }
 
 //class CompotaConfiguration(val name: String) extends CompotaConfigurationAux
 
 
-abstract class AwsNisperoConfiguration(val name: String, val compotaConfiguration: AwsCompotaConfiguration) extends AnyNisperoConfiguration {
+abstract class AwsNisperoConfiguration extends AnyNisperoConfiguration {
+
+  def name: String
+
+  def compotaConfiguration: AwsCompotaConfiguration
 
   def workerInstanceType = compotaConfiguration.workerInstanceType
 

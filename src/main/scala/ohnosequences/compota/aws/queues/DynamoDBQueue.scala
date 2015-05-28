@@ -204,9 +204,13 @@ class DynamoDBQueue[T](name: String,
                        writeThroughput: Long = 1
                        ) extends Queue[T, DynamoDBContext](name) { queue =>
 
-  override type Msg = DynamoDBMessage[T]
+  override type QueueQueueMessage = DynamoDBMessage[T]
+  override type QueueQueueWriter = DynamoDBQueueWriter[T]
+  override type QueueQueueReader = DynamoDBQueueReader[T]
+  override type QueueQueueOp = DynamoDBQueueOP[T]
 
-  override def create(ctx: DynamoDBContext): Try[QueueOp[T, DynamoDBMessage[T], DynamoDBQueueReader[T], DynamoDBQueueWriter[T]]] = {
+
+  override def create(ctx: DynamoDBContext): Try[QueueQueueOp] = {
     Try {
       DynamoDBUtils.createTable(
         ddb = ctx.aws.ddb,
@@ -223,12 +227,11 @@ class DynamoDBQueue[T](name: String,
         .withAttributes(Map(QueueAttributeName.ReceiveMessageWaitTimeSeconds.toString -> receiveMessageWaitTime.toSeconds.toString)) //max
       ).getQueueUrl
 
-      new DynamoDBQueueOP[Elmnt](queue, Resources.dynamodbTable(ctx.metadata, name), queueUrl, ctx.aws, serializer, bench)
+      new DynamoDBQueueOP[T](queue, Resources.dynamodbTable(ctx.metadata, name), queueUrl, ctx.aws, serializer, bench)
     }
   }
 
 
-  override type Writer = DynamoDBQueueWriter[T]
-  override type Reader = DynamoDBQueueReader[T]
+
 }
 

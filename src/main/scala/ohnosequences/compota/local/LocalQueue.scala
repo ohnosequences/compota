@@ -61,12 +61,14 @@ class LocalQueue[T](name: String,
   val rawQueue = new ConcurrentSkipListMap[String, T]()
   val rawQueueP = new ConcurrentSkipListMap[String, T]()
 
-  type Msg = LocalMessage[T]
+  override type QueueQueueMessage = LocalMessage[T]
 
-  type Reader = LocalQueueReader[T]
-  type Writer = LocalQueueWriter[T]
+  override type QueueQueueReader = LocalQueueReader[T]
+  override type QueueQueueWriter = LocalQueueWriter[T]
+  override type QueueQueueOp = LocalQueueOp[T]
 
-  override def create(ctx: LocalContext): Try[QueueOp[T, LocalMessage[T], LocalQueueReader[T], LocalQueueWriter[T]]] = {
+
+  override def create(ctx: LocalContext): Try[QueueQueueOp] = {
     Monkey.call(Success(new LocalQueueOp[T](queue, ctx)), monkeyAppearanceProbability.create)
   }
 }

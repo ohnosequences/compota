@@ -15,7 +15,7 @@ trait AnyAwsNispero extends AnyNispero {
 
 
 
-class AwsNispero[In, Out, InCtx, OutCtx, InQueue <: Queue[In, InCtx], OutQueue <: Queue[Out, OutCtx]](
+class AwsNispero[In, Out, InCtx, OutCtx, InQueue <:  AnyQueue.of2[In, InCtx], OutQueue <: AnyQueue.of2[Out, OutCtx]](
                                                                       inputQueue: InQueue,
                                                                       inputContext: AwsEnvironment => InCtx,
                                                                       outputQueue: OutQueue,
@@ -29,7 +29,7 @@ class AwsNispero[In, Out, InCtx, OutCtx, InQueue <: Queue[In, InCtx], OutQueue <
 }
 
 object AwsNispero {
-  def apply[In, Out, InQueue <: Queue[In, DynamoDBContext], OutQueue <: Queue[Out, DynamoDBContext]](
+  def apply[In, Out, InQueue <:  AnyQueue.of2[In, DynamoDBContext], OutQueue <:  AnyQueue.of2[Out, DynamoDBContext]](
                                                                                 inputQueue: InQueue,
                                                                                 outputQueue: OutQueue,
                                                                                 instructions: Instructions[In, Out],

@@ -1,7 +1,7 @@
 package ohnosequences.compota.aws
 
 import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.compota.aws.deployment.Metadata
+import ohnosequences.compota.aws.deployment.{AnyMetadata, Metadata}
 import ohnosequences.compota.aws.queues.DynamoDBQueue
 import ohnosequences.compota.environment.Env
 import ohnosequences.compota.local.LocalNispero
@@ -58,24 +58,33 @@ class AwsWordCount {
   )
 
   val rawMetadata = ohnosequences.compota.test.generated.metadata
-  val metadata = new Metadata(
+
+  val compotaMetadata = new Metadata(
     rawMetadata.artifact,
     rawMetadata.jarUrl,
     rawMetadata.testJarUrl,
-    Some(this.getClass.toString))
+    Some(this.getClass.toString)
+  )
 
-  object wordCountCompotaConfiguration extends AwsCompotaConfiguration(metadata) {
+  object wordCountCompotaConfiguration extends AwsCompotaConfiguration {
+
+
+    override def metadata: AnyMetadata = compotaMetadata
 
     override val loggerDebug: Boolean = true
     override val deleteErrorQueue: Boolean = false
     override val timeout: Duration = Duration(1, HOURS)
 
-
   }
 
 
 
-  object splitNisperoConfiguration extends  AwsNisperoConfiguration("split", wordCountCompotaConfiguration) {
+  object splitNisperoConfiguration extends  AwsNisperoConfiguration {
+
+    override def name: String = "split"
+
+    override def compotaConfiguration: AwsCompotaConfiguration = wordCountCompotaConfiguration
+
     override def workerDesiredSize: Int = 1
   }
 
@@ -85,7 +94,10 @@ class AwsWordCount {
     splitInstructions,
     splitNisperoConfiguration)
 
-  object wordLengthNisperoConfiguration extends AwsNisperoConfiguration("wordLenght", wordCountCompotaConfiguration) {
+  object wordLengthNisperoConfiguration extends AwsNisperoConfiguration {
+    override def name: String = "wordLenght"
+
+    override def compotaConfiguration: AwsCompotaConfiguration = wordCountCompotaConfiguration
     override def workerDesiredSize: Int = 1
   }
 

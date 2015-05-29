@@ -17,11 +17,11 @@ trait AnyNispero {
   type OutContext
 
   //type Input
-  type InputQueue <: AnyQueue.of[InContext]
+  type InputQueue <: AnyQueue.of2[Input, InContext]
   val inputQueue: InputQueue
 
   //type Output
-  type OutputQueue <: AnyQueue.of[OutContext]
+  type OutputQueue <: AnyQueue.of2[Output, OutContext]
   val outputQueue: OutputQueue
 
   val inContext: NisperoEnvironment => InContext
@@ -57,11 +57,19 @@ trait AnyNispero {
 object AnyNispero {
   type of[E <: AnyEnvironment[E]] = AnyNispero { type NisperoEnvironment = E}
 
+  type of3[E <: AnyEnvironment[E], I, O, C, IQ <: AnyQueue.of2[I, C], OQ <: AnyQueue.of2[O, C]] = AnyNispero {
+    type NisperoEnvironment = E
+    type Input = I
+    type Output = O
+    type InputQueue = IQ
+    type OutputQueue = OQ
+  }
+
 
 }
 
 
-abstract class Nispero[In, Out, Env <: AnyEnvironment[Env], InCtx, OutCtx, InQueue <: Queue[In, InCtx], OutQueue <: Queue[Out, OutCtx]](
+abstract class Nispero[In, Out, Env <: AnyEnvironment[Env], InCtx, OutCtx, InQueue <:  AnyQueue.of2[In, InCtx], OutQueue <:  AnyQueue.of2[Out, OutCtx]](
   val inputQueue: InQueue,
   val inContext: Env => InCtx,
   val outputQueue: OutQueue,

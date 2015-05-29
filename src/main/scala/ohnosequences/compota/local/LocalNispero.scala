@@ -1,7 +1,7 @@
 package ohnosequences.compota.local
 
 import ohnosequences.compota.{AnyNispero, Nispero, Instructions}
-import ohnosequences.compota.queues.Queue
+import ohnosequences.compota.queues.{AnyQueue, Queue}
 
 trait AnyLocalNispero extends AnyNispero {
 
@@ -13,7 +13,7 @@ trait AnyLocalNispero extends AnyNispero {
 }
 
 
-class LocalNispero[In, Out, InContext, OutContext, InQueue <: Queue[In, InContext], OutQueue <: Queue[Out, OutContext]](
+class LocalNispero[In, Out, InContext, OutContext, InQueue <: AnyQueue.of2[In, InContext], OutQueue <: AnyQueue.of2[Out, OutContext]](
                                                                                    inputQueue: InQueue,
                                                                                    inContext: LocalEnvironment => InContext,
                                                                                    outputQueue: OutQueue,
@@ -30,7 +30,7 @@ class LocalNispero[In, Out, InContext, OutContext, InQueue <: Queue[In, InContex
 
 }
 
-class LocalNisperoLocal[In, Out, InQueue <: Queue[In, LocalContext], OutQueue <: Queue[Out, LocalContext]](
+class LocalNisperoLocal[In, Out, InQueue <: AnyQueue.of2[In, LocalContext], OutQueue <: AnyQueue.of2[Out, LocalContext]](
                                                                                                                          inputQueue: InQueue,
                                                                                                                          outputQueue: OutQueue,
                                                                                                                          instructions: Instructions[In, Out],
@@ -42,7 +42,7 @@ class LocalNisperoLocal[In, Out, InQueue <: Queue[In, LocalContext], OutQueue <:
 
 
 object LocalNispero {
-  def apply[In, Out, InQueue <: Queue[In, LocalContext], OutQueue <: Queue[Out, LocalContext]](
+  def apply[In, Out, InQueue <: AnyQueue.of2[In, LocalContext], OutQueue <: AnyQueue.of2[Out, LocalContext]](
                                                                                  inputQueue: InQueue,
                                                                                  outputQueue: OutQueue,
                                                                                  instructions: Instructions[In, Out],

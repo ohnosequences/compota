@@ -310,9 +310,36 @@ YM <: AnyQueueMessage.of[Y], YR <: AnyQueueReader.of[Y, YM], YW <: AnyQueueWrite
   override type YQueue = YQ
 
 
-
-
 }
+
+//class ProductQueue2[Ctx, X, Y, XQ <: AnyQueue.of2[Ctx, X], YQ <: AnyQueue.of2[Ctx, Y]](val xQueue: XQ, val yQueue: YQ, val xMonoid: Monoid[X], val yMonoid: Monoid[Y]) extends AnyProductQueue {
+//
+//  override type XElement = X
+//  override type YElement = Y
+//
+//  val name = xQueue.name + "_" + yQueue.name
+//
+//  override type QueueContext = Ctx
+//
+//
+//
+//  override type XMessage = xQueue.QueueQueueMessage
+//  override type YMessage = yQueue.QueueQueueMessage
+//
+//  override type XReader = xQueue.QueueQueueReader
+//  override type YReader = yQueue.QueueQueueReader
+//
+//  override type XWriter = xQueue.QueueQueueWriter
+//  override type YWriter = yQueue.QueueQueueWriter
+//
+//  override type XQueueOp = xQueue.QueueQueueOp
+//  override type YQueueOp = yQueue.QueueQueueOp
+//
+//  override type XQueue = xQueue.type
+//  override type YQueue = yQueue.type
+//
+//
+//}
 //}
 //class AnyProductQueueOp extends AnyQueueOp {
 //

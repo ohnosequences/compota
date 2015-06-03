@@ -13,10 +13,7 @@ object userScriptGenerator {
                   |cd $workingDir$
                   |
                   |exec &> log.txt
-                  |yum install java-1.7.0-openjdk.x86_64 -y
                   |chmod a+r log.txt
-                  |alternatives --install /usr/bin/java java /usr/lib/jvm/jre-1.7.0-openjdk.x86_64/bin/java 20000
-                  |alternatives --auto java
                   |
                   |aws s3 cp s3://$jarUrl$ $workingDir$/$jarFile$ --region eu-west-1
                   """.stripMargin +

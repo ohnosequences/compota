@@ -22,7 +22,7 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   def loggingDebug: Boolean = false
 
-  def amiId = "ami-5256b825"
+  def amiId = "ami-a10897d6" //"ami-5256b825"
 
   def securityGroups = List("compota")
 

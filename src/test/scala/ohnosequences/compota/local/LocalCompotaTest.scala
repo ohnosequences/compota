@@ -42,25 +42,28 @@ object textQueue extends LocalQueue[String]("text", visibilityTimeout = Duration
 object wordsQueue extends LocalQueue[String]("words", visibilityTimeout = Duration(60, SECONDS))
 object countsQueue extends LocalQueue[Int]("counts")
 
+
+
+object wordCountCompotaConfiguration extends AnyLocalCompotaConfiguration {
+  override def name: String = "wordCount"
+  override val loggerDebug: Boolean = false
+  override val timeout= Duration(100, SECONDS)
+  override val terminationDaemonIdleTime =  Duration(10, SECONDS)
+}
+
 object splitNispero extends LocalNisperoLocal (
   textQueue,
   wordsQueue,
   splitInstructions,
-  new LocalNisperoConfiguration("split", 5)
+  LocalNisperoConfiguration(wordCountCompotaConfiguration, "split", 5)
 )
 
 object wordLengthNispero extends LocalNisperoLocal (
   wordsQueue,
   countsQueue,
   wordLengthInstructions,
-  new LocalNisperoConfiguration("lenght", 5)
+  LocalNisperoConfiguration(wordCountCompotaConfiguration, "lenght", 5)
 )
-
-object wordCountCompotaConfiguration extends LocalCompotaConfiguration("wordCount") {
-  override val loggerDebug: Boolean = false
-  override val timeout= Duration(100, SECONDS)
-  override val terminationDaemonIdleTime =  Duration(10, SECONDS)
-}
 
 
 

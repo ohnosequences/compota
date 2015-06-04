@@ -10,34 +10,41 @@ trait AnyNispero {
 
   type NisperoEnvironment <: AnyEnvironment[NisperoEnvironment]
 
-  type Input
-  type Output
+  type NisperoInput
+  type NisperoOutput
 
-  type InContext
-  type OutContext
+  type NisperoInputContext
+  type NisperoOutputContext
 
-  //type Input
-  type InputQueue <: AnyQueue.of2[Input, InContext]
-  val inputQueue: InputQueue
+  type NisperoInputQueue <: AnyQueue.of2[NisperoInput, NisperoInputContext]
+  def inputQueue: NisperoInputQueue
 
-  //type Output
-  type OutputQueue <: AnyQueue.of2[Output, OutContext]
-  val outputQueue: OutputQueue
+  type NisperoOutputQueue <: AnyQueue.of2[NisperoOutput, NisperoOutputContext]
+  def outputQueue: NisperoOutputQueue
 
-  val inContext: NisperoEnvironment => InContext
-  val outContext: NisperoEnvironment => OutContext
+  def inputContext: NisperoEnvironment => NisperoInputContext
+  def outputContext: NisperoEnvironment => NisperoOutputContext
 
-  val instructions: Instructions[Input, Output]
+  val instructions: Instructions[NisperoInput, NisperoOutput]
 
-  val configuration: AnyNisperoConfiguration
+  type NisperoConfiguration <: AnyNisperoConfiguration
+
+  val configuration: NisperoConfiguration
 
 
  // def name: String = instructions.name
 
 
-  type W <: AnyWorker {type WorkerEnvironment = NisperoEnvironment}
+  //type W <: AnyWorker {type WorkerEnvironment = NisperoEnvironment}
 
-  def createWorker(): W
+
+
+  def createWorker() =  new Worker[NisperoInput, NisperoOutput, NisperoEnvironment, NisperoInputContext, NisperoOutputContext, NisperoInputQueue, NisperoOutputQueue](inputQueue,
+    inputContext,
+    outputQueue,
+    outputContext,
+    instructions,
+    configuration.name)
 
 
 //  def deleteInputQueue(env: NisperoEnvironment): Try[Unit] = {
@@ -59,45 +66,45 @@ object AnyNispero {
 
   type of3[E <: AnyEnvironment[E], I, O, C, IQ <: AnyQueue.of2[I, C], OQ <: AnyQueue.of2[O, C]] = AnyNispero {
     type NisperoEnvironment = E
-    type Input = I
-    type Output = O
-    type InputQueue = IQ
-    type OutputQueue = OQ
+    type NisperoInputContext = C
+    type NisperoOutputContext = C
+    type NisperoInput = I
+    type NisperoOutput = O
+    type NisperoInputQueue = IQ
+    type NisperoOutputQueue = OQ
   }
 
 
 }
 
 
-abstract class Nispero[In, Out, Env <: AnyEnvironment[Env], InCtx, OutCtx, InQueue <:  AnyQueue.of2[In, InCtx], OutQueue <:  AnyQueue.of2[Out, OutCtx]](
-  val inputQueue: InQueue,
-  val inContext: Env => InCtx,
-  val outputQueue: OutQueue,
-  val outContext: Env => OutCtx,
-  val instructions: Instructions[In, Out],
-  val configuration: AnyNisperoConfiguration
-)
-extends AnyNispero { nispero =>
-
-  type InContext = InCtx
-  type OutContext = OutCtx
-
-  type InputQueue = InQueue
-  type OutputQueue = OutQueue
-
-  type NisperoEnvironment = Env
-
-  type Input = In
-  type Output = Out
-
-  type W = Worker[In, Out, Env, InContext, OutContext, InQueue, OutQueue]
-  def createWorker() = new Worker[In, Out, Env, InContext, OutContext, InQueue, OutQueue](inputQueue,
-    inContext,
-    outputQueue,
-    outContext,
-    instructions,
-    configuration.name)
-
-
-
-}
+//abstract class Nispero[In, Out, Env <: AnyEnvironment[Env], InCtx, OutCtx, InQueue <:  AnyQueue.of2[In, InCtx], OutQueue <:  AnyQueue.of2[Out, OutCtx]](
+//  val inputQueue: InQueue,
+//  val inContext: Env => InCtx,
+//  val outputQueue: OutQueue,
+//  val outContext: Env => OutCtx,
+//  val instructions: Instructions[In, Out],
+//  val configuration: AnyNisperoConfiguration
+//)
+//extends AnyNispero { nispero =>
+//
+//  type InContext = InCtx
+//  type OutContext = OutCtx
+//
+//  type InputQueue = InQueue
+//  type OutputQueue = OutQueue
+//
+//  type NisperoEnvironment = Env
+//
+//  type Input = In
+//  type Output = Out
+//
+//  type W = Worker[In, Out, Env, InContext, OutContext, InQueue, OutQueue]
+////  def createWorker() = new Worker[In, Out, Env, InContext, OutContext, InQueue, OutQueue](inputQueue,
+////    inContext,
+////    outputQueue,
+////    outContext,
+////    instructions,
+////    configuration.name)
+//
+//}

@@ -14,4 +14,5 @@ trait AnyCompotaConfiguration {
 
 trait AnyNisperoConfiguration {
   def name: String
+  def workers: Int
 }

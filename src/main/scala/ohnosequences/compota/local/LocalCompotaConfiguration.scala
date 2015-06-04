@@ -6,7 +6,7 @@ import ohnosequences.compota.{Namespace, AnyCompotaConfiguration}
 
 import scala.concurrent.duration.Duration
 
-abstract class LocalCompotaConfiguration(val name: String) extends AnyCompotaConfiguration {
+trait AnyLocalCompotaConfiguration extends AnyCompotaConfiguration {
 
   def workingDirectory: File = new File("compota")
   def loggingDirectory: File = new File(workingDirectory, "logs")
@@ -19,7 +19,10 @@ abstract class LocalCompotaConfiguration(val name: String) extends AnyCompotaCon
     new File(taskLogDirectory(namespace), "log.txt")
   }
 
+  def errorThreshold = 5
 
-  val errorThreshold = 5
   override val deleteErrorQueue: Boolean = true
 }
+
+
+case class LocalCompotaConfiguration(name: String, loggerDebug: Boolean, timeout: Duration) extends AnyLocalCompotaConfiguration

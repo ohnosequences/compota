@@ -111,6 +111,9 @@ abstract class AwsNisperoConfiguration extends AnyNisperoConfiguration {
   def workerDesiredSize: Int = 1
   def workerMaxSize: Int = 100
 
+
+  override def workers: Int = workerDesiredSize
+
   def workerAutoScalingGroup = AutoScalingGroup(
     name = Resources.workerAutoScalingGroup(compotaConfiguration.metadata, name),
     minSize = workerMinSize,

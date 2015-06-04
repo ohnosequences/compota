@@ -20,7 +20,7 @@ object AnyAwsCompota {
 
 trait AnyAwsCompota extends AnyCompota {
   type CompotaEnvironment = AwsEnvironment
-  type Nispero <: AnyAwsNispero
+  type CompotaNispero <: AnyAwsNispero
   type MetaManager = AwsMetaManager[CompotaUnDeployActionContext]
 
   type CompotaConfiguration <: AwsCompotaConfiguration
@@ -75,7 +75,7 @@ trait AnyAwsCompota extends AnyCompota {
   }
 
 
-  override def launchWorker(nispero: Nispero): Try[CompotaEnvironment] = {
+  override def launchWorker(nispero: CompotaNispero): Try[CompotaEnvironment] = {
     val prefix = "worker_" + nispero.configuration.name
     AwsEnvironment.execute(
       executor,
@@ -91,17 +91,17 @@ trait AnyAwsCompota extends AnyCompota {
   }
 
 
-  override def createNisperoWorkers(env: CompotaEnvironment, nispero: Nispero): Try[Unit] = {
+  override def createNisperoWorkers(env: CompotaEnvironment, nispero: CompotaNispero): Try[Unit] = {
     Try {
-      env.logger.info("creating working auto scaling group " + nispero.awsConfiguration.workerAutoScalingGroup.name)
-      env.awsClients.as.createAutoScalingGroup(nispero.awsConfiguration.workerAutoScalingGroup)
+      env.logger.info("creating working auto scaling group " + nispero.configuration.workerAutoScalingGroup.name)
+      env.awsClients.as.createAutoScalingGroup(nispero.configuration.workerAutoScalingGroup)
       ()
     }
   }
 
-  override def deleteNisperoWorkers(env: CompotaEnvironment, nispero: Nispero): Try[Unit] = {
+  override def deleteNisperoWorkers(env: CompotaEnvironment, nispero: CompotaNispero): Try[Unit] = {
     Try {
-      val group = nispero.awsConfiguration.workerAutoScalingGroup.name
+      val group = nispero.configuration.workerAutoScalingGroup.name
       env.logger.info("deleting auto scaling group: " + group)
       env.awsClients.as.deleteAutoScalingGroup(group)
       ()
@@ -141,9 +141,9 @@ abstract class AwsCompota[U] (
    val configuration: AwsCompotaConfiguration)
   extends AnyAwsCompota {
 
-  type CompotaUnDeployActionContext = U
+  override type CompotaUnDeployActionContext = U
 
-  type Nispero = AnyAwsNispero
+  override type CompotaNispero = AnyAwsNispero
 
   override type CompotaConfiguration = AwsCompotaConfiguration
 

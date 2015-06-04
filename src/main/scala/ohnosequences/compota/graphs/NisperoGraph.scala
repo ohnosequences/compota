@@ -19,8 +19,8 @@ object NisperoGraph {
     Try {
       nisperos.foreach { nispero =>
         nisperoNames.put(nispero.configuration.name, nispero)
-        val inputQueueOp = nispero.inputQueue.create(nispero.inContext(env)).get
-        val outputQueueOp = nispero.outputQueue.create(nispero.outContext(env)).get
+        val inputQueueOp = nispero.inputQueue.create(nispero.inputContext(env)).get
+        val outputQueueOp = nispero.outputQueue.create(nispero.outputContext(env)).get
 
         inputQueueOp.subOps().foreach { subOp =>
           queueOpNames.put(subOp.queue.name, subOp)

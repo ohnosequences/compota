@@ -17,7 +17,7 @@ class LocalEnvironment(val instanceId: InstanceId,
                        val localErrorTable: LocalErrorTable,
                        val logger: FileLogger,
                        val errorCounts: ConcurrentHashMap[String, Int],
-                       val configuration: LocalCompotaConfiguration,
+                       val configuration: AnyLocalCompotaConfiguration,
                        val sendUnDeployCommand0: (LocalEnvironment, String, Boolean) => Try[Unit],
                        val isStoppedFlag: java.util.concurrent.atomic.AtomicBoolean,
                        val instancesEnvironments: ConcurrentHashMap[InstanceId, (AnyLocalNispero, LocalEnvironment)],
@@ -108,7 +108,7 @@ object LocalEnvironment {
               nispero: Option[AnyLocalNispero],
               executor: ExecutorService,
               localErrorTable: LocalErrorTable,
-              configuration: LocalCompotaConfiguration,
+              configuration: AnyLocalCompotaConfiguration,
               errorCount: ConcurrentHashMap[String, Int],
               sendUnDeployCommand: (LocalEnvironment, String, Boolean) => Try[Unit])(statement: LocalEnvironment => Unit): Try[LocalEnvironment] = {
 

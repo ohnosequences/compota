@@ -12,19 +12,19 @@ import scala.util.{Failure, Success, Try}
 
 trait AnyCompota {
   type CompotaEnvironment <: AnyEnvironment[CompotaEnvironment]
-  type Nispero <: AnyNispero.of[CompotaEnvironment]
-  type MetaManager <:  AnyMetaManager.of[CompotaEnvironment]
+  type CompotaNispero <: AnyNispero.of[CompotaEnvironment]
+  type CompotaMetaManager <:  AnyMetaManager.of[CompotaEnvironment]
 
   type CompotaUnDeployActionContext
 
-  val nisperos: List[Nispero]
-  val reducers: List[AnyQueueReducer.of[CompotaEnvironment]]
+  def nisperos: List[CompotaNispero]
+  def reducers: List[AnyQueueReducer.of[CompotaEnvironment]]
 
 
   type CompotaConfiguration <: AnyCompotaConfiguration
-  val configuration: CompotaConfiguration
+  def configuration: CompotaConfiguration
 
-  def nisperosNames: Map[String, Nispero] =  nisperos.map { nispero =>
+  def nisperosNames: Map[String, CompotaNispero] =  nisperos.map { nispero =>
     (nispero.configuration.name, nispero)
   }.toMap
 
@@ -45,7 +45,7 @@ trait AnyCompota {
     Success(true)
   }
 
-  def launchWorker(nispero: Nispero): Try[CompotaEnvironment]
+  def launchWorker(nispero: CompotaNispero): Try[CompotaEnvironment]
 
   def launchWorker(name: String): Try[CompotaEnvironment] = {
 
@@ -85,9 +85,9 @@ trait AnyCompota {
 
   def setTasksAdded(): Try[Unit]
 
-  def createNisperoWorkers(env: CompotaEnvironment, nispero: Nispero): Try[Unit]
+  def createNisperoWorkers(env: CompotaEnvironment, nispero: CompotaNispero): Try[Unit]
 
-  def deleteNisperoWorkers(env: CompotaEnvironment, nispero: Nispero): Try[Unit]
+  def deleteNisperoWorkers(env: CompotaEnvironment, nispero: CompotaNispero): Try[Unit]
 
   def deleteManager(env: CompotaEnvironment): Try[Unit]
 
@@ -112,7 +112,7 @@ object AnyCompota {
   type of2[E <: AnyEnvironment[E], U] = AnyCompota { type CompotaEnvironment = E ; type CompotaUnDeployActionContext = U  }
   type of[E <: AnyEnvironment[E], N <: AnyNispero.of[E]] = AnyCompota {
     type CompotaEnvironment = E ;
-    type Nispero = N  }
+    type CompotaNispero = N  }
 }
 
 //abstract class Compota[E <: AnyEnvironment[E], N <: AnyNispero.of[E], U, C <: AnyCompotaConfiguration](

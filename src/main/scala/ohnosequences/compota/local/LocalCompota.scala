@@ -19,10 +19,9 @@ import scala.util.{Failure, Success, Try}
 
 trait AnyLocalCompota extends AnyCompota {
   override type CompotaEnvironment = LocalEnvironment
-  override type Nispero <: AnyLocalNispero
-  override type MetaManager = LocalMetaManager[CompotaUnDeployActionContext]
-
-  override type CompotaConfiguration <: LocalCompotaConfiguration
+  override type CompotaNispero <: AnyLocalNispero
+  override type CompotaMetaManager = LocalMetaManager[CompotaUnDeployActionContext]
+  override type CompotaConfiguration <: AnyLocalCompotaConfiguration
 
   val isFinished = new java.util.concurrent.atomic.AtomicBoolean(false)
 
@@ -68,7 +67,7 @@ trait AnyLocalCompota extends AnyCompota {
   }
 
   //not needed for local compota
-  override def launchWorker(nispero: Nispero): Try[LocalEnvironment] = ???
+  override def launchWorker(nispero: CompotaNispero): Try[LocalEnvironment] = ???
 
 
   def launchWorker(nispero: AnyLocalNispero, id: Int): Try[LocalEnvironment] = {
@@ -121,15 +120,15 @@ trait AnyLocalCompota extends AnyCompota {
     Success(tasksAdded_.set(true))
   }
 
-  override def createNisperoWorkers(env: CompotaEnvironment, nispero: Nispero): Try[Unit] = {
+  override def createNisperoWorkers(env: CompotaEnvironment, nispero: CompotaNispero): Try[Unit] = {
     Try {
-      for (i <- 1 to nispero.localConfiguration.workers) {
+      for (i <- 1 to nispero.configuration.workers) {
         launchWorker(nispero, i)
       }
     }
   }
 
-  override def deleteNisperoWorkers(env: CompotaEnvironment, nispero: Nispero): Try[Unit] = {
+  override def deleteNisperoWorkers(env: CompotaEnvironment, nispero: CompotaNispero): Try[Unit] = {
 
     env.logger.info("stopping " + nispero.configuration.name + " nispero")
     //logger.debug("envs: " + )
@@ -180,7 +179,7 @@ trait AnyLocalCompota extends AnyCompota {
 
   override def launchConsole(nisperoGraph: NisperoGraph, env: CompotaEnvironment): Try[AnyConsole] = {
     Try{
-      val console = new LocalConsole[Nispero](AnyLocalCompota.this, env, nisperoGraph)
+      val console = new LocalConsole[CompotaNispero](AnyLocalCompota.this, env, nisperoGraph)
       new UnfilteredConsoleServer(console).start()
       console
     }
@@ -191,17 +190,16 @@ trait AnyLocalCompota extends AnyCompota {
 object AnyLocalCompota {
   type of[U] = AnyLocalCompota { type CompotaUnDeployActionContext = U}
 
-  type of2[N <: AnyLocalNispero] = AnyLocalCompota { type Nispero = N}
+  type of2[N <: AnyLocalNispero] = AnyLocalCompota { type CompotaNispero = N}
 }
 
 abstract class LocalCompota[U](val nisperos: List[AnyLocalNispero],
                             val reducers: List[AnyQueueReducer.of[LocalEnvironment]],
-                            val configuration: LocalCompotaConfiguration
+                            val configuration: AnyLocalCompotaConfiguration
                             ) extends AnyLocalCompota {
 
-  override type CompotaConfiguration = LocalCompotaConfiguration
-  override type CompotaEnvironment = LocalEnvironment
-  override type Nispero = AnyLocalNispero
+  override type CompotaNispero = AnyLocalNispero
+  override type CompotaConfiguration = AnyLocalCompotaConfiguration
   override type CompotaUnDeployActionContext = U
 
 }

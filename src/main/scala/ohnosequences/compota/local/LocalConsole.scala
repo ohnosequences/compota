@@ -104,13 +104,13 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N], e
         <tr>
           <td class="col-md-6">workers amount</td>
           <td class="col-md-6">
-            {nispero.localConfiguration.workers}
+            {nispero.configuration.workers}
           </td>
         </tr>
         <tr>
           <td class="col-md-6">working directory</td>
           <td class="col-md-6">
-            {nispero.localConfiguration.workingDirectory.getAbsolutePath}
+            {nispero.configuration.workingDirectory.getAbsolutePath}
           </td>
         </tr>
       </tbody>

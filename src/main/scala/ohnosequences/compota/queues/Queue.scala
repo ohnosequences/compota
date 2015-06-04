@@ -3,6 +3,7 @@ package ohnosequences.compota.queues
 import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 
+import ohnosequences.compota.monoid.Monoid
 import ohnosequences.logging.Logger
 
 import scala.annotation.tailrec
@@ -12,12 +13,14 @@ import scala.util.{Failure, Success, Try}
 
 trait AnyQueueMessage {
   type QueueMessageElement
+
   def getBody: Try[Option[QueueMessageElement]]
+
   val id: String
 }
 
 object AnyQueueMessage {
-  type of[E] = AnyQueueMessage{ type QueueMessageElement = E}
+  type of[E] = AnyQueueMessage {type QueueMessageElement = E}
 }
 
 abstract class QueueMessage[E] extends AnyQueueMessage {
@@ -36,20 +39,24 @@ trait AnyQueueReader {
   def receiveMessage(logger: Logger): Try[Option[QueueReaderMessage]]
 
   def waitForMessage(logger: Logger,
-                     isStopped: => Boolean = {false},
+                     isStopped: => Boolean = {
+                       false
+                     },
                      initialTimeout: Duration = Duration(100, MILLISECONDS)
                       ): Try[Option[QueueReaderMessage]] = {
 
     @tailrec
     def waitForMessageRep(timeout: Long): Try[Option[QueueReaderMessage]] = {
-      if(isStopped) {
+      if (isStopped) {
         Success(None)
       } else {
-        Try {receiveMessage(logger)}.flatMap{e => e}  match {
+        Try {
+          receiveMessage(logger)
+        }.flatMap { e => e } match {
           case Failure(t) if isStopped => {
             Success(None)
           }
-          case Failure(t)=> {
+          case Failure(t) => {
             Failure(t)
           }
           case Success(None) => {
@@ -83,6 +90,7 @@ abstract class QueueReader[E, M <: AnyQueueMessage.of[E]] extends AnyQueueReader
 
 trait AnyQueueWriter {
   type QueueWriterElement
+
   def writeRaw(values: List[(String, QueueWriterElement)]): Try[Unit]
 
   def writeMessages(prefixId: String, values: List[QueueWriterElement]): Try[Unit] = {
@@ -94,18 +102,19 @@ trait AnyQueueWriter {
 }
 
 object AnyQueueWriter {
-  type of[E] = AnyQueueWriter { type QueueWriterElement = E }
+  type of[E] = AnyQueueWriter {type QueueWriterElement = E}
 }
 
 abstract class QueueWriter[E] extends AnyQueueWriter {
   override type QueueWriterElement = E
 }
 
-trait AnyQueue { queue =>
-  
+trait AnyQueue {
+  queue =>
+
   type QueueContext
 
-  val name: String
+  def name: String
 
   type QueueElement
 
@@ -116,29 +125,39 @@ trait AnyQueue { queue =>
 
   type QueueQueueOp <: AnyQueueOp.of[QueueElement, QueueQueueMessage, QueueQueueReader, QueueQueueWriter]
 
-   def create(ctx: QueueContext): Try[QueueQueueOp]
+  def create(ctx: QueueContext): Try[QueueQueueOp]
 
-   def delete(ctx: QueueContext): Try[Unit] = {
-     create(ctx).flatMap(_.delete())
-   }
+  def delete(ctx: QueueContext): Try[Unit] = {
+    create(ctx).flatMap(_.delete())
+  }
+}
+
+trait MonoidQueue extends AnyQueue {
+  val monoid: Monoid[QueueElement]
 }
 
 object AnyQueue {
-  type of[Ctx] = AnyQueue { type QueueContext = Ctx}
+  type of[Ctx] = AnyQueue {type QueueContext = Ctx}
 
-    type of2[E, Ctx] = AnyQueue {
-      type QueueContext = Ctx
-      type QueueElement = E
-    }
+  type of2[E, Ctx] = AnyQueue {
+    type QueueContext = Ctx
+    type QueueElement = E
+  }
+
+  type of2m[E, Ctx] = MonoidQueue {
+    type QueueContext = Ctx
+    type QueueElement = E
+
+  }
 
 
-//  type of2[E, Ctx, M <: AnyQueueMessage.of[E], R <: AnyQueueReader.of[E, M], W <: AnyQueueWriter.of[E]] = AnyQueue {
-//    type QueueContext = Ctx
-//    type QueueElement = E
-//    type QueueQueueMessage = M
-//    type QueueQueueReader = R
-//    type QueueQueueWriter = W
-//  }
+  //  type of2[E, Ctx, M <: AnyQueueMessage.of[E], R <: AnyQueueReader.of[E, M], W <: AnyQueueWriter.of[E]] = AnyQueue {
+  //    type QueueContext = Ctx
+  //    type QueueElement = E
+  //    type QueueQueueMessage = M
+  //    type QueueQueueReader = R
+  //    type QueueQueueWriter = W
+  //  }
 
   type of3[E, Ctx, M <: AnyQueueMessage.of[E], R <: AnyQueueReader.of[E, M], W <: AnyQueueWriter.of[E], O <: AnyQueueOp.of[E, M, R, W]] = AnyQueue {
     type QueueContext = Ctx
@@ -161,8 +180,10 @@ trait AnyQueueOp {
   def subOps(): List[AnyQueueOp] = List(AnyQueueOp.this)
 
   type QueueOpElement
-  type QueueOpQueueMessage <:  AnyQueueMessage.of[QueueOpElement]   // QueueMessage[QueueOpElement]
-  type QueueOpQueueReader <:  AnyQueueReader.of[QueueOpElement, QueueOpQueueMessage]  // QueueReader[QElement, QMessage]
+  type QueueOpQueueMessage <: AnyQueueMessage.of[QueueOpElement]
+  // QueueMessage[QueueOpElement]
+  type QueueOpQueueReader <: AnyQueueReader.of[QueueOpElement, QueueOpQueueMessage]
+  // QueueReader[QElement, QMessage]
   type QueueOpQueueWriter <: AnyQueueWriter.of[QueueOpElement] //QueueWriter[QElement]
 
   val queue: AnyQueue
@@ -182,6 +203,7 @@ trait AnyQueueOp {
   def deleteMessage(message: QueueOpQueueMessage): Try[Unit]
 
   def reader: Try[QueueOpQueueReader]
+
   def writer: Try[QueueOpQueueWriter]
 
   def delete(): Try[Unit]

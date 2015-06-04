@@ -312,33 +312,35 @@ YM <: AnyQueueMessage.of[Y], YR <: AnyQueueReader.of[Y, YM], YW <: AnyQueueWrite
 
 }
 
-//class ProductQueue2[Ctx, X, Y, XQ <: AnyQueue.of2[Ctx, X], YQ <: AnyQueue.of2[Ctx, Y]](val xQueue: XQ, val yQueue: YQ, val xMonoid: Monoid[X], val yMonoid: Monoid[Y]) extends AnyProductQueue {
+//class ProductQueue2[Ctx, X, Y, XQ <: AnyQueue.of2m[Ctx, X], YQ <: AnyQueue.of2m[Ctx, Y]](val xQueue2: XQ, val yQueue2: YQ) extends AnyProductQueue {
 //
-//  override type XElement = X
-//  override type YElement = Y
+//  override type XElement = xQueue2.QueueElement
+//  override type YElement = yQueue2.QueueElement
 //
-//  val name = xQueue.name + "_" + yQueue.name
+//  override val name = xQueue2.name + "_" + yQueue2.name
 //
 //  override type QueueContext = Ctx
 //
+//  override type XMessage = xQueue2.QueueQueueMessage
+//  override type YMessage = yQueue2.QueueQueueMessage
 //
+//  override type XReader = xQueue2.QueueQueueReader
+//  override type YReader = yQueue2.QueueQueueReader
 //
-//  override type XMessage = xQueue.QueueQueueMessage
-//  override type YMessage = yQueue.QueueQueueMessage
+//  override type XWriter = xQueue2.QueueQueueWriter
+//  override type YWriter = yQueue2.QueueQueueWriter
 //
-//  override type XReader = xQueue.QueueQueueReader
-//  override type YReader = yQueue.QueueQueueReader
+//  override type XQueueOp = xQueue2.QueueQueueOp
+//  override type YQueueOp = yQueue2.QueueQueueOp
 //
-//  override type XWriter = xQueue.QueueQueueWriter
-//  override type YWriter = yQueue.QueueQueueWriter
+//  override type XQueue = xQueue2.type
+//  override type YQueue = yQueue2.type
 //
-//  override type XQueueOp = xQueue.QueueQueueOp
-//  override type YQueueOp = yQueue.QueueQueueOp
+//  override def xQueue =xQueue2
+//  override def yQueue =yQueue2
 //
-//  override type XQueue = xQueue.type
-//  override type YQueue = yQueue.type
-//
-//
+//  override val xMonoid: Monoid[XElement] = xQueue.monoid
+//  override val yMonoid: Monoid[XElement] = yQueue.monoid
 //}
 //}
 //class AnyProductQueueOp extends AnyQueueOp {

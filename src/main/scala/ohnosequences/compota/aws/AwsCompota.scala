@@ -20,7 +20,7 @@ object AnyAwsCompota {
 
 trait AnyAwsCompota extends AnyCompota {
   type CompotaEnvironment = AwsEnvironment
-  type CompotaNispero <: AnyAwsNispero
+  type CompotaNispero = AnyAwsNispero
   type MetaManager = AwsMetaManager[CompotaUnDeployActionContext]
 
   type CompotaConfiguration <: AwsCompotaConfiguration
@@ -29,7 +29,6 @@ trait AnyAwsCompota extends AnyCompota {
   def awsCredentialsProvider: AWSCredentialsProvider = {
     new InstanceProfileCredentialsProvider()
   }
-
 
 
  // val awsConfiguration: AwsCompotaConfiguration
@@ -86,7 +85,7 @@ trait AnyAwsCompota extends AnyCompota {
       configuration,
       sendUnDeployCommand,
       isMetaManager = false) {
-      env => nispero.createWorker().start(env)
+      env => nispero.worker.start(env)
     }
   }
 
@@ -143,7 +142,7 @@ abstract class AwsCompota[U] (
 
   override type CompotaUnDeployActionContext = U
 
-  override type CompotaNispero = AnyAwsNispero
+//  override type CompotaNispero = AnyAwsNispero
 
   override type CompotaConfiguration = AwsCompotaConfiguration
 

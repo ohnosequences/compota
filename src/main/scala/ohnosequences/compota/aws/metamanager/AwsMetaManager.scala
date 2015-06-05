@@ -16,6 +16,7 @@ class AwsMetaManager[U](val compota: AnyAwsCompota.of[U]) extends BaseMetaManage
 
   override type MetaManagerEnvironment = AwsEnvironment
 
+  override type MetaManagerNispero = AnyAwsNispero
   override type MetaManagerUnDeployingActionContext = U
   override type MetaManagerCompota = AnyAwsCompota.of[U]
 

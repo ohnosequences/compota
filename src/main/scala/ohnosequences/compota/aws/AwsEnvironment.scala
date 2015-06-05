@@ -86,6 +86,8 @@ class AwsEnvironment(val awsClients: AWSClients,
         sendUnDeployCommand0,
         isMetaManager
       )
+      logger.debug("creating working directory: " + new File(workingDirectory, suffix).getAbsolutePath)
+      new File(workingDirectory, suffix).mkdir()
       (env, statement(env))
     }
   }

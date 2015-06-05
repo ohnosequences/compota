@@ -15,7 +15,7 @@ trait AnyWorker {
   type InputQueue <: AnyQueue
   type OutputQueue <: AnyQueue
 
-  val nisperoName: String
+  def nisperoName: String
 
   def start(instance: WorkerEnvironment): Unit
 }

@@ -25,39 +25,19 @@ trait AnyNispero {
   def inputContext: NisperoEnvironment => NisperoInputContext
   def outputContext: NisperoEnvironment => NisperoOutputContext
 
-  val instructions: Instructions[NisperoInput, NisperoOutput]
+  def instructions: Instructions[NisperoInput, NisperoOutput]
 
   type NisperoConfiguration <: AnyNisperoConfiguration
 
-  val configuration: NisperoConfiguration
+  def configuration: NisperoConfiguration
 
-
- // def name: String = instructions.name
-
-
-  //type W <: AnyWorker {type WorkerEnvironment = NisperoEnvironment}
-
-
-
-  def createWorker() =  new Worker[NisperoInput, NisperoOutput, NisperoEnvironment, NisperoInputContext, NisperoOutputContext, NisperoInputQueue, NisperoOutputQueue](inputQueue,
+  def worker =  new Worker[NisperoInput, NisperoOutput, NisperoEnvironment, NisperoInputContext, NisperoOutputContext, NisperoInputQueue, NisperoOutputQueue](inputQueue,
     inputContext,
     outputQueue,
     outputContext,
     instructions,
     configuration.name)
 
-
-//  def deleteInputQueue(env: NisperoEnvironment): Try[Unit] = {
-//    inputQueue.delete(inContext(env))
-//  }
-//
-//  def deleteOutputQueue(env: NisperoEnvironment): Try[Unit] = {
-//    outputQueue.delete(outContext(env))
-//  }
-
-//  def reduceOutputQueue(environment: NisperoEnvironment): Try[Unit] = {
-//    outputQueue
-//  }
 
 }
 
@@ -73,38 +53,4 @@ object AnyNispero {
     type NisperoInputQueue = IQ
     type NisperoOutputQueue = OQ
   }
-
-
 }
-
-
-//abstract class Nispero[In, Out, Env <: AnyEnvironment[Env], InCtx, OutCtx, InQueue <:  AnyQueue.of2[In, InCtx], OutQueue <:  AnyQueue.of2[Out, OutCtx]](
-//  val inputQueue: InQueue,
-//  val inContext: Env => InCtx,
-//  val outputQueue: OutQueue,
-//  val outContext: Env => OutCtx,
-//  val instructions: Instructions[In, Out],
-//  val configuration: AnyNisperoConfiguration
-//)
-//extends AnyNispero { nispero =>
-//
-//  type InContext = InCtx
-//  type OutContext = OutCtx
-//
-//  type InputQueue = InQueue
-//  type OutputQueue = OutQueue
-//
-//  type NisperoEnvironment = Env
-//
-//  type Input = In
-//  type Output = Out
-//
-//  type W = Worker[In, Out, Env, InContext, OutContext, InQueue, OutQueue]
-////  def createWorker() = new Worker[In, Out, Env, InContext, OutContext, InQueue, OutQueue](inputQueue,
-////    inContext,
-////    outputQueue,
-////    outContext,
-////    instructions,
-////    configuration.name)
-//
-//}

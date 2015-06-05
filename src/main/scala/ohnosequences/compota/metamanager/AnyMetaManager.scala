@@ -7,7 +7,7 @@ import ohnosequences.compota.console.AnyConsole
 import ohnosequences.compota.environment.AnyEnvironment
 import ohnosequences.compota.graphs.NisperoGraph
 import ohnosequences.compota.queues.{AnyQueueOp, Queue, QueueOp}
-import ohnosequences.compota.{TerminationDaemon, AnyCompota, Namespace}
+import ohnosequences.compota.{AnyNispero, TerminationDaemon, AnyCompota, Namespace}
 import ohnosequences.compota.Namespace._
 
 
@@ -26,15 +26,15 @@ trait AnyMetaManager {
 
   type MetaManagerEnvironment <: AnyEnvironment[MetaManagerEnvironment]
 
-  type MetaManagerCompota <: AnyCompota.of2[MetaManagerEnvironment, MetaManagerUnDeployingActionContext]
+  type MetaManagerNispero <: AnyNispero.of[MetaManagerEnvironment]
 
-  val compota: MetaManagerCompota
+  type MetaManagerCompota <: AnyCompota.of3[MetaManagerEnvironment, MetaManagerUnDeployingActionContext, MetaManagerNispero]
+
+  def compota: MetaManagerCompota
 
   def initMessage(): MetaManagerCommand
 
-
   val runingTasks = new ConcurrentHashMap[String, AtomicInteger]()
-
 
   def getProcessingTasks(): List[(String, Int)] = {
     import scala.collection.JavaConversions._

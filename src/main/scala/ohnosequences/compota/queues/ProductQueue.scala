@@ -130,42 +130,31 @@ trait AnyProductQueue extends AnyQueue { anyproductQueue =>
     }
   }
 
-  class ProductMessage(val xMessage: Option[XMessage], val yMessage: Option[YMessage]) extends AnyQueueMessage {
+  class ProductMessage(val message: Either[XMessage, YMessage]) extends AnyQueueMessage {
 
     override type QueueMessageElement = (XElement, YElement)
 
-
     override val id: String = {
-      xMessage.map(_.id).getOrElse("") + "#" + yMessage.map(_.id).getOrElse("")
+      message match {
+        case Left(xm) => xm.id
+        case Right(ym) => ym.id
+      }
     }
 
     override def getBody: Try[Option[(XElement, YElement)]] = {
-
-      val xValue = xMessage match {
-        case None => {
-          Success(Some(xMonoid.unit))
+      message match {
+        case Left(xm) => {
+          xm.getBody.map {
+            case None => None
+            case Some(xb) => Some((xb, yMonoid.unit))
+          }
         }
-        case Some(xmsg) => {
-          xmsg.getBody
+        case Right(ym) => {
+          ym.getBody.map {
+            case None => None
+            case Some(yb) => Some((xMonoid.unit, yb))
+          }
         }
-      }
-
-      val yValue = yMessage match {
-        case None => {
-          Success(Some(yMonoid.unit))
-        }
-        case Some(ymsg) => {
-          ymsg.getBody
-        }
-      }
-
-      (xValue, yValue) match {
-        case (Failure(t), _) => Failure(t)
-        case (_, Failure(t)) => Failure(t)
-        case (Success(None), Success(None)) => Success(None) //deleted from both queues
-        case (Success(Some(xv)), Success(Some(yv))) => Success(Some((xv, yv)))
-        case (Success(Some(xv)), Success(None)) => Success(Some((xv, yMonoid.unit)))
-        case (Success(None), Success(Some(yv))) => Success(Some((xMonoid.unit, yv)))
       }
     }
   }
@@ -176,18 +165,15 @@ trait AnyProductQueue extends AnyQueue { anyproductQueue =>
     override type QueueReaderMessage = ProductMessage
 
     override def receiveMessage(logger: Logger): Try[Option[QueueReaderMessage]] = {
-      xReader.receiveMessage(logger).flatMap {
-        case None => {
-          yReader.receiveMessage(logger).map {
-            case None => None
-            case Some(ymsg) => Some(new ProductMessage(None, Some(ymsg)))
-          }
+      if (scala.util.Random.nextBoolean()) {
+        xReader.receiveMessage(logger).map {
+          case None => None
+          case Some(xmsg) => Some(new ProductMessage(Left(xmsg)))
         }
-        case Some(xmsg) => {
-          yReader.receiveMessage(logger).map {
-            case None => Some(new ProductMessage(Some(xmsg), None))
-            case Some(ymsg) => Some(new ProductMessage(Some(xmsg), Some(ymsg)))
-          }
+      } else {
+        yReader.receiveMessage(logger).map {
+          case None => None
+          case Some(ymsg) => Some(new ProductMessage(Right(ymsg)))
         }
       }
     }
@@ -203,32 +189,80 @@ trait AnyProductQueue extends AnyQueue { anyproductQueue =>
         }
         xWriter.writeRaw(xMessages).get
         val yMessages = values.map { case (id, (x, y)) =>
-          (id + "_1", y)
+          (id + "_2", y)
         }
         yWriter.writeRaw(yMessages).get
       }
     }
   }
 
-  class ProductQueueOp(val queue: AnyQueue, val xQueueOp: XQueueOp, val yQueueOp: YQueueOp) extends AnyQueueOp {
+  class ProductQueueOp(val queue: AnyQueue, val xQueueOp: XQueueOp, val yQueueOp: YQueueOp) extends AnyQueueOp { productQueueOp =>
+
+
+    override def subOps(): List[AnyQueueOp] = xQueueOp.subOps() ++ yQueueOp.subOps()
+
     override type QueueOpElement = (XElement, YElement)
     override type QueueOpQueueMessage = ProductMessage
 
-    override def deleteMessage(message: QueueOpQueueMessage): Try[Unit] = ???
+    override def deleteMessage(message: QueueOpQueueMessage): Try[Unit] = {
+      message.message match {
+        case Left(xmsg) => xQueueOp.deleteMessage(xmsg)
+        case Right(ymsg) => yQueueOp.deleteMessage(ymsg)
+      }
+    }
 
-    override def writer: Try[QueueOpQueueWriter] = ???
+    override def writer: Try[QueueOpQueueWriter] = {
+      xQueueOp.writer.flatMap { xWriter =>
+        yQueueOp.writer.map { yWriter =>
+          new ProductQueueWriter(productQueueOp, xWriter, yWriter)
+        }
+      }
+    }
 
-    override def reader: Try[QueueOpQueueReader] = ???
+    override def reader: Try[QueueOpQueueReader] = {
+      xQueueOp.reader.flatMap { xReader =>
+        yQueueOp.reader.map { yReader =>
+          new ProductQueueReader(productQueueOp, xReader, yReader)
+        }
+      }
+    }
 
-    override def get(key: String): Try[QueueOpElement] = ???
+    //not agreed with write!!!
+    override def get(key: String): Try[QueueOpElement] = {
+      xQueueOp.get(key) match {
+        case Failure(t) => yQueueOp.get(key).map { yEl =>
+          (xMonoid.unit, yEl)
+        }
+        case Success(xEl) =>  Success(xEl, yMonoid.unit)
+      }
+    }
 
-    override def size: Try[Int] = ???
+    override def size: Try[Int] = {
+      xQueueOp.size.flatMap { xSize =>
+        yQueueOp.size.map { ySize =>
+          xSize + ySize
+        }
+      }
+    }
 
-    override def delete(): Try[Unit] = ???
+    override def delete(): Try[Unit] = {
+      xQueueOp.delete().flatMap { xr =>
+        yQueueOp.delete()
+      }
+    }
 
-    override def list(lastKey: Option[String], limit: Option[Int]): Try[(Option[String], List[String])] = ???
+    //todo add second queue
+    override def list(lastKey: Option[String], limit: Option[Int]): Try[(Option[String], List[String])] = {
+      xQueueOp.list(lastKey, limit)
+    }
 
-    override def isEmpty: Try[Boolean] = ???
+    override def isEmpty: Try[Boolean] = {
+      xQueueOp.isEmpty.flatMap { xIsEmpty =>
+        yQueueOp.isEmpty.map { yIsEmpty =>
+          xIsEmpty && yIsEmpty
+        }
+      }
+    }
 
     override type QueueOpQueueWriter = ProductQueueWriter
 

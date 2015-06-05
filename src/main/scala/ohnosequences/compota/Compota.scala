@@ -113,6 +113,12 @@ object AnyCompota {
   type of[E <: AnyEnvironment[E], N <: AnyNispero.of[E]] = AnyCompota {
     type CompotaEnvironment = E ;
     type CompotaNispero = N  }
+  type of3[E <: AnyEnvironment[E], U, N <: AnyNispero.of[E]] = AnyCompota {
+    type CompotaEnvironment = E
+    type CompotaUnDeployActionContext = U
+    type CompotaNispero = N
+  }
+
 }
 
 //abstract class Compota[E <: AnyEnvironment[E], N <: AnyNispero.of[E], U, C <: AnyCompotaConfiguration](

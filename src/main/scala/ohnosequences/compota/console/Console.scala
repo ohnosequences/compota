@@ -193,7 +193,10 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
               }
             }
           }
-        }}
+          case _: AnyQueueOp => {
+            xml.NodeSeq.Empty
+          }
+      }}
       </tbody>
     </table>
     <a class="btn btn-info showQueueMessages" href="#" data-queue={queueOp.queue.name}>

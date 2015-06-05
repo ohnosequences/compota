@@ -42,6 +42,7 @@ class LocalEnvironment(val instanceId: InstanceId,
         instancesEnvironments,
         Some(LocalEnvironment.this)
       )
+      new File(workingDirectory, suffix).mkdir()
       (env, statement(env))
     }
   }
@@ -113,7 +114,7 @@ object LocalEnvironment {
               sendUnDeployCommand: (LocalEnvironment, String, Boolean) => Try[Unit])(statement: LocalEnvironment => Unit): Try[LocalEnvironment] = {
 
     Success(()).flatMap { u =>
-
+      configuration.workingDirectory.mkdir()
       configuration.loggingDirectory.mkdir()
       val loggerDirectory = new File(configuration.loggingDirectory, instanceId.id)
       FileLogger.apply(

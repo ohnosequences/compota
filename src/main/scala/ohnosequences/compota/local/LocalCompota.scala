@@ -19,7 +19,7 @@ import scala.util.{Failure, Success, Try}
 
 trait AnyLocalCompota extends AnyCompota {
   override type CompotaEnvironment = LocalEnvironment
-  override type CompotaNispero <: AnyLocalNispero
+  override type CompotaNispero = AnyLocalNispero
   override type CompotaMetaManager = LocalMetaManager[CompotaUnDeployActionContext]
   override type CompotaConfiguration <: AnyLocalCompotaConfiguration
 
@@ -84,7 +84,7 @@ trait AnyLocalCompota extends AnyCompota {
       errorCounts,
       sendUnDeployCommand
     ) { env =>
-      nispero.createWorker().start(env)
+      nispero.worker.start(env)
     }
   }
 
@@ -160,10 +160,16 @@ trait AnyLocalCompota extends AnyCompota {
   }
 
   override def launch(): Try[Unit] = {
+    //println("ge")
     launchMetaManager().map { env => ()}
   }
 
   override def sendUnDeployCommand(env: CompotaEnvironment, reason: String, force: Boolean): Try[Unit] = {
+//    if (force) {
+//      //force stop
+//
+//    } else {}
+
     controlQueue.create(env.localContext).flatMap { queueOp =>
       queueOp.writer.flatMap { writer =>
         writer.writeRaw(List(("undeploy_" + reason + "_" + force, UnDeploy(reason, force))))
@@ -198,7 +204,7 @@ abstract class LocalCompota[U](val nisperos: List[AnyLocalNispero],
                             val configuration: AnyLocalCompotaConfiguration
                             ) extends AnyLocalCompota {
 
-  override type CompotaNispero = AnyLocalNispero
+ // override type CompotaNispero = AnyLocalNispero
   override type CompotaConfiguration = AnyLocalCompotaConfiguration
   override type CompotaUnDeployActionContext = U
 

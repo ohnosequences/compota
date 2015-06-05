@@ -20,6 +20,7 @@ class LocalMetaManager[U](
 
   override type MetaManagerEnvironment = LocalEnvironment
   override type MetaManagerUnDeployingActionContext = U
+  override type MetaManagerNispero = AnyLocalNispero
   override type MetaManagerCompota = AnyLocalCompota.of[U]
 
 

@@ -200,6 +200,7 @@ class DynamoDBQueue[T](name: String,
                        val serializer: Serializer[T],
                        bench: Option[Bench] = None,
                        val receiveMessageWaitTime: Duration = Duration(20, SECONDS), //max 20 seconds
+                       val visibilityTimeout: Duration = Duration(10, MINUTES),
                        readThroughput: Long = 1,
                        writeThroughput: Long = 1
                        ) extends Queue[T, DynamoDBContext](name) { queue =>
@@ -224,7 +225,12 @@ class DynamoDBQueue[T](name: String,
 
       val queueUrl = ctx.aws.sqs.sqs.createQueue(new CreateQueueRequest()
         .withQueueName(Resources.sqsQueue(ctx.metadata, name))
-        .withAttributes(Map(QueueAttributeName.ReceiveMessageWaitTimeSeconds.toString -> receiveMessageWaitTime.toSeconds.toString)) //max
+        .withAttributes(
+          Map(
+            QueueAttributeName.ReceiveMessageWaitTimeSeconds.toString -> receiveMessageWaitTime.toSeconds.toString,
+            QueueAttributeName.VisibilityTimeout.toString -> visibilityTimeout.toSeconds.toString
+          )
+        ) //max
       ).getQueueUrl
 
       new DynamoDBQueueOP[T](queue, Resources.dynamodbTable(ctx.metadata, name), queueUrl, ctx.aws, serializer, bench)

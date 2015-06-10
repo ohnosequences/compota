@@ -1,9 +1,8 @@
 package ohnosequences.compota.metamanager
 
-import java.util.concurrent.atomic.AtomicBoolean
-
+import ohnosequences.compota.TerminationDaemon
 import ohnosequences.compota.console.AnyConsole
-import ohnosequences.compota.{TerminationDaemon, Namespace}
+import ohnosequences.compota.graphs.QueueChecker
 import ohnosequences.compota.queues.AnyQueueOp
 
 import scala.util.{Failure, Success, Try}
@@ -11,156 +10,171 @@ import scala.util.{Failure, Success, Try}
 
 trait BaseMetaManager extends AnyMetaManager {
 
-
   override type MetaManagerCommand = BaseMetaManagerCommand
 
-  override def initMessage(): BaseMetaManagerCommand = CreateNisperoWorkers(0)
+  override def initMessage(): BaseMetaManagerCommand = LaunchConsole
 
- // val unDeployActionStarted = new AtomicBoolean(false)
- // val unDeployActionForce = new AtomicBoolean(false)
+  def sendMessageToControlQueue(env: MetaManagerEnvironment, command: BaseMetaManagerCommand): Try[Unit] = {
+    Success(()).flatMap { u =>
+      controlQueue.create(controlQueueContext(env)).flatMap { controlQueueOp =>
+        controlQueueOp.writer.flatMap { writer =>
+          writer.writeMessages(command.prefix + System.currentTimeMillis(), List(command))
+        }
+      }
+    }
+  }
 
   override def process(command: BaseMetaManagerCommand,
                        env: MetaManagerEnvironment,
-                       unDeployContext: MetaManagerUnDeployingActionContext,
                        controlQueueOp: AnyQueueOp,
                        queueOps: List[AnyQueueOp],
-                       launchTerminationDaemon: MetaManagerEnvironment => Try[TerminationDaemon[MetaManagerEnvironment]],
-                       launchConsole: MetaManagerEnvironment => Try[AnyConsole]
-                       ): Try[List[BaseMetaManagerCommand]] = {
+                       queueChecker: QueueChecker[MetaManagerEnvironment]
+                        ): Try[List[BaseMetaManagerCommand]] = {
     val logger = env.logger
     logger.info("processing tasks " + command)
     command match {
-      case CreateNisperoWorkers(index) if index < compota.nisperos.size => {
-        val nispero = compota.nisperos(index)
-        Try {
-          compota.createNisperoWorkers(env, nispero)
-        }.flatMap{e => e}.map { res =>
-          List(CreateNisperoWorkers(index + 1))
-        }
-      }
-      case CreateNisperoWorkers(index) => {
-        Success(List(AddTasks))
-      }
-      case AddTasks => {
-        logger.info("adding tasks?")
-        compota.tasksAdded().flatMap { added =>
-          if(added) {
-            logger.warn("tasks has been already added")
-            Success(List[BaseMetaManagerCommand]())
-          } else {
-            logger.info("adding tasks")
-            compota.addTasks(env).flatMap { r =>
-              compota.setTasksAdded()
-            }.map { res =>
-              List(LaunchConsole)
-            }
-          }
-        }
-      }
+
       case LaunchConsole => {
-        env.subEnvironment("console") { env =>
-          launchConsole(env)
+        env.subEnvironmentAsync("console") { env =>
+          compota.launchConsole(queueChecker, controlQueueOp, env)
         }.map { tEnv =>
           List[BaseMetaManagerCommand](LaunchTerminationDaemon)
         }
       }
+
       case LaunchTerminationDaemon => {
-        env.subEnvironment("terminationDaemon") { env =>
-          launchTerminationDaemon(env).recoverWith { case t =>
-            env.logger.error(t)
-            Success(())
-          }
+        env.subEnvironmentAsync("terminationDaemon") { env =>
+          compota.launchTerminationDaemon(queueChecker, env)
         }.map { tEnv =>
+          List[BaseMetaManagerCommand](AddTasks)
+        }
+      }
+
+      case AddTasks => {
+        compota.compotaDeployed(env).flatMap { deployed =>
+          if (deployed) {
+            logger.warn("Compota has already been deployed, skipping adding tasks")
+            Success(List(CreateNisperoWorkers(0)))
+          } else {
+            logger.info("adding tasks")
+            compota.addTasks(env).map { res =>
+              List(CreateNisperoWorkers(0))
+            }
+          }
+        }
+      }
+
+
+      case CreateNisperoWorkers(index) if index < compota.nisperos.size => {
+        val nispero = compota.nisperos(index)
+        Try {
+          compota.createNisperoWorkers(env, nispero)
+        }.flatMap { e => e }.map { res =>
+          List(CreateNisperoWorkers(index + 1))
+        }
+      }
+
+      case CreateNisperoWorkers(index) => {
+        Success(List[BaseMetaManagerCommand](PrepareUnDeployActions))
+      }
+
+      case PrepareUnDeployActions => {
+        compota.compotaUnDeployActionContext.get match {
+          case Some(ctx) => {
+            env.logger.info("already prepared")
+            Success(List[BaseMetaManagerCommand]())
+          }
+          case None => {
+            compota.prepareUnDeployActions(env).map { ctx =>
+              env.logger.info("saving context")
+              compota.compotaUnDeployActionContext.set(Some(ctx))
+              List[BaseMetaManagerCommand]()
+            }
+          }
+        }
+      }
+
+      case ForceUnDeploy(reason, message) => {
+        compota.forceUnDeploy(env, reason, message).map { r =>
           List[BaseMetaManagerCommand]()
         }
       }
-      case UnDeploy(reason, force) => {
-        logger.info("undeploying reason: " + reason + " force: " + force)
-        Success(List(DeleteNisperoWorkers(0, reason, force)))
+
+      case UnDeploy => {
+        Success(List(DeleteNisperoWorkers(0)))
       }
-      case DeleteNisperoWorkers(index, reason, force) if index < compota.nisperos.size => {
+
+//      case UnDeploy(reason, force) => {
+//        logger.info("undeploying reason: " + reason + " force: " + force)
+//        Success(List(DeleteNisperoWorkers(0, reason, force)))
+//      }
+
+      case DeleteNisperoWorkers(index) if index < compota.nisperos.size => {
         val nispero = compota.nisperos(index)
         Try {
           compota.deleteNisperoWorkers(env, nispero)
-        }.flatMap{e => e}.map { res =>
-          List(DeleteNisperoWorkers(index + 1, reason, force))
+        }.flatMap { e => e }.map { res =>
+          List(DeleteNisperoWorkers(index + 1))
         }
       }
-      case DeleteNisperoWorkers(index, reason, true) => {
-        Success(List(DeleteQueue(0, reason, true)))
+
+      case DeleteNisperoWorkers(index) => {
+        Success(List(ReduceQueue(0)))
       }
-      case DeleteNisperoWorkers(index, reason, false) => {
-        Success(List(ReduceQueue(0, reason)))
-      }
-      case ReduceQueue(index, reason) if index < compota.reducers.size => {
+
+      case ReduceQueue(index) if index < compota.reducers.size => {
         val reducer = compota.reducers(index)
         Try {
           logger.info("reducing queue " + reducer.queue.name)
           reducer.reduce(env)
-        }.flatMap{e => e}.map { res =>
-          List(ReduceQueue(index + 1, reason))
+        }.flatMap { e => e }.map { res =>
+          List(ReduceQueue(index + 1))
         }
       }
-      case ReduceQueue(index, reason) => {
-        Success(List(DeleteQueue(0, reason, force = false)))
+
+      case ReduceQueue(index) => {
+        Success(List(DeleteQueue(0)))
       }
-      case DeleteQueue(index, reason, force) if index < queueOps.size => {
+
+      case DeleteQueue(index) if index < queueOps.size => {
         logger.info("deleting queue " + queueOps(index).queue.name)
         Try {
           queueOps(index).delete()
-        }.flatMap{e => e}.map { res =>
-          List(DeleteQueue(index + 1, reason, force))
+        }.flatMap { e => e }.map { res =>
+          List(DeleteQueue(index + 1))
         }
       }
-      case DeleteQueue(index, reason, force) => {
-        Success(List(UnDeployActions(reason, force)))
+      case DeleteQueue(index) => {
+        Success(List(ExecuteUnDeployActions))
       }
 
-      case UnDeployActions(reason, true) => {
-//        if(unDeployActionStarted.get() && unDeployActionForce.get()) {
-//          logger.info("undeploy actions has been already started")
-//          Success(List[BaseMetaManagerCommand]())
-//        } else {
-//          logger.info("running undeploy actions force=true")
-//          unDeployActionForce.set(true)
-//          unDeployActionStarted.set(true)
-
-        //skip undeploy steps in case of error
-          Try{compota.unDeployActions(true, env, unDeployContext)}.flatMap{e => e} match {
-            case Success(message) => Success(List(FinishCompota(reason, message)))
-            case Failure(t) => {
-              logger.error(t)
-              Success(List(FinishCompota(reason, t.toString)))
+      case ExecuteUnDeployActions => {
+        Success(()).flatMap { u =>
+          compota.compotaUnDeployActionContext.get match {
+            case None => {
+              Failure(new Error("compotaUnDeployActionContext is not set but ExecuteUnDeployActions started"))
+            }
+            case Some(ctx) => {
+              compota.unDeployActions(env, ctx).map { message =>
+                List(FinishCompota("solved", message))
+              }
             }
           }
-       // }
+        }
       }
-      case UnDeployActions(reason, false) => {
-//        if(unDeployActionStarted.get()) {
-//          logger.info("undeploy actions has been already started")
-//          Success(List[BaseMetaManagerCommand]())
-//        } else {
-//          logger.info("running undeploy actions")
-//          unDeployActionStarted.set(true)
-//          unDeployActionForce.set(false)
 
-          Try{compota.unDeployActions(false, env, unDeployContext)}.flatMap{e => e}.map { message =>
-            List(FinishCompota(reason, message))
-          }
-       // }
-      }
       case FinishCompota(reason, message) => {
         compota.finishUnDeploy(env, reason, message).map { res =>
           List(UnDeployMetaManger)
         }
       }
+
       case UnDeployMetaManger => {
-        Try {
+        Success(()).flatMap { u =>
           logger.info("deleting control queue " + controlQueueOp.queue.name)
           env.stop()
           controlQueueOp.delete()
           compota.deleteManager(env)
-
         }.map { res =>
           List[BaseMetaManagerCommand]()
         }
@@ -170,6 +184,7 @@ trait BaseMetaManager extends AnyMetaManager {
       case _ => {
         Failure(new Error("unknown command"))
       }
+
     }
 
   }

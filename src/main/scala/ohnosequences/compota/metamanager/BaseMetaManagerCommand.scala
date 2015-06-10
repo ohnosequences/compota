@@ -20,29 +20,31 @@ case class Command0(component: String, action: String, args: List[String]) { com
 
   def toBaseMetaManagerCommand: Try[BaseMetaManagerCommand] = {
     val createNisperoWorkers = CreateNisperoWorkers(1)
-    val deleteNisperoWorkers = DeleteNisperoWorkers(1, "reason", true)
-    val unDeploy = UnDeploy("reason", true)
-    val unDeployActions = UnDeployActions("reason", true)
+    val deleteNisperoWorkers = DeleteNisperoWorkers(1)
+    val forceUndeploy = ForceUnDeploy("reason", "message")
     //  val deleteErrorTable = DeleteErrorTable("reason", true)
-    val reduceQueue = ReduceQueue(1, "reason")
-    val deleteQueue = DeleteQueue(1, "reason", true)
+    val reduceQueue = ReduceQueue(1)
+    val deleteQueue = DeleteQueue(1)
     val finishCompota = FinishCompota("reason", "message")
 
 
 
     command0 match {
       case Command0(createNisperoWorkers.component, createNisperoWorkers.action, index :: Nil) => Try{ CreateNisperoWorkers(index.toInt) }
-      case Command0(deleteNisperoWorkers.component, deleteNisperoWorkers.action, index :: reason :: force :: Nil) => Try{ DeleteNisperoWorkers(index.toInt, reason, force.toBoolean) }
-      case Command0(deleteQueue.component, deleteQueue.action, index :: reason :: force :: Nil) => Try{ DeleteQueue(index.toInt, reason, force.toBoolean) }
-      case Command0(unDeploy.component, unDeploy.action, reason :: force :: Nil) => Try{ UnDeploy(reason, force.toBoolean) }
-      case Command0(reduceQueue.component, reduceQueue.action, index :: reason :: Nil) => Try{ ReduceQueue(index.toInt, reason) }
-      case Command0(unDeployActions.component, unDeployActions.action, reason :: force :: Nil) => Try{ UnDeployActions(reason, force.toBoolean) }
+      case Command0(deleteNisperoWorkers.component, deleteNisperoWorkers.action, index :: Nil) => Try{ DeleteNisperoWorkers(index.toInt) }
+      case Command0(deleteQueue.component, deleteQueue.action, index :: Nil) => Try{ DeleteQueue(index.toInt) }
+      case Command0(UnDeploy.component, UnDeploy.action, Nil) => Try{ UnDeploy }
+      case Command0(reduceQueue.component, reduceQueue.action, index :: Nil) => Try{ ReduceQueue(index.toInt) }
+      case Command0(forceUndeploy.component, forceUndeploy.action, reason :: message :: Nil) => Try{ ForceUnDeploy(reason, message) }
       case Command0(UnDeployMetaManger.component, UnDeployMetaManger.action, Nil) => Try{ UnDeployMetaManger }
       case Command0(AddTasks.component, AddTasks.action, Nil) => Try{ AddTasks }
       case Command0(LaunchTerminationDaemon.component, LaunchTerminationDaemon.action, Nil) => Try{ LaunchTerminationDaemon }
       case Command0(LaunchConsole.component, LaunchConsole.action, Nil) => Try{ LaunchConsole }
+      case Command0(PrepareUnDeployActions.component, PrepareUnDeployActions.action, Nil) => Try{ PrepareUnDeployActions }
+      case Command0(ExecuteUnDeployActions.component, ExecuteUnDeployActions.action, Nil) => Try{ ExecuteUnDeployActions }
+
       case Command0(finishCompota.component, finishCompota.action, reason :: message :: Nil) => Try{ FinishCompota(reason, message) }
-      case _ => Failure(new Error("can't parse BaseManagerCommand encoded with " + command0))
+      case _ => Failure(new Error("couldn't parse BaseManagerCommand encoded with " + command0))
     }
   }
 }
@@ -63,7 +65,7 @@ trait BaseMetaManagerCommand extends AnyMetaManagerCommand {
 }
 
 case class CreateNisperoWorkers(nisperoIndex: Int) extends BaseMetaManagerCommand {
-  override val component: String = "nispero_workers"
+  override val component: String = "nispero"
   override val action: String = "create"
   override val args: List[String] = List(nisperoIndex.toString)
 }
@@ -86,22 +88,22 @@ case object LaunchConsole extends BaseMetaManagerCommand {
   override val args: List[String] = List()
 }
 
-case class DeleteNisperoWorkers(nisperoIndex: Int, reason: String, force: Boolean) extends BaseMetaManagerCommand {
-  override val component: String = "nispero_workers"
+case class DeleteNisperoWorkers(nisperoIndex: Int) extends BaseMetaManagerCommand {
+  override val component: String = "nispero"
   override val action: String = "delete"
-  override val args: List[String] = List(nisperoIndex.toString, reason, force.toString)
+  override val args: List[String] = List(nisperoIndex.toString)
 }
 
-case class UnDeploy(reason: String, force: Boolean) extends BaseMetaManagerCommand {
+case object UnDeploy extends BaseMetaManagerCommand {
   override val component: String = "compota"
   override val action: String = "undeploy"
-  override val args: List[String] = List[String](reason, force.toString)
+  override val args: List[String] = List[String]()
 }
 
-case class ReduceQueue(index: Int, reason: String) extends BaseMetaManagerCommand {
+case class ReduceQueue(index: Int) extends BaseMetaManagerCommand {
   override val component: String = "queue"
   override val action: String = "reduce"
-  override val args: List[String] = List[String](index.toString, reason)
+  override val args: List[String] = List[String](index.toString)
 }
 
 case class FinishCompota(reason: String, message: String) extends BaseMetaManagerCommand {
@@ -110,10 +112,22 @@ case class FinishCompota(reason: String, message: String) extends BaseMetaManage
   override val args: List[String] = List[String](reason, message)
 }
 
-case class UnDeployActions(reason: String, force: Boolean) extends BaseMetaManagerCommand {
+case object PrepareUnDeployActions extends BaseMetaManagerCommand {
+  override val component: String = "undeploy_actions"
+  override val action: String = "prepare"
+  override val args: List[String] = List[String]()
+}
+
+case object ExecuteUnDeployActions extends BaseMetaManagerCommand {
   override val component: String = "undeploy_actions"
   override val action: String = "execute"
-  override val args: List[String] = List[String](reason, force.toString)
+  override val args: List[String] = List[String]()
+}
+
+case class ForceUnDeploy(reason: String, message: String) extends BaseMetaManagerCommand {
+  override val component: String = "compota"
+  override val action: String = "force_undeploy"
+  override val args: List[String] = List[String](reason, message)
 }
 
 case object UnDeployMetaManger extends BaseMetaManagerCommand { //delete control queue as well
@@ -122,9 +136,8 @@ override val component: String = "metamanager"
   override val args: List[String] = List[String]()
 }
 
-
-case class DeleteQueue(index: Int, reason: String, force: Boolean) extends BaseMetaManagerCommand {
+case class DeleteQueue(index: Int) extends BaseMetaManagerCommand {
   override val component: String = "queue"
   override val action: String = "delete"
-  override val args: List[String] = List[String](index.toString, reason, force.toString)
+  override val args: List[String] = List[String](index.toString)
 }

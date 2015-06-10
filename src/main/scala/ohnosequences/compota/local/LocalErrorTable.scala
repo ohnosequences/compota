@@ -14,7 +14,6 @@ import scala.util.{Success, Failure, Try}
 class LocalErrorTable extends ErrorTable {
 
   val errors = new ConcurrentHashMap[(Namespace, (Long, InstanceId)), (String, String)]()
-  errors.elements().toIndexedSeq
 
   override def reportError(errorTableItem: ErrorTableItem): Try[Unit] = {
     Try {
@@ -23,6 +22,7 @@ class LocalErrorTable extends ErrorTable {
   }
 
   override def listErrors(lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ErrorTableItem])] = {
+   // println(errors)
     def listErrors(errors: List[((Namespace, (Long, InstanceId)), (String, String))]): Try[(Option[String], List[ErrorTableItem])] = {
       Try {
         limit match {
@@ -56,7 +56,9 @@ class LocalErrorTable extends ErrorTable {
   }
 
 
-
+  override def recover(): Try[Unit] = {
+    Success(())
+  }
 
   override def getError(namespace: Namespace, timestamp: Long, instanceId: InstanceId): Try[ErrorTableItem] = {
     val key = (namespace, (timestamp, instanceId))
@@ -68,9 +70,14 @@ class LocalErrorTable extends ErrorTable {
     }
   }
 
+//  def printErrors(): Unit = {
+//    errors.forEach { case (namespace, )}
+//  }
+
   override def getNamespaceErrorCount(namespace: Namespace): Try[Int] = {
     Try{
-      errors.count(_._1.equals(namespace))
+      //print("looking for " + namespace + "in" + errors.map
+      errors.count(_._1._1.equals(namespace))
     }
   }
 }

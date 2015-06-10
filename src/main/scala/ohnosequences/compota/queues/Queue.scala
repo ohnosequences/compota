@@ -109,8 +109,7 @@ abstract class QueueWriter[E] extends AnyQueueWriter {
   override type QueueWriterElement = E
 }
 
-trait AnyQueue {
-  queue =>
+trait AnyQueue { queue =>
 
   type QueueContext
 
@@ -130,6 +129,8 @@ trait AnyQueue {
   def delete(ctx: QueueContext): Try[Unit] = {
     create(ctx).flatMap(_.delete())
   }
+
+  def subQueues: List[AnyQueue] = List(queue)
 }
 
 trait MonoidQueue extends AnyQueue {

@@ -46,8 +46,8 @@ object AwsNispero {
                                                                                 instructions: Instructions[In, Out],
                                                                                 configuration: AwsNisperoConfiguration):
   AwsNispero[In, Out, DynamoDBContext, DynamoDBContext, InQueue, OutQueue] = new AwsNispero[In, Out, DynamoDBContext, DynamoDBContext, InQueue, OutQueue](
-  inputQueue, {t: AwsEnvironment => t.createDynamoDBContext()},
-  outputQueue,{t: AwsEnvironment => t.createDynamoDBContext()},
+  inputQueue, {t: AwsEnvironment => t.createDynamoDBContext},
+  outputQueue,{t: AwsEnvironment => t.createDynamoDBContext},
   instructions,
   configuration)
 }

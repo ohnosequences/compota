@@ -60,5 +60,5 @@ object InMemoryQueueReducer {
                                      monoid: Monoid[I],
                                      monkeyAppearanceProbability: MonkeyAppearanceProbability = MonkeyAppearanceProbability()
                                      ): InMemoryQueueReducer[AwsEnvironment, I, DynamoDBContext, Q] =
-    new InMemoryQueueReducer[AwsEnvironment, I, DynamoDBContext, Q](queue, {e: AwsEnvironment => e.createDynamoDBContext()}, monoid, monkeyAppearanceProbability)
+    new InMemoryQueueReducer[AwsEnvironment, I, DynamoDBContext, Q](queue, {e: AwsEnvironment => e.createDynamoDBContext}, monoid, monkeyAppearanceProbability)
 }

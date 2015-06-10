@@ -10,6 +10,13 @@ trait AnyCompotaConfiguration {
   def terminationDaemonIdleTime: Duration = Duration(100, SECONDS)
   def deleteErrorQueue: Boolean
   def consolePassword: String = "nispero"
+  def consoleHTTPS: Boolean = false
+
+  def localErrorThreshold: Int
+  def errorThreshold: Int
+
+  val loggersPrintToConsole: Boolean = true
+
 }
 
 trait AnyNisperoConfiguration {

@@ -2,8 +2,10 @@ package ohnosequences.compota.console
 
 import java.io.ByteArrayInputStream
 
+import ohnosequences.logging.Logger
 import unfiltered.Cycle
-import unfiltered.netty.{SslContextProvider, Https, Secured, ServerErrorResponse}
+import unfiltered.netty._
+import unfiltered.netty.cycle.Plan.Intent
 import unfiltered.response._
 import unfiltered.request.{BasicAuth, Path, Seg, GET}
 import unfiltered.netty.cycle.{Plan, SynchronousExecution}
@@ -15,11 +17,12 @@ trait Users {
   def auth(u: String, p: String): Boolean
 }
 
-case class Auth(users: Users) {
+case class AuthWithLogging(users: Users, logger: Logger) {
   def apply[A, B](intent: Cycle.Intent[A, B]) =
     Cycle.Intent[A, B] {
       case req@BasicAuth(user, pass) if users.auth(user, pass) =>
         //println(req.uri)
+        logger.info(req.uri)
         Cycle.Intent.complete(intent)(req)
       case _ =>
         Unauthorized ~> WWWAuthenticate( """Basic realm="/"""")
@@ -34,7 +37,7 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
                                                                   with ServerErrorResponse {
   val logger = console.logger
 
-  def intent = Auth(users) {
+  def intent = AuthWithLogging(users, logger) {
     case GET(Path("/")) => {
       val mainPage = console.mainHTML.mkString
         .replace("@main", console.compotaInfoPage.toString())
@@ -48,7 +51,7 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
       ResponseString("undeploy message was sent")
     }
 
-    case GET(Path("/errors")) => {
+    case GET(Path("/errorsPage")) => {
 
       val mainPage = console.mainHTML.mkString
         .replace("@main", console.errorsPage.toString())
@@ -204,18 +207,27 @@ class UnfilteredConsoleServer(console: AnyConsole) {
 
   def start() {
 
-
     console.logger.info("starting console server")
+
     try {
-      unfiltered.netty.Server.https(port = 443, ssl = SslContextProvider.selfSigned(new io.netty.handler.ssl.util.SelfSignedCertificate)).handler(new ConsolePlan(users, console)).run {s =>
-        console.logger.info("started: " + s.portBindings.head.url)
+      val server: Server = if (console.isHTTPS) {
+        unfiltered.netty.Server.https(port = 443, ssl = SslContextProvider.selfSigned(new io.netty.handler.ssl.util.SelfSignedCertificate)).handler(new ConsolePlan(users, console))
+      } else {
+        unfiltered.netty.Server.http(port = 80).handler(new ConsolePlan(users, console))
       }
+      server.start()
+      console.logger.info("console server started on port " + server.ports.head)
+
     } catch {
       case t: Throwable => {
-        println("trying to bind to localhost")
-        unfiltered.netty.Server.https(443, "localhost", ssl = SslContextProvider.selfSigned(new io.netty.handler.ssl.util.SelfSignedCertificate)).handler(new ConsolePlan(users, console)).run {
-          s =>         console.logger.info("started: " + s.portBindings.head.url)
+        val server = if(console.isHTTPS) {
+          unfiltered.netty.Server.https(443, "localhost", ssl = SslContextProvider.selfSigned(new io.netty.handler.ssl.util.SelfSignedCertificate)).handler(new ConsolePlan(users, console))
+        } else {
+          unfiltered.netty.Server.http(80, "localhost").handler(new ConsolePlan(users, console))
         }
+        server.start()
+        console.logger.info("console server started on port " + server.ports.head)
+
       }
     }
   }

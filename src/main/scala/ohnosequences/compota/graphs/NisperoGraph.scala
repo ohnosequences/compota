@@ -8,71 +8,73 @@ import ohnosequences.compota.queues._
 import scala.collection.mutable
 import scala.util.Try
 
-//todo add product queue
 object NisperoGraph {
-  def apply[E <: AnyEnvironment[E]](env: E, nisperos: List[AnyNispero.of[E]]): Try[NisperoGraph] = {
-    val nisperoNames = new mutable.HashMap[String, AnyNispero]()
-    val queueOpNames = new mutable.HashMap[String, AnyQueueOp]()
-    val queueOps = new mutable.HashMap[AnyQueue, List[AnyQueueOp]]()
+  def apply[E <: AnyEnvironment[E]](nisperos: Map[String, AnyNispero.of[E]]): NisperoGraph[E] = {
     val edges = mutable.ListBuffer[Edge[String, String]]()
+    nisperos.foreach { case (nisperoName, nispero) =>
 
-    Try {
-      nisperos.foreach { nispero =>
-        val nisperoConfiguration = nispero.configuration
-        val nisperoName = nisperoConfiguration.name
-        nisperoNames.put(nisperoName, nispero)
-        val inputQueueOp = nispero.inputQueue.create(nispero.inputContext(env)).get
-        val outputQueueOp = nispero.outputQueue.create(nispero.outputContext(env)).get
-
-        inputQueueOp.subOps().foreach { subOp =>
-          queueOpNames.put(subOp.queue.name, subOp)
-        }
-
-        outputQueueOp.subOps().foreach { subOp =>
-          queueOpNames.put(subOp.queue.name, subOp)
-        }
-
-        queueOps.put(nispero.inputQueue, inputQueueOp.subOps())
-        queueOps.put(nispero.outputQueue, outputQueueOp.subOps())
-
-
-        inputQueueOp.subOps().zipWithIndex.foreach { case (inputSubOp, i) =>
-          outputQueueOp.subOps().zipWithIndex.foreach { case (outputSubOp, j) =>
-            edges += Edge(nispero.configuration.name + i + "_" + j, Node(inputSubOp.queue.name), Node(outputQueueOp.queue.name))
-          }
+      nispero.inputQueue.subQueues.zipWithIndex.foreach { case (inputSubQueue, i) =>
+        nispero.outputQueue.subQueues.zipWithIndex.foreach { case (outputSubQueue, j) =>
+          edges += Edge(nispero.configuration.name + "_" + i + "_" + j, Node(inputSubQueue.name), Node(outputSubQueue.name))
         }
       }
-      new NisperoGraph(new Graph(edges.toList), nisperoNames.toMap, queueOpNames.toMap, queueOps.toMap)
     }
+    new NisperoGraph[E](new Graph(edges.toList), nisperos)
   }
 }
 
 
-class NisperoGraph(
-                    graph: Graph[String, String],
-                    nisperos: Map[String, AnyNispero],
-                    val queueOpNames: Map[String, AnyQueueOp],
-                    val queueOps: Map[AnyQueue, List[AnyQueueOp]]) {
+class NisperoGraph[E <: AnyEnvironment[E]](
+                                            val graph: Graph[String, String],
+                                            val nisperos: Map[String, AnyNispero.of[E]]
+                                            ) {
 
-  val sortedQueueNames = graph.sort
+  val sortedQueues: List[Node[String]] = graph.sort
 
-  val notLeafsQueues: List[AnyQueueOp] = sortedQueueNames.filterNot(graph.out(_).isEmpty).map { node =>
-    queueOpNames(node.label)
+  val notLeafsQueues: List[String] = sortedQueues.filterNot(graph.out(_).isEmpty).map(_.label)
+
+}
+
+object QueueChecker {
+  def apply[E <: AnyEnvironment[E]](env: E, nisperoGraph: NisperoGraph[E]): Try[QueueChecker[E]] = {
+    Try {
+      val queueOps = new mutable.HashMap[String, AnyQueueOp]()
+      nisperoGraph.nisperos.foreach { case (name, nispero) =>
+        val inputQueueOp = nispero.inputQueue.create(nispero.inputContext(env)).get
+        val outputQueueOp = nispero.outputQueue.create(nispero.outputContext(env)).get
+
+        inputQueueOp.subOps().foreach { subOp =>
+          queueOps.put(subOp.queue.name, subOp)
+        }
+
+        outputQueueOp.subOps().foreach { subOp =>
+          queueOps.put(subOp.queue.name, subOp)
+        }
+      }
+
+      new QueueChecker(nisperoGraph, queueOps.toMap, nisperoGraph.notLeafsQueues.map { queueName =>
+        queueOps.get(queueName).get
+      })
+    }
   }
+}
 
-//  val queueOps: List[AnyQueueOp] = {
-//    sortedQueueNames.map { node =>
-//      queuesOpsNames(node.label)
-//    }
-//  }
+class QueueChecker[E <: AnyEnvironment[E]](val nisperoGraph: NisperoGraph[E],
+                                           val queueOps: Map[String, AnyQueueOp],
+                                           val notLeafsQueueOps: List[AnyQueueOp]) {
+
+
 
   //return either first not empty queue, either all not-leafs (to delete them)
-  def checkQueues[E <: AnyEnvironment[E]](env: E): Try[Either[AnyQueueOp, List[AnyQueueOp]]] = Try {
+  def checkQueues(): Try[Either[AnyQueueOp, List[AnyQueueOp]]] = Try {
 
-    notLeafsQueues.find { queue => !queue.isEmpty.get  } match {
-      case None =>  Right(notLeafsQueues)
+    notLeafsQueueOps.find { queueOp =>
+      !queueOp.isEmpty.get
+    } match {
+      case None => Right(notLeafsQueueOps)
       case Some(queueOp) => Left(queueOp)
     }
   }
+
 }
 

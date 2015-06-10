@@ -76,6 +76,7 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   def workerPurchaseModel: PurchaseModel = SpotAuto
 
+  override def errorThreshold: Int = 10
 }
 
 //class CompotaConfiguration(val name: String) extends CompotaConfigurationAux

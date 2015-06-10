@@ -121,6 +121,8 @@ trait AnyProductQueue extends AnyQueue { anyproductQueue =>
   override type QueueQueueOp = ProductQueueOp
 
 
+  override def subQueues: List[AnyQueue] = xQueue.subQueues ++ yQueue.subQueues
+
   override def create(ctx: QueueContext): Try[QueueQueueOp] = {
 
     xQueue.create(ctx).flatMap { xQueueOp =>

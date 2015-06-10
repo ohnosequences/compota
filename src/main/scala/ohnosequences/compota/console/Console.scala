@@ -4,7 +4,7 @@ import java.net.URL
 
 import ohnosequences.awstools.utils.SQSUtils
 import ohnosequences.compota.aws.queues.DynamoDBQueueOP
-import ohnosequences.compota.graphs.NisperoGraph
+import ohnosequences.compota.graphs.{QueueChecker, NisperoGraph}
 import ohnosequences.compota._
 import ohnosequences.compota.environment.{AnyEnvironment, InstanceId}
 import ohnosequences.compota.local.LocalQueueOp
@@ -25,7 +25,7 @@ abstract class AnyConsole {
 
   def sidebar: NodeSeq
 
-
+  def isHTTPS = true
 
   def errorsPage: NodeSeq
 
@@ -106,15 +106,23 @@ trait AnyWorkerInfo {
 
 
 
-abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCompota.of[E, N]](compota: C, env: E, nisperoGraph: NisperoGraph) extends AnyConsole{
+abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCompota.of[E, N]](
+                                                                                                 compota: C,
+                                                                                                 env: E,
+                                                                                                 controlQueueOp: AnyQueueOp,
+                                                                                                 nisperoGraph: QueueChecker[E]) extends AnyConsole {
+
+
 
   override val logger: Logger = env.logger
 
   override def password: String = compota.configuration.consolePassword
 
 
+  override def isHTTPS: Boolean = compota.configuration.consoleHTTPS
+
   def compotaInfoPage: NodeSeq = {
-    compotaInfoPageHeader ++ compotaInfoPageDetails
+    compotaInfoPageHeader ++ compotaInfoPageDetailsTable ++ compotaControlQueueDetails
   }
 
 
@@ -206,14 +214,22 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
 
-  def compotaInfoPageDetails: NodeSeq
+  def compotaInfoPageDetailsTable: NodeSeq
+
+  def compotaControlQueueDetails: NodeSeq = {
+    <h2>Control queue</h2>
+    queueStatus(controlQueueOp)
+  }
 
   def sidebar: NodeSeq = {
+    <ul class="nav nav-sidebar">
+      <li><a href="/"><strong>home</strong></a></li>
+    </ul>
     <ul class="nav nav-sidebar">
       {nisperosLinks()}
     </ul>
       <ul class="nav nav-sidebar">
-        <li><a href="/errors">errors</a></li>
+        <li><a href="/errorsPage">errors</a></li>
         <li><a href="#" class="undeploy">undeploy</a></li>
       </ul>
   }
@@ -233,10 +249,11 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
       <table class="table table-striped">
         <thead>
           <tr>
-            <th class="col-md-3">id</th>
-            <th class="col-md-3">instance</th>
-            <th class="col-md-3">time</th>
+            <th class="col-md-3">namespace</th>
+            <th class="col-md-2">instance</th>
+            <th class="col-md-2">time</th>
             <th class="col-md-3">message</th>
+            <th class="col-md-2">stack trace</th>
           </tr>
         </thead>
         <tbody id ="errorsTableBody">
@@ -285,13 +302,25 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
           <div class="page-header">
             <h2>input</h2>
           </div>
-          <div> {
-            nisperoGraph.queueOps(nispero.inputQueue).map(queueStatus)
-            } </div>
+          <div>
+            {nispero.inputQueue.subQueues.map { queue =>
+            nisperoGraph.queueOps.get(queue.name) match {
+              case None => xml.NodeSeq.Empty
+              case Some(queueOp) => queueStatus(queueOp)
+            }
+            }}
+          </div>
           <div class="page-header">
             <h2>output</h2>
           </div>
-          <div> {nisperoGraph.queueOps(nispero.outputQueue).map(queueStatus)} </div>
+          <div>
+            {nispero.outputQueue.subQueues.map { queue =>
+            nisperoGraph.queueOps.get(queue.name) match {
+              case None => xml.NodeSeq.Empty
+              case Some(queueOp) => queueStatus(queueOp)
+            }
+          }}
+          </div>
           <div class="page-header">
             <h2>instances</h2>
           </div>
@@ -317,6 +346,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
   def listErrorTable(lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ErrorTableItem])] = {
+    //logger.info(env.errorTable.listErrors(None, None).toString)
     env.errorTable.listErrors(lastToken, limit)
   }
 
@@ -339,7 +369,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
         <a href={"/error/message/" + item.namespace.toString + "/" + item.timestamp + "/" + item.instanceId.id}>message</a>
       </td>
       <td>
-        <a href={"/error/stackTrace/" + item.namespace.toString + "/" + item.timestamp + "/" + item.instanceId.id}>message</a>
+        <a href={"/error/stackTrace/" + item.namespace.toString + "/" + item.timestamp + "/" + item.instanceId.id}>stack trace</a>
       </td>
     </tr>
   }
@@ -355,10 +385,16 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
 
 
   def listMessages(queueName: String, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[String])] = {
-    nisperoGraph.queueOpNames.get(queueName) match {
-      case None => Failure(new Error("queue " + queueName + " not found"))
-      case Some(queueOp) => {
-        queueOp.list(lastToken, limit)
+
+    if(queueName.equals(controlQueueOp.queue.name)) {
+      controlQueueOp.list(lastToken, limit)
+    } else {
+      nisperoGraph.queueOps.get(queueName) match {
+        case None => Failure(new Error("queue " + queueName + " not found"))
+
+        case Some(queueOp) => {
+          queueOp.list(lastToken, limit)
+        }
       }
     }
   }
@@ -396,9 +432,13 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
 
 
   def getMessage(queue: String, id: String): Try[Either[URL, String]] = {
-    nisperoGraph.queueOpNames.get(queue) match {
-      case None => Failure(new Error("queue " + queue + " doesn't exists"))
-      case Some(queueOp) =>  queueOp.getContent(id)
+    if(queue.equals(controlQueueOp.queue.name)) {
+      controlQueueOp.getContent(id)
+    } else {
+      nisperoGraph.queueOps.get(queue) match {
+        case None => Failure(new Error("queue " + queue + " doesn't exists"))
+        case Some(queueOp) => queueOp.getContent(id)
+      }
     }
   }
 
@@ -443,7 +483,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   def name: String = compota.configuration.name
 
   def sendUndeployCommand(reason: String, force: Boolean): Unit = {
-    compota.sendUnDeployCommand(env, reason, force)
+    compota.sendForceUnDeployCommand(env, reason, reason)
   }
 
   def mainCSS: String = {

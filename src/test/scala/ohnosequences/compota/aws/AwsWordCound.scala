@@ -131,14 +131,13 @@ class AwsWordCount {
     override def addTasks(environment: AwsEnvironment): Try[Unit] = {
       environment.logger.debug("test")
       // environment.logger.error(new Error("exception"))
-      val op = textQueue.create(environment.createDynamoDBContext()).get
+      val op = textQueue.create(environment.createDynamoDBContext).get
       val writer = op.writer.get
       writer.writeRaw(List(("1", "a a a b b")))
     }
 
-    override def unDeployActions(force: Boolean, env: AwsEnvironment, context: Int): Try[String] = {
+    override def unDeployActions(env: AwsEnvironment, context: Int): Try[String] = {
       Success("message context = " +context)
-
     }
   }
 

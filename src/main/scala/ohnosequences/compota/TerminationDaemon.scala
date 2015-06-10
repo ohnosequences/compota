@@ -1,7 +1,7 @@
 package ohnosequences.compota
 
 import ohnosequences.compota.environment._
-import ohnosequences.compota.graphs.NisperoGraph
+import ohnosequences.compota.graphs.{QueueChecker, NisperoGraph}
 import ohnosequences.compota.Namespace._
 
 
@@ -9,60 +9,59 @@ import scala.annotation.tailrec
 import scala.concurrent.duration.Duration
 import scala.util.{Try, Success, Failure}
 
-class TerminationDaemon[E <: AnyEnvironment[E]](nisperoGraph: NisperoGraph,
-                        sendUnDeployCommand: (E, String, Boolean) => Try[Unit],
-                        startedTime: Long,
-                        timeout: Duration,
-                        terminationDaemonIdleTime: Duration) {
-  def start(environment: E): Try[Unit] = {
+class TerminationDaemon[E <: AnyEnvironment[E]](compota: AnyCompota.ofE[E], queueChecker: QueueChecker[E]) {
+  def start(env: E): Try[Unit] = {
 
-    def isTimeoutReached: Boolean = {
-      (System.currentTimeMillis() - startedTime) > timeout.toMillis
-    }
+    compota.startedTime(env).map { startedTime =>
 
-    @tailrec
-    def messageLoop(): Try[Unit] = {
-      Thread.sleep(terminationDaemonIdleTime.toMillis)
-      if (isTimeoutReached) {
-        environment.logger.info("reached compota timeout: " + timeout.toMinutes + " mins")
-        environment.logger.info("sending undeploy command")
-        sendUnDeployCommand(environment, "timeout", true).recoverWith[Unit] { case t =>
-          environment.reportError(terminationDaemon / "send_undeploy_command", new Error("couldn't send undeploy command", t))
+      def isTimeoutReached: Boolean = {
+        (System.currentTimeMillis() - startedTime) > compota.configuration.timeout.toMillis
+      }
+
+      @tailrec
+      def messageLoop(): Try[Unit] = {
+        if (env.isStopped) {
           Success(())
-        }
-      } else if (environment.isStopped) {
-        Success(())
-      } else {
-        nisperoGraph.checkQueues(environment) match {
-          case Failure(t) => {
-            environment.reportError(terminationDaemon / "check_queues", new Error("couldn't check queues", t))
-            Success(())
-          }
-          case Success(Left(queueOp)) => {
-            environment.logger.debug("queue " + queueOp.queue.name + " isn't empty")
-            messageLoop()
-          }
-          case Success(Right(queues)) => {
-            environment.logger.info("all queues are empty")
-
-            environment.logger.info("sending undeploy command")
-            sendUnDeployCommand(environment, "terminated", false).recoverWith { case t =>
-              environment.reportError(terminationDaemon / "send_undeploy_command", new Error("couldn't send undeploy command", t))
-              Success(())
+        } else {
+          Thread.sleep(compota.configuration.terminationDaemonIdleTime.toMillis)
+          if (isTimeoutReached) {
+            val message = "reached compota timeout: " + compota.configuration.timeout + " mins"
+            env.logger.info(message)
+            env.logger.info("force undeploy")
+            compota.sendForceUnDeployCommand(env, "timeout", message).recoverWith { case t =>
+              env.reportError(terminationDaemon / "send_force_undeploy", new Error("couldn't send force undeploy command", t))
+                Failure(t)
+            }
+          } else {
+            compota.compotaUnDeployActionContext.get() match {
+              case None => {
+                env.logger.debug("undeploy context is not ready")
+              }
+              case Some(context) => {
+                queueChecker.checkQueues() match {
+                  case Failure(t) => {
+                    env.reportError(terminationDaemon / "check_queues", new Error("couldn't check queues", t))
+                  }
+                  case Success(Left(queueOp)) => {
+                    env.logger.info("queue " + queueOp.queue.name + " isn't empty")
+                  }
+                  case Success(Right(queues)) => {
+                    env.logger.info("all queues are empty")
+                    env.logger.info("sending undeploy command")
+                    compota.sendUnDeployCommand(env).recoverWith { case t =>
+                      env.reportError(terminationDaemon / "send_undeploy_command", new Error("couldn't send undeploy command", t))
+                      Failure(t)
+                    }
+                  }
+                }
+              }
             }
           }
+          messageLoop()
         }
       }
-    }
-    messageLoop() match {
-      case Failure(t) => {
-        environment.logger.info ("stopping termination daemon")
-        Failure(t)
-      }
-      case Success(u) => {
-        environment.logger.info ("stopping termination daemon")
-        Success(u)
-      }
+      messageLoop()
+      env.logger.info("termination daemon stopped")
     }
   }
 }

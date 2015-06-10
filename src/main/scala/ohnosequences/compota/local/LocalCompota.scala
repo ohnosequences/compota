@@ -1,31 +1,30 @@
 package ohnosequences.compota.local
 
-import java.io.File
-import java.net.URL
+
 import java.util.concurrent.{TimeUnit, Executors, ConcurrentHashMap}
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicInteger, AtomicReference, AtomicBoolean}
 
 import ohnosequences.compota.console.{UnfilteredConsoleServer, AnyConsole}
 import ohnosequences.compota.environment.InstanceId
-import ohnosequences.compota.graphs.NisperoGraph
+import ohnosequences.compota.graphs.{QueueChecker}
 import ohnosequences.compota.local.metamanager.{LocalMetaManager}
-import ohnosequences.compota.metamanager.{UnDeploy, BaseMetaManagerCommand}
-import ohnosequences.compota.queues.{AnyQueueReducer}
-import ohnosequences.compota.{AnyCompota, TerminationDaemon}
+import ohnosequences.compota.metamanager.{ForceUnDeploy, UnDeploy}
+import ohnosequences.compota.queues.{AnyQueueOp, AnyQueueReducer}
+import ohnosequences.compota.{AnyCompota}
+import ohnosequences.logging.{FileLogger, Logger}
 import scala.collection.JavaConversions._
-import scala.concurrent.duration._
+import scala.collection.mutable.ListBuffer
 
 import scala.util.{Failure, Success, Try}
 
 trait AnyLocalCompota extends AnyCompota {
   override type CompotaEnvironment = LocalEnvironment
   override type CompotaNispero = AnyLocalNispero
+
   override type CompotaMetaManager = LocalMetaManager[CompotaUnDeployActionContext]
   override type CompotaConfiguration <: AnyLocalCompotaConfiguration
 
   val isFinished = new java.util.concurrent.atomic.AtomicBoolean(false)
-
-  val controlQueue = new LocalQueue[BaseMetaManagerCommand]("control_queue", visibilityTimeout = Duration(10, SECONDS))
 
   val executor = Executors.newCachedThreadPool()
 
@@ -38,26 +37,56 @@ trait AnyLocalCompota extends AnyCompota {
     }
   }
 
-  val instancesEnvironments = new ConcurrentHashMap[InstanceId, (AnyLocalNispero, LocalEnvironment)]()
+  val environments = new ConcurrentHashMap[InstanceId, LocalEnvironment]()
+
+  private val initialEnvironment_ = new AtomicReference[Option[LocalEnvironment]](None)
+  override def initialEnvironment: Try[LocalEnvironment] = {
+    initialEnvironment_.get match {
+      case Some(env) => Success(env)
+      case None => {
+        FileLogger(configuration.initialEnvironmentId.id,
+          configuration.loggingDirectory,
+          "log.txt",
+          configuration.loggerDebug,
+          printToConsole = configuration.loggersPrintToConsole
+        ).map { logger =>
+          configuration.workingDirectory.mkdir()
+          new LocalEnvironment(
+            instanceId = configuration.initialEnvironmentId,
+            workingDirectory = configuration.workingDirectory,
+            logger = logger,
+            executor = executor,
+            errorTable = errorTable,
+            configuration = configuration,
+            sendForceUnDeployCommand0 = sendForceUnDeployCommand,
+            environments = environments,
+            rootEnvironment0 = None,
+            origin = None,
+            localErrorCounts = new AtomicInteger(0)
+          )
+        }
+      }
+    }
+  }
 
   def terminateInstance(instanceId: InstanceId): Try[Unit] = {
-    Option(instancesEnvironments.get(instanceId)) match {
+    Option(environments.get(instanceId)) match {
       case None => Success(()) //so idempotent
-      case Some((nispero, env)) => {
+      case Some(env) => {
         env.stop()
         Success(())
       }
     }
   }
 
-  val errorCounts = new ConcurrentHashMap[String, Int]()
+  override val metaManager = new LocalMetaManager[CompotaUnDeployActionContext](AnyLocalCompota.this)
 
-  val metamanager = new LocalMetaManager[CompotaUnDeployActionContext](AnyLocalCompota.this, instancesEnvironments)
-
-  def getInstanceLog(instanceId: InstanceId): Try[String] = {
-    Option(instancesEnvironments.get(instanceId)) match {
+  def getInstanceLog(logger: Logger, instanceId: InstanceId): Try[String] = {
+    logger.info("looking for instance " + instanceId.id)
+    logger.info("known instances: " + environments.keys().toList)
+    Option(environments.get(instanceId)) match {
       case None => Failure(new Error("instance " + instanceId.id + " not found"))
-      case Some((nispero, env)) => {
+      case Some(env) => {
         Try {
           val log = scala.io.Source.fromFile(env.logger.logFile).getLines().mkString(System.lineSeparator())
           log
@@ -66,81 +95,56 @@ trait AnyLocalCompota extends AnyCompota {
     }
   }
 
-  //not needed for local compota
-  override def launchWorker(nispero: CompotaNispero): Try[LocalEnvironment] = ???
 
+  private def workerSubId(nispero: AnyLocalNispero, id: Int): String = {
+    "worker_" + nispero.configuration.name + "_" + id
+  }
 
   def launchWorker(nispero: AnyLocalNispero, id: Int): Try[LocalEnvironment] = {
-    val prefix = "worker_" + nispero.configuration.name + "_" + id
-
-    LocalEnvironment.execute(
-      InstanceId(prefix),
-      new File(configuration.workingDirectory, prefix),
-      instancesEnvironments,
-      Some(nispero),
-      executor,
-      errorTable,
-      configuration,
-      errorCounts,
-      sendUnDeployCommand
-    ) { env =>
-      nispero.worker.start(env)
-    }
-  }
-
-  def launchMetaManager(): Try[LocalEnvironment] = {
-    val prefix = "metamanager"
-    LocalEnvironment.execute(
-      InstanceId(prefix),
-      new File(configuration.workingDirectory, prefix),
-      instancesEnvironments,
-      None,
-      executor,
-      errorTable,
-      configuration,
-      errorCounts,
-      sendUnDeployCommand
-    ) { env =>
-      env.logger.debug("launching metamanger")
-      metamanager.launchMetaManager(env, controlQueue, {e: LocalEnvironment => e.localContext}, {launchTerminationDaemon}, {launchConsole})
+    val subId = workerSubId(nispero, id)
+    initialEnvironment.flatMap { iEnv =>
+      iEnv.subEnvironmentAsync(subId) { env =>
+        nispero.worker.start(env)
+      }
     }
   }
 
 
-  override def startedTime(): Try[Long] = Success(System.currentTimeMillis())
+  override def startedTime(env: CompotaEnvironment): Try[Long] = Success(System.currentTimeMillis())
 
-  val tasksAdded_ = new AtomicBoolean(false)
-
-  override def tasksAdded(): Try[Boolean] = {
-    Success(tasksAdded_.get)
+  val compotaDeployed_ = new AtomicBoolean(false)
+  override def compotaDeployed(env: CompotaEnvironment): Try[Boolean] = {
+    Success(compotaDeployed_.get)
   }
 
-
-  override def setTasksAdded(): Try[Unit] = {
-    Success(tasksAdded_.set(true))
-  }
 
   override def createNisperoWorkers(env: CompotaEnvironment, nispero: CompotaNispero): Try[Unit] = {
     Try {
       for (i <- 1 to nispero.configuration.workers) {
-        launchWorker(nispero, i)
+        launchWorker(nispero, i).get
       }
     }
   }
 
   override def deleteNisperoWorkers(env: CompotaEnvironment, nispero: CompotaNispero): Try[Unit] = {
-
     env.logger.info("stopping " + nispero.configuration.name + " nispero")
     //logger.debug("envs: " + )
     Try {
-      instancesEnvironments.foreach { case (id, (n, e)) =>
-        if (n.configuration.name.equals(nispero.configuration.name)) {
-          env.logger.debug("stopping environment: " + id)
-          e.stop()
+      for (i <- 1 to nispero.configuration.workers) {
+        terminateInstance(configuration.initialEnvironmentId.subInstance(workerSubId(nispero, i))).get
+      }
+    }
+  }
 
+  def listNisperoWorkers(nispero: CompotaNispero): Try[List[CompotaEnvironment]] = {
+    Try {
+      val res = new ListBuffer[CompotaEnvironment]()
+      for (i <- 1 to nispero.configuration.workers) {
+        Option(environments.get(configuration.initialEnvironmentId.subInstance(workerSubId(nispero, i)))).foreach { e =>
+          res += e
         }
       }
-
+      res.toList
     }
   }
 
@@ -153,39 +157,67 @@ trait AnyLocalCompota extends AnyCompota {
     }
   }
 
+  def getInstanceStackTrace(instanceId: InstanceId): Try[String] = {
+    Option(environments.get(instanceId)) match {
+      case None => Failure(new Error("instance " + instanceId + " does not exist"))
+      case Some(e) => {
+        e.getThreadInfo match {
+          case None => Failure(new Error("couldn't get stack trace for " + instanceId))
+          case Some((t, a)) => {
+            val stackTrace = new StringBuffer()
+            a.foreach { s =>
+              stackTrace.append("at " + s.toString + System.lineSeparator())
+            }
+            Success(stackTrace.toString)
+          }
+        }
+      }
+    }
+  }
+
 
   override def deleteManager(env: CompotaEnvironment): Try[Unit] = {
     env.executor.awaitTermination(10, TimeUnit.SECONDS)
     Success(())
   }
 
-  override def launch(): Try[Unit] = {
+  override def launch(): Try[CompotaEnvironment] = {
     //println("ge")
-    launchMetaManager().map { env => ()}
+    launchMetaManager()
   }
 
-  override def sendUnDeployCommand(env: CompotaEnvironment, reason: String, force: Boolean): Try[Unit] = {
-//    if (force) {
-//      //force stop
-//
-//    } else {}
 
-    controlQueue.create(env.localContext).flatMap { queueOp =>
-      queueOp.writer.flatMap { writer =>
-        writer.writeRaw(List(("undeploy_" + reason + "_" + force, UnDeploy(reason, force))))
+  def finishUnDeploy(env: LocalEnvironment, reason: String, message: String): Try[Unit] = {
+    Success(isFinished.set(true))
+  }
+
+
+
+
+  //send command to metamanager that reduce queues etc
+  override def sendUnDeployCommand(env: CompotaEnvironment): Try[Unit] = {
+    metaManager.sendMessageToControlQueue(env, UnDeploy)
+  }
+
+  override def sendForceUnDeployCommand(env: CompotaEnvironment, reason: String, message: String): Try[Unit] = {
+    metaManager.sendMessageToControlQueue(env, ForceUnDeploy(reason, message))
+  }
+
+  //undeploy right now
+  override def forceUnDeploy(env: CompotaEnvironment, reason: String, message: String): Try[Unit] = {
+    Success(()).flatMap { u =>
+      env.logger.warn("force undeploy")
+      env.logger.info("forcedUnDeployActions")
+      forcedUnDeployActions(env).flatMap { message =>
+        env.logger.info("forcedUnDeployActions result: " + message)
+        finishUnDeploy(env, reason, message)
       }
     }
   }
 
-  def finishUnDeploy(env: LocalEnvironment, reason: String, message: String): Try[Unit] = {
-    Success(isFinished.set(true))
-    //Success(())
-  }
-
-
-  override def launchConsole(nisperoGraph: NisperoGraph, env: CompotaEnvironment): Try[AnyConsole] = {
+  override def launchConsole(nisperoGraph: QueueChecker[CompotaEnvironment], controlQueueOp: AnyQueueOp, env: CompotaEnvironment): Try[AnyConsole] = {
     Try{
-      val console = new LocalConsole[CompotaNispero](AnyLocalCompota.this, env, nisperoGraph)
+      val console = new LocalConsole[CompotaNispero](AnyLocalCompota.this, env, controlQueueOp, nisperoGraph)
       new UnfilteredConsoleServer(console).start()
       console
     }

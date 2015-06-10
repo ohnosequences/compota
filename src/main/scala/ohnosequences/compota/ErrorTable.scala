@@ -32,7 +32,10 @@ object ErrorTableItem {
 }
 case class ErrorTableItem(namespace: Namespace, timestamp: Long, instanceId: InstanceId,  message: String, stackTrace: String) {
 
-  val format = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss")
+  val formatFull = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss")
+
+  val format = new SimpleDateFormat("HH:mm:ss")
+
 
   def formattedTime(): String = {
     format.format(new Date(timestamp))
@@ -64,6 +67,8 @@ trait ErrorTable {
   def reportError(errorTableItem: ErrorTableItem): Try[Unit]
 
   def getNamespaceErrorCount(namespace: Namespace): Try[Int]
+
+  def recover(): Try[Unit]
 
   def listErrors(lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ErrorTableItem])]
 

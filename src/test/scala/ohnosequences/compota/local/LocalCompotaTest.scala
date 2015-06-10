@@ -3,7 +3,8 @@ package ohnosequences.compota.local
 import java.util.concurrent.atomic.AtomicReference
 
 import ohnosequences.compota.environment.Env
-import ohnosequences.compota.{InMemoryQueueReducerLocal, InMemoryQueueReducer, Instructions}
+import ohnosequences.compota.graphs.QueueChecker
+import ohnosequences.compota.{TerminationDaemon, InMemoryQueueReducerLocal, InMemoryQueueReducer, Instructions}
 import ohnosequences.compota.monoid.{stringMonoid, intMonoid}
 import ohnosequences.logging.{ConsoleLogger, Logger}
 import org.junit.Test
@@ -11,7 +12,7 @@ import org.junit.Assert._
 import scala.concurrent.duration._
 
 import scala.concurrent.duration.Duration
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 object wordLengthInstructions extends Instructions[String, Int] {
 
@@ -46,9 +47,12 @@ object countsQueue extends LocalQueue[Int]("counts")
 
 object wordCountCompotaConfiguration extends AnyLocalCompotaConfiguration {
   override def name: String = "wordCount"
-  override val loggerDebug: Boolean = false
+  override val loggerDebug: Boolean = true
   override val timeout= Duration(100, SECONDS)
   override val terminationDaemonIdleTime =  Duration(10, SECONDS)
+  override val visibilityTimeout: Duration = Duration(5, SECONDS)
+
+  override def errorThreshold: Int = 3
 }
 
 object splitNispero extends LocalNisperoLocal (
@@ -80,17 +84,47 @@ class LocalCompotaTest {
 
     val s = System.currentTimeMillis() + 1
 
-    override def prepareUnDeployActions(env: wordLenghtCompota.CompotaEnvironment): Try[Int] = Success(1000)
+    override def prepareUnDeployActions(env: wordLenghtCompota.CompotaEnvironment): Try[Int] = {
+      Failure(new Error("intentional"))
 
-    override def addTasks(environment: CompotaEnvironment): Try[Unit] = {
-      environment.logger.debug("test")
-      // environment.logger.error(new Error("exception"))
-      val op = textQueue.create(environment.localContext).get
-      val writer = op.writer.get
-      writer.writeMessages("1", input)
+      //Success(1000)
     }
 
-    override def unDeployActions(force: Boolean, env: LocalEnvironment, context: Int): Try[String] = {
+    override def addTasks(env: CompotaEnvironment): Try[Unit] = {
+      env.logger.debug("test")
+     // while(true) {
+     //   Thread.sleep(1000)
+       // environment.logger.info(controlQueue.rawQueue.toString)
+       // environment.logger.info(controlQueue.rawQueueP.toString)
+
+    //  }
+      // environment.logger.error(new Error("exception"))
+      val op = textQueue.create(env.localContext).get
+      val writer = op.writer.get
+      writer.writeMessages("1", input)
+     // env.logger.info(env.errorTable.listErrors(None, None).toString)
+      Failure(new Error("intentional"))
+
+    }
+
+
+//    override def launchTerminationDaemon(graph: QueueChecker[CompotaEnvironment], env: CompotaEnvironment): Try[TerminationDaemon[LocalCompotaTest.this.wordLenghtCompota.CompotaEnvironment]] = {
+//      while(true) {
+//        env.logger.info("waiting")
+//        env.logger.info(controlQueue.rawQueue.toString)
+//        env.logger.info(controlQueue.rawQueueP.toString)
+//        Thread.sleep(5000)
+//      }
+//      Failure(new Error("e"))
+//    }
+
+
+
+    override def unDeployActions(env: LocalEnvironment, context: Int): Try[String] = {
+      env.logger.info("waiting")
+      env.logger.info(metaManager.controlQueue.rawQueue.toString)
+      env.logger.info(metaManager.controlQueue.rawQueueP.toString)
+      Thread.sleep(5000)
       Success("message context = " +context)
 
     }

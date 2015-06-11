@@ -11,7 +11,8 @@ import ohnosequences.compota.queues._
 import ohnosequences.logging.ConsoleLogger
 import scala.util.{Failure, Success, Try}
 
-trait AnyCompota { anyCompota =>
+trait AnyCompota {
+  anyCompota =>
 
   type CompotaEnvironment <: AnyEnvironment[CompotaEnvironment]
   type CompotaNispero <: AnyNispero.of[CompotaEnvironment]
@@ -20,18 +21,21 @@ trait AnyCompota { anyCompota =>
 
   val compotaUnDeployActionContext: AtomicReference[Option[CompotaUnDeployActionContext]] = new AtomicReference(None)
 
-  type CompotaMetaManager <:  AnyMetaManager.of[CompotaEnvironment]
+  type CompotaMetaManager <: AnyMetaManager.of[CompotaEnvironment]
+
   def metaManager: CompotaMetaManager
 
   def nisperos: List[CompotaNispero]
+
   def reducers: List[AnyQueueReducer.of[CompotaEnvironment]]
 
   type CompotaConfiguration <: AnyCompotaConfiguration
+
   def configuration: CompotaConfiguration
 
   def initialEnvironment: Try[CompotaEnvironment]
 
-  def nisperosNames: Map[String, CompotaNispero] =  nisperos.map { nispero =>
+  def nisperosNames: Map[String, CompotaNispero] = nisperos.map { nispero =>
     (nispero.configuration.name, nispero)
   }.toMap
 
@@ -120,12 +124,13 @@ trait AnyCompota { anyCompota =>
         compota = anyCompota,
         queueChecker = queueChecker
       )
-      td.start(env).map{ u => td}
+      td.start(env).map { u => td }
 
     }
   }
 
   def launchConsole(nisperoGraph: QueueChecker[CompotaEnvironment], controlQueue: AnyQueueOp, env: CompotaEnvironment): Try[AnyConsole]
+
 }
 
 object AnyCompota {

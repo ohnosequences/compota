@@ -11,6 +11,10 @@ trait AnyAwsNispero extends AnyNispero {
   override type NisperoEnvironment = AwsEnvironment
 }
 
+//object AnyAwsNispero {
+//  type of[N <: ]
+//}
+
 
 
 

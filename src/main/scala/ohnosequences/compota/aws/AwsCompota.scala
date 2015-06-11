@@ -6,9 +6,10 @@ import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import com.amazonaws.auth.{InstanceProfileCredentialsProvider, AWSCredentialsProvider}
 import ohnosequences.awstools.AWSClients
 import ohnosequences.compota.aws.metamanager.AwsMetaManager
-import ohnosequences.compota.console.AnyConsole
+import ohnosequences.compota.console.{UnfilteredConsoleServer, AnyConsole}
 import ohnosequences.compota.environment.InstanceId
 import ohnosequences.compota.graphs.{QueueChecker}
+import ohnosequences.compota.local.LocalConsole
 import ohnosequences.compota.metamanager.{ForceUnDeploy, UnDeploy}
 import ohnosequences.compota.queues._
 import ohnosequences.compota.{AnyCompota}
@@ -18,9 +19,10 @@ import scala.util.{Failure, Success, Try}
 
 object AnyAwsCompota {
   type of[U] = AnyAwsCompota { type CompotaUnDeployActionContext = U}
+  type ofN[N <: AnyAwsNispero] = AnyAwsCompota { type CompotaNispero = N }
 }
 
-trait AnyAwsCompota extends AnyCompota {
+trait AnyAwsCompota extends AnyCompota { awsCompota =>
   override type CompotaEnvironment = AwsEnvironment
   override type CompotaNispero = AnyAwsNispero
   override type CompotaMetaManager = AwsMetaManager[CompotaUnDeployActionContext]
@@ -28,11 +30,11 @@ trait AnyAwsCompota extends AnyCompota {
   type CompotaConfiguration <: AwsCompotaConfiguration
 
 
-  def awsCredentialsProvider: AWSCredentialsProvider = {
+  lazy val awsCredentialsProvider: AWSCredentialsProvider = {
     new InstanceProfileCredentialsProvider()
   }
 
-  override def metaManager: CompotaMetaManager = new AwsMetaManager[CompotaUnDeployActionContext](AnyAwsCompota.this)
+  override val metaManager: CompotaMetaManager = new AwsMetaManager[CompotaUnDeployActionContext](AnyAwsCompota.this)
 
   val executor = Executors.newCachedThreadPool()
 
@@ -49,8 +51,13 @@ trait AnyAwsCompota extends AnyCompota {
   }
 
 
-
-  def launchConsole(nisperoGraph: QueueChecker[CompotaEnvironment], controlQueueOp: AnyQueueOp, env: CompotaEnvironment): Try[AnyConsole] = ???
+  override def launchConsole(nisperoGraph: QueueChecker[CompotaEnvironment], controlQueue: AnyQueueOp, env: CompotaEnvironment): Try[AnyConsole] = {
+    Try {
+      val console = new AwsConsole[CompotaNispero](awsCompota, env, controlQueue, nisperoGraph)
+      new UnfilteredConsoleServer(console).start()
+      console
+    }
+  }
 
   private val initialEnvironment_ = new AtomicReference[Option[AwsEnvironment]](None)
   override def initialEnvironment: Try[AwsEnvironment] = {

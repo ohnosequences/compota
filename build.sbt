@@ -4,6 +4,9 @@ name          := "compota"
 description   := "compota (ex nisperon)"
 organization  := "ohnosequences"
 
+resolvers += "Era7 maven releases" at "https://s3-eu-west-1.amazonaws.com/releases.era7.com"
+resolvers += "Era7 maven snapshots" at "https://s3-eu-west-1.amazonaws.com/snapshots.era7.com"
+
 libraryDependencies ++= Seq(
   "commons-io"      %  "commons-io"               % "2.4",
   "org.json4s"      %% "json4s-native"            % "3.2.11",

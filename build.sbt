@@ -1,45 +1,29 @@
 Nice.scalaProject
 
-
-name := "compota"
-description := "compota (ex nisperon)"
-organization := "ohnosequences"
-
-bucketSuffix := "era7.com"
-
-
+name          := "compota"
+description   := "compota (ex nisperon)"
+organization  := "ohnosequences"
 
 libraryDependencies ++= Seq(
-  "commons-io"     % "commons-io" % "2.4",
-  "org.json4s"    %% "json4s-native" % "3.2.11",
-  "ohnosequences" %% "aws-scala-tools" % "0.13.0-SNAPSHOT",
-  "net.databinder" %% "unfiltered-filter" % "0.8.4",
-  "net.databinder" %% "unfiltered-netty" % "0.8.4",
-  "net.databinder" %% "unfiltered-netty-server" % "0.8.4",
-  "com.novocode" % "junit-interface" % "0.11" % "test"
+  "commons-io"      %  "commons-io"               % "2.4",
+  "org.json4s"      %% "json4s-native"            % "3.2.11",
+  "ohnosequences"   %% "aws-scala-tools"          % "0.13.0-SNAPSHOT",
+  "net.databinder"  %% "unfiltered-filter"        % "0.8.4",
+  "net.databinder"  %% "unfiltered-netty"         % "0.8.4",
+  "net.databinder"  %% "unfiltered-netty-server"  % "0.8.4"
 )
 
-publishArtifact in (Test, packageBin) := true
+// test dependencies
+libraryDependencies ++= Seq(
+  "com.novocode"    %   "junit-interface"   % "0.11"    % "test",
+  "org.scalacheck"  %%  "scalacheck"        % "1.11.0"  % "test"
+)
 
-libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.11.0" % "test"
-
-dependencyOverrides += "commons-codec" % "commons-codec" % "1.6"
-
-dependencyOverrides += "org.scala-lang.modules" % "scala-parser-combinators_2.11" % "1.0.2"
-
-dependencyOverrides += "org.scala-lang.modules" % "scala-xml_2.11" % "1.0.2"
-
+// dependencyOverrides
+dependencyOverrides ++= Set(
+  "commons-codec"           %   "commons-codec"             % "1.6",
+  "org.scala-lang.modules"  %%  "scala-parser-combinators"  % "1.0.3",
+  "org.scala-lang.modules"  %%  "scala-xml"                 % "1.0.3"
+)
 
 testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-maxSize", "40", "-minSuccessfulTests", "10", "-workers", "1", "-verbosity", "1")
-
-
-//fatArtifactSettings
-
-mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) => {
-  case "log4j.properties" => MergeStrategy.first
-  case "overview.html" => MergeStrategy.first
-  case PathList("org", "apache", "commons", _*) => MergeStrategy.first
-  case x => old(x)
-}
-}
-

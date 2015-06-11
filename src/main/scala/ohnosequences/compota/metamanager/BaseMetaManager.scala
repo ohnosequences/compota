@@ -18,7 +18,7 @@ trait BaseMetaManager extends AnyMetaManager {
     Success(()).flatMap { u =>
       controlQueue.create(controlQueueContext(env)).flatMap { controlQueueOp =>
         controlQueueOp.writer.flatMap { writer =>
-          writer.writeMessages(command.prefix + System.currentTimeMillis(), List(command))
+          writer.writeMessages(printMessage(command.prefix) + System.currentTimeMillis(), List(command))
         }
       }
     }

@@ -58,6 +58,25 @@ trait AnyMetaManager {
               queueChecker: QueueChecker[MetaManagerEnvironment]
                ): Try[List[MetaManagerCommand]]
 
+  def printMessage(message: String): String = {
+    message.split(System.lineSeparator()).toList match {
+      case line1 :: line2 :: tail => {
+        if (line1.length > 50) {
+          line1.take(50) + "..."
+        } else {
+          line1
+        }      }
+      case _ => {
+        if (message.length > 50) {
+          message.take(50) + "..."
+        } else {
+          message
+        }
+      }
+    }
+  }
+
+
   def launchMetaManager(env: MetaManagerEnvironment//,
                        // controlQueueContext: MetaManagerEnvironment => MetaManagerControlQueueContext
                        // launchTerminationDaemon: (QueueChecker[MetaManagerEnvironment], MetaManagerEnvironment) => Try[TerminationDaemon[MetaManagerEnvironment]],
@@ -89,16 +108,16 @@ trait AnyMetaManager {
             Success(())
           }
           case Some(message) => {
-            logger.debug("parsing message " + message.id)
+            logger.debug("parsing message " + printMessage(message.id))
             //logger.info(message.getBody.toString)
             message.getBody.recoverWith { case t =>
-              env.reportError(Namespace.metaManager / Namespace.controlQueue, new Error("couldn't parse message " + message.id + " from control queue", t))
+              env.reportError(Namespace.metaManager / Namespace.controlQueue, new Error("couldn't parse message " + printMessage(message.id) + " from control queue", t))
               Failure(t)
             }.flatMap {
               case None => {
-                logger.warn("message " + message.id + " is deleted")
+                logger.warn("message " + printMessage(message.id) + " is deleted")
                 queueOp.deleteMessage(message).recoverWith { case t =>
-                  env.reportError(Namespace.metaManager / Namespace.controlQueue, new Error("couldn't delete message " + message.id + " from control queue", t))
+                  env.reportError(Namespace.metaManager / Namespace.controlQueue, new Error("couldn't delete message " + printMessage(message.id) + " from control queue", t))
                   Failure(t)
                 }
               }
@@ -109,21 +128,21 @@ trait AnyMetaManager {
                     runingTasks.putIfAbsent(body.prefix, new AtomicInteger())
                     runingTasks.get(body.prefix).incrementAndGet()
 
-                    logger.debug("processing message " + body)
+                    logger.debug("processing message " + printMessage(body.toString))
                     process(body, env, queueOp, queueOps, queueChecker) match {
                       case Failure(t) => {
                         //command processing failure
                         env.reportError(Namespace.metaManager / body.prefix, t)
                       }
                       case Success(commands) => {
-                        logger.debug("writing result: " + commands)
-                        writer.writeRaw(commands.map { c => (c.prefix, c)}).recoverWith { case t =>
+                        logger.debug("writing result: " + printMessage(commands.toString))
+                        writer.writeRaw(commands.map { c => (printMessage(c.prefix) + "_" + System.currentTimeMillis(), c)}).recoverWith { case t =>
                           env.reportError(Namespace.metaManager / Namespace.controlQueue, new Error("couldn't write message to control queue", t))
                           Failure(t)
                         }.flatMap { written =>
-                          logger.debug("deleting message: " + message.id)
+                          logger.debug("deleting message: " + printMessage(message.id))
                           queueOp.deleteMessage(message).recoverWith { case t =>
-                            env.reportError(Namespace.metaManager / Namespace.controlQueue, new Error("couldn't delete message " + message.id + " from control queue", t))
+                            env.reportError(Namespace.metaManager / Namespace.controlQueue, new Error("couldn't delete message " + printMessage(message.id) + " from control queue", t))
                             Failure(t)
                           }
                         }
@@ -168,8 +187,8 @@ trait AnyMetaManager {
               queueOp.reader.flatMap { reader =>
                 logger.debug("creating control queue writer")
                 queueOp.writer.flatMap { writer =>
-                  logger.info("writing init message: " + initMessage)
-                  writer.writeRaw(List(("init", initMessage))).flatMap { res =>
+                  logger.info("writing init message: " + printMessage(initMessage.toString))
+                  writer.writeRaw(List((printMessage(initMessage.toString) + "_" + System.currentTimeMillis(), initMessage))).flatMap { res =>
                     logger.debug("starting message loop")
                     messageLoop(
                       queueOp,

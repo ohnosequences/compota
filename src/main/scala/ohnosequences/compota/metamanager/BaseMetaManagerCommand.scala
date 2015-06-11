@@ -58,10 +58,31 @@ trait BaseMetaManagerCommand extends AnyMetaManagerCommand {
 
   def prefix: String = {
     component + "_" +
-      (if(action.isEmpty) "" else action + "_") +
-      (if(args.isEmpty) "" else args.reduce(_ + "_" + _))
+      (if(action.isEmpty) "" else action) +
+      (if(args.isEmpty) "" else ":_" + args.reduce(_ + "_" + _))
   }
   def toCommand0 = Command0(component, action, args)
+
+  def printMessage(message: String): String = {
+    message.split(System.lineSeparator()).toList match {
+      case line1 :: line2 :: tail => {
+        if (line1.length > 50) {
+          line1.take(50) + "..."
+        } else {
+          line1
+        }
+      }
+      case _ => {
+        if (message.length > 50) {
+          message.take(50) + "..."
+        } else {
+          message
+        }
+      }
+    }
+  }
+
+  override def toString = printMessage(prefix)
 }
 
 case class CreateNisperoWorkers(nisperoIndex: Int) extends BaseMetaManagerCommand {

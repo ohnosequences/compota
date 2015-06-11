@@ -35,7 +35,10 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env {
           Thread.currentThread().setName(suffix)
           env.logger.debug("changing thread name to " + instanceId.id)
           env.environments.put(instanceId, env)
-          statement(env)
+          Try {
+            statement(env)
+          }
+          //env.reportError()
           Thread.currentThread().setName(oldName)
           env.environments.remove(env.instanceId)
         }

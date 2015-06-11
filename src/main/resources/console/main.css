@@ -12,6 +12,12 @@ body {
  * Global add-ons
  */
 
+@media screen and (min-width: 768px) {
+	#instanceStackTraceModal .modal-dialog  {width:900px;}
+	#viewInstanceLogModal .modal-dialog  {width:900px;}
+
+}
+
 .vspace20 {
     height: 20px;
 }
@@ -34,6 +40,9 @@ body {
     margin-bottom: 40px;
 }
 
+.marginLeft, .sshInstance, .terminateInstance, .instanceStackTrace, .viewInstanceLog  {
+    margin-left: 10px;
+}
 
 /* Sidebar navigation */
 .nav-sidebar {

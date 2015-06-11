@@ -13,6 +13,8 @@ description := "compota wordcount example"
 
 organization := "ohnosequences"
 
+scalaVersion := "2.10.4"
+
 //resolvers ++= Seq(
 //  "Era7 Releases"       at "http://releases.era7.com.s3.amazonaws.com",
 //  "Era7 Snapshots"      at "http://snapshots.era7.com.s3.amazonaws.com"
@@ -23,9 +25,9 @@ libraryDependencies ++= Seq(
   "ohnosequences" % "compota_2.10" % "0.9.1-SNAPSHOT"
 )
 
-resolvers +=  Resolver.url("era7" + " public ivy releases",  url("http://releases.era7.com.s3.amazonaws.com"))(Resolver.ivyStylePatterns)
+// resolvers +=  Resolver.url("era7" + " public ivy releases",  url("http://releases.era7.com.s3.amazonaws.com"))(Resolver.ivyStylePatterns)
 
-resolvers +=  Resolver.url("era7" + " public ivy snapshots",  url("http://snapshots.era7.com.s3.amazonaws.com"))(Resolver.ivyStylePatterns)
+// resolvers +=  Resolver.url("era7" + " public ivy snapshots",  url("http://snapshots.era7.com.s3.amazonaws.com"))(Resolver.ivyStylePatterns)
 
 resolvers += Resolver.sonatypeRepo("snapshots")
 
@@ -38,11 +40,11 @@ isPrivate := true
 //todo fix this name
 metadataObject := name.value
 
-dependencyOverrides += "ohnosequences" % "aws-scala-tools_2.10" % "0.7.1-SNAPSHOT"
+dependencyOverrides += "ohnosequences" %% "aws-scala-tools" % "0.7.1-SNAPSHOT"
 
-dependencyOverrides += "ohnosequences" % "aws-statika_2.10" % "1.0.1"
+dependencyOverrides += "ohnosequences" %% "aws-statika" % "1.0.1"
 
-dependencyOverrides += "ohnosequences" % "amazon-linux-ami_2.10" % "0.14.1"
+dependencyOverrides += "ohnosequences" %% "amazon-linux-ami" % "0.14.1"
 
 dependencyOverrides += "commons-codec" % "commons-codec" % "1.6"
 

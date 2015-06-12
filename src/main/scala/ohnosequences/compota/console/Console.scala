@@ -33,11 +33,11 @@ abstract class AnyConsole {
 
   def printErrorTable(lastToken: Option[String]): NodeSeq
 
-  def printErrorStackTrace(namespace: String, timestamp: String, instanceId: String): Try[String]
+  def getErrorStackTrace(instanceId: String, namespace: String, timestamp: String): Try[String]
 
-  def printErrorMessage(namespace: String, timestamp: String, instanceId: String): Try[String]
+  def getErrorMessage(instanceId: String, namespace: String, timestamp: String): Try[String]
 
-  def sendUndeployCommand(reason: String, force: Boolean): Unit
+  def sendForceUnDeployCommand(reason: String, message: String): Unit
 
   def printWorkers(nispero: String, lastToken: Option[String]): NodeSeq
 
@@ -51,17 +51,15 @@ abstract class AnyConsole {
 
   def shutdown(): Unit
 
-  def getInstanceLogRaw(instanceId: String): Try[Either[URL, String]]
+  def getLogRaw(instanceId: String, namespace: String = ""): Try[Either[URL, String]]
 
-  def printInstanceLog(instanceId: String): NodeSeq
+  def printLog(instanceId: String, namespace: String = ""): NodeSeq
 
-  def printInstanceStackTrace(instanceId: String): NodeSeq
+  def terminateInstance(instanceId: String): NodeSeq
 
-  def terminateInstance(id: String): NodeSeq
+  def sshInstance(instanceId: String): NodeSeq
 
-  def sshInstance(id: String): NodeSeq
-
-  def getNamespaceLog(id: String): Try[Either[URL, String]]
+  def stackTraceInstance(instanceId: String): NodeSeq
 
   def getMessage(queue: String, id: String): Try[Either[URL, String]]
 
@@ -118,41 +116,29 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
 
   override def password: String = compota.configuration.consolePassword
 
-
   override def isHTTPS: Boolean = compota.configuration.consoleHTTPS
 
   def compotaInfoPage: NodeSeq = {
     compotaInfoPageHeader ++ compotaInfoPageDetailsTable ++ compotaControlQueueDetails
   }
 
+//  def getLog()
+//
+//  override def printLog(instanceId: String, namespace: String): NodeSeq = {
+//    preResult(getLog(instanceId, namespace))
+//  }
 
+ // def getTerminateInstance(id: InstanceId): Try[String]
 
-  def getInstanceLog(instanceId: InstanceId): Try[String]
-
-  override def printInstanceLog(instanceId: String): NodeSeq = {
-    preResult(getInstanceLog(InstanceId(instanceId)))
-  }
-
-
-  def getSSHInstance(id: InstanceId): Try[String]
-
-  override def sshInstance(id: String): NodeSeq = {
-    preResult(getSSHInstance(InstanceId(id)))
-  }
-
-
-  def getTerminateInstance(id: InstanceId): Try[String]
-
-  override def terminateInstance(id: String): NodeSeq = {
-    preResult(getTerminateInstance(InstanceId(id)))
-  }
-
-
-  def getInstanceStackTrace(id: InstanceId): Try[String]
-
-  override def printInstanceStackTrace(instanceId: String): NodeSeq = {
-    preResult(getInstanceStackTrace(InstanceId(instanceId)))
-  }
+//  override def terminateInstance(id: String): NodeSeq = {
+//    preResult(getTerminateInstance(InstanceId(id)))
+//  }
+//
+//  def getInstanceStackTrace(id: InstanceId): Try[String]
+//
+//  override def printInstanceStackTrace(instanceId: String): NodeSeq = {
+//    preResult(getInstanceStackTrace(InstanceId(instanceId)))
+//  }
 
 
   def compotaInfoPageHeader: NodeSeq = {
@@ -221,18 +207,18 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
     queueStatus(controlQueueOp)
   }
 
-  def sidebar: NodeSeq = {
-    <ul class="nav nav-sidebar">
-      <li><a href="/"><strong>home</strong></a></li>
-    </ul>
-    <ul class="nav nav-sidebar">
-      {nisperosLinks()}
-    </ul>
-      <ul class="nav nav-sidebar">
-        <li><a href="/errorsPage">errors</a></li>
-        <li><a href="#" class="undeploy">undeploy</a></li>
-      </ul>
-  }
+//  def sidebar: NodeSeq = {
+//    <ul class="nav nav-sidebar">
+//      <li><a href="/"><strong>home</strong></a></li>
+//    </ul>
+//    <ul class="nav nav-sidebar">
+//      {nisperosLinks()}
+//    </ul>
+//      <ul class="nav nav-sidebar">
+//        <li><a href="/errorsPage">errors</a></li>
+//        <li><a href="#" class="undeploy">undeploy</a></li>
+//      </ul>
+//  }
 
   def nisperosLinks(): NodeSeq = {
     val l = for {(name, nispero) <- compota.nisperosNames}
@@ -346,7 +332,6 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
   def listErrorTable(lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ErrorTableItem])] = {
-    //logger.info(env.errorTable.listErrors(None, None).toString)
     env.errorTable.listErrors(lastToken, limit)
   }
 
@@ -357,10 +342,10 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   def printErrorTableItem(lastToken: Option[String], item: ErrorTableItem): Node = {
     <tr data-lastToken={lastToken.getOrElse("")}>
       <td>
-        <a href={"/logging/namespace/" + item.namespace.toString}>{item.namespace.toString}</a>
+        <a href={"/logging/" + item.instanceId + "/" + item.namespace.toString}>{item.namespace.toString}</a>
       </td>
       <td>
-        <a href={"/instance/" + item.instanceId.id + "/log"}>{item.instanceId.id}</a>
+        <a href={"/logging/" + item.instanceId.id}>{item.instanceId.id}</a>
       </td>
       <td>
         {item.formattedTime()}
@@ -374,11 +359,11 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
     </tr>
   }
 
-  def printErrorStackTrace(namespace: String, timestamp: String, instanceId: String): Try[String] = {
+  def getErrorStackTrace(namespace: String, timestamp: String, instanceId: String): Try[String] = {
     env.errorTable.getError(Namespace(namespace), timestamp.toLong, InstanceId(instanceId)).map(_.stackTrace)
   }
 
-  def printErrorMessage(namespace: String, timestamp: String, instanceId: String): Try[String] = {
+  def getErrorMessage(namespace: String, timestamp: String, instanceId: String): Try[String] = {
     env.errorTable.getError(Namespace(namespace), timestamp.toLong, InstanceId(instanceId)).map(_.message)
   }
 
@@ -482,7 +467,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
 
   def name: String = compota.configuration.name
 
-  def sendUndeployCommand(reason: String, force: Boolean): Unit = {
+  def sendForceUnDeployCommand(reason: String, message: String): Unit = {
     compota.sendForceUnDeployCommand(env, reason, reason)
   }
 

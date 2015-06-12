@@ -10,14 +10,15 @@ import ohnosequences.compota.graphs.{QueueChecker}
 import ohnosequences.compota.local.metamanager.{LocalMetaManager}
 import ohnosequences.compota.metamanager.{ForceUnDeploy, UnDeploy}
 import ohnosequences.compota.queues.{AnyQueueOp, AnyQueueReducer}
-import ohnosequences.compota.{AnyCompota}
+import ohnosequences.compota.{Namespace, AnyCompota}
 import ohnosequences.logging.{FileLogger, Logger}
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ListBuffer
 
 import scala.util.{Failure, Success, Try}
 
-trait AnyLocalCompota extends AnyCompota {
+trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
+
   override type CompotaEnvironment = LocalEnvironment
   override type CompotaNispero = AnyLocalNispero
 
@@ -37,7 +38,7 @@ trait AnyLocalCompota extends AnyCompota {
     }
   }
 
-  val environments = new ConcurrentHashMap[InstanceId, LocalEnvironment]()
+  val environments = new ConcurrentHashMap[(InstanceId, Namespace), LocalEnvironment]()
 
   private val initialEnvironment_ = new AtomicReference[Option[LocalEnvironment]](None)
   override def initialEnvironment: Try[LocalEnvironment] = {
@@ -53,6 +54,7 @@ trait AnyLocalCompota extends AnyCompota {
           configuration.workingDirectory.mkdir()
           new LocalEnvironment(
             instanceId = configuration.initialEnvironmentId,
+            namespace = Namespace.root,
             workingDirectory = configuration.workingDirectory,
             logger = logger,
             executor = executor,
@@ -69,23 +71,25 @@ trait AnyLocalCompota extends AnyCompota {
     }
   }
 
-  def terminateInstance(instanceId: InstanceId): Try[Unit] = {
-    Option(environments.get(instanceId)) match {
+  def terminateInstance(instance: InstanceId): Try[Unit] = {
+    environments.find { case ((inst, ns), env) =>
+      instance.id.equals(inst.id)
+    } match {
       case None => Success(()) //so idempotent
-      case Some(env) => {
+      case Some(((inst, ns), env)) => {
         env.stop()
         Success(())
       }
     }
   }
 
-  override val metaManager = new LocalMetaManager[CompotaUnDeployActionContext](AnyLocalCompota.this)
+  override val metaManager = new LocalMetaManager[CompotaUnDeployActionContext](anyLocalCompota)
 
-  def getInstanceLog(logger: Logger, instanceId: InstanceId): Try[String] = {
-    logger.info("looking for instance " + instanceId.id)
-    logger.info("known instances: " + environments.keys().toList)
-    Option(environments.get(instanceId)) match {
-      case None => Failure(new Error("instance " + instanceId.id + " not found"))
+  def getLog(logger: Logger, instanceId: InstanceId, namespace: Namespace): Try[String] = {
+    logger.info("looking for namespace " + namespace.toString)
+   // logger.info("known instances: " + environments.keys().toList)
+    Option(environments.get(namespace)) match {
+      case None => Failure(new Error("namespace " + namespace.toString + " not found"))
       case Some(env) => {
         Try {
           val log = scala.io.Source.fromFile(env.logger.logFile).getLines().mkString(System.lineSeparator())
@@ -96,14 +100,23 @@ trait AnyLocalCompota extends AnyCompota {
   }
 
 
-  private def workerSubId(nispero: AnyLocalNispero, id: Int): String = {
+  private def workerSubspace(nispero: AnyLocalNispero, id: Int): String = {
     "worker_" + nispero.configuration.name + "_" + id
   }
 
+  private def workerNamespace(nispero: AnyLocalNispero, id: Int): Namespace = {
+    Namespace.root / workerSubspace(nispero, id)
+  }
+
+  private def workerInstanceNamespace(nispero: AnyLocalNispero, id: Int): (InstanceId, Namespace) = {
+    val s = workerSubspace(nispero, id)
+    (InstanceId(s), Namespace.root / s)
+  }
+
   def launchWorker(nispero: AnyLocalNispero, id: Int): Try[LocalEnvironment] = {
-    val subId = workerSubId(nispero, id)
+    val subId = workerSubspace(nispero, id)
     initialEnvironment.flatMap { iEnv =>
-      iEnv.subEnvironmentAsync(subId) { env =>
+      iEnv.subEnvironmentAsync(subId, instanceId = InstanceId(subId)) { env =>
         nispero.worker.start(env)
       }
     }
@@ -131,7 +144,7 @@ trait AnyLocalCompota extends AnyCompota {
     //logger.debug("envs: " + )
     Try {
       for (i <- 1 to nispero.configuration.workers) {
-        terminateInstance(configuration.initialEnvironmentId.subInstance(workerSubId(nispero, i))).get
+        terminateInstance(workerInstanceNamespace(nispero, i)._1).get
       }
     }
   }
@@ -140,7 +153,7 @@ trait AnyLocalCompota extends AnyCompota {
     Try {
       val res = new ListBuffer[CompotaEnvironment]()
       for (i <- 1 to nispero.configuration.workers) {
-        Option(environments.get(configuration.initialEnvironmentId.subInstance(workerSubId(nispero, i)))).foreach { e =>
+        Option(environments.get(workerNamespace(nispero, i))).foreach { e =>
           res += e
         }
       }
@@ -157,12 +170,32 @@ trait AnyLocalCompota extends AnyCompota {
     }
   }
 
-  def getInstanceStackTrace(instanceId: InstanceId): Try[String] = {
-    Option(environments.get(instanceId)) match {
-      case None => Failure(new Error("instance " + instanceId + " does not exist"))
+  def getStackTrace(instance: InstanceId, namespace: Namespace): Try[String] = {
+    Option(environments.get((instance, namespace))) match {
+      case None => Failure(new Error("instance " + instance.id + " with namespace " + namespace.toString + " does not exist"))
       case Some(e) => {
         e.getThreadInfo match {
-          case None => Failure(new Error("couldn't get stack trace for " + instanceId))
+          case None => Failure(new Error("couldn't get stack trace for " + namespace.toString))
+          case Some((t, a)) => {
+            val stackTrace = new StringBuffer()
+            a.foreach { s =>
+              stackTrace.append("at " + s.toString + System.lineSeparator())
+            }
+            Success(stackTrace.toString)
+          }
+        }
+      }
+    }
+  }
+
+  def getStackTrace(instance: InstanceId): Try[String] = {
+    environments.find { case ((inst, ns), env) =>
+      instance.id.equals(inst.id)
+    } match {
+      case None => Failure(new Error("instance " + instance.id + " does not exist"))
+      case Some(((inst, ns), env)) => {
+        env.getThreadInfo match {
+          case None => Failure(new Error("couldn't get stack trace for " + instance.id))
           case Some((t, a)) => {
             val stackTrace = new StringBuffer()
             a.foreach { s =>

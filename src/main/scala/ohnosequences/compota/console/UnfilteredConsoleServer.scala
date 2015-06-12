@@ -47,7 +47,7 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
     }
 
     case GET(Path("/undeploy")) => {
-      console.sendUndeployCommand("adhoc", force = true)
+      console.sendForceUnDeployCommand("terminated from console", "terminated from console")
       ResponseString("undeploy message was sent")
     }
 
@@ -82,20 +82,12 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
       ResponseString(console.printMessages(queueName, Some(lastToken)).toString())
     }
 
-    case GET(Path(Seg("logging" :: "instance" :: instanceId :: Nil))) => {
-      console.getInstanceLogRaw(instanceId) match {
-        case Success(Left(url)) => Redirect(url.toString)
-        case Success(Right(log)) => ResponseString(log)
-        case Failure(t) => NotFound
-      }
+    case GET(Path(Seg("logging" :: instanceId :: Nil))) => {
+      ResponseString(console.printLog(instanceId).toString())
     }
 
-    case GET(Path(Seg("logging" :: "namespace" :: namespace :: Nil))) => {
-      console.getNamespaceLog(namespace) match {
-        case Success(Left(url)) => Redirect(url.toString)
-        case Success(Right(log)) => ResponseString(log)
-        case Failure(t) => NotFound
-      }
+    case GET(Path(Seg("logging" :: instanceId :: namespace :: Nil))) => {
+      ResponseString(console.printLog(instanceId, namespace).toString())
     }
 
 
@@ -112,16 +104,20 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
     }
 
 
-    case GET(Path(Seg("instance" :: instanceId :: "log" :: "raw" :: Nil))) => {
-      console.getInstanceLogRaw(instanceId) match {
+    case GET(Path(Seg("logging" :: "raw" :: instanceId :: Nil))) => {
+      console.getLogRaw(instanceId) match {
         case Success(Left(url)) => Redirect(url.toString)
         case Success(Right(log)) => ResponseString(log)
         case Failure(t) => NotFound
       }
     }
 
-    case GET(Path(Seg("instance" :: instanceId :: "log" :: Nil))) => {
-      ResponseString(console.printInstanceLog(instanceId).toString)
+    case GET(Path(Seg("logging" :: "raw" :: instanceId :: namespace :: Nil))) => {
+      console.getLogRaw(instanceId, namespace) match {
+        case Success(Left(url)) => Redirect(url.toString)
+        case Success(Right(log)) => ResponseString(log)
+        case Failure(t) => NotFound
+      }
     }
 
 
@@ -130,18 +126,18 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
     }
 
     case GET(Path(Seg("instance" :: id :: "stackTrace" :: Nil))) => {
-      ResponseString(console.printInstanceStackTrace(id).toString)
+      ResponseString(console.stackTraceInstance(id).toString)
     }
 
     case GET(Path(Seg("error" :: "message" :: namespase :: timestamp :: instanceId ::  Nil))) => {
-      console.printErrorMessage(namespase, timestamp, instanceId) match {
+      console.getErrorMessage(namespase, timestamp, instanceId) match {
         case Success(s) => ResponseString(s)
         case Failure(t) => NotFound
       }
     }
 
     case GET(Path(Seg("error" :: "stackTrace" :: namespase :: timestamp :: instanceId ::  Nil))) => {
-      console.printErrorStackTrace(namespase, timestamp, instanceId) match {
+      console.getErrorStackTrace(namespase, timestamp, instanceId) match {
         case Success(s) => ResponseString(s)
         case Failure(t) => NotFound
       }

@@ -22,11 +22,15 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
                                          nisperoGraph: QueueChecker[LocalEnvironment]) extends
   Console[LocalEnvironment, N, AnyLocalCompota.of2[N]](localCompota, env, controlQueueOp, nisperoGraph) {
 
-  override def getNamespaceLog(id: String): Try[Either[URL, String]] = {
-    Try {
-      val log = scala.io.Source.fromFile(localCompota.configuration.taskLogFile(new Namespace(id))).getLines().mkString
-      Right(log)
+
+  override def getLogRaw(instanceId: String, namespace: String): Try[Either[URL, String]] = {
+    localCompota.getLog(env.logger, InstanceId(instanceId), Namespace(namespace)).map { s =>
+      Right(s)
     }
+  }
+
+  override def printLog(instanceId: String, namespace: String): NodeSeq = {
+    preResult(localCompota.getLog(env.logger, InstanceId(instanceId), Namespace(namespace)))
   }
 
   override def sidebar: NodeSeq = {
@@ -38,6 +42,7 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
     </ul>
       <ul class="nav nav-sidebar">
         <li><a href="/errorsPage">errors</a></li>
+        <li><a href="/namespaces">namespaces</a></li>
         <li><a href="/threads">threads</a></li>
         <li><a href="#" class="undeploy">undeploy</a></li>
       </ul>
@@ -47,17 +52,9 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
     logger.info("shutdown")
   }
 
-  override def getTerminateInstance(id: InstanceId): Try[String] = {
-    localCompota.terminateInstance(id).map(_ => "instance " + id.id  + " terminated")
-  }
 
-  override def getInstanceLogRaw(instanceId: String): Try[Either[URL, String]] = {
-    localCompota.getInstanceLog(logger, InstanceId(instanceId)).map(Right(_))
-  }
-
-
-  override def getInstanceLog(instanceId: InstanceId): Try[String] = {
-    localCompota.getInstanceLog(logger, instanceId)
+  override def terminateInstance(instanceId: String): NodeSeq = {
+    preResult(localCompota.terminateInstance(InstanceId(instanceId)).map(_ => "instance " + instanceId  + " terminated"))
   }
 
   case class ListWorkerInfoLocal(env: LocalEnvironment) extends AnyWorkerInfo {
@@ -126,11 +123,6 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
     </table>
   }
 
-
-  override def getSSHInstance(id: InstanceId): Try[String] = {
-    Failure(new Error("ssh is not supported by local nispero"))
-  }
-
   override def compotaInfoPageDetailsTable: NodeSeq = {
     <table class="table table-striped topMargin20">
       <tbody>
@@ -152,9 +144,15 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
   }
 
 
-  override def getInstanceStackTrace(id: InstanceId): Try[String] = {
-    localCompota.getInstanceStackTrace(id)
+
+
+
+
+  override def stackTraceInstance(instanceId: String): NodeSeq = {
+    preResult(localCompota.getStackTrace(InstanceId(instanceId)))
   }
+
+  override def sshInstance(instanceId: String): NodeSeq = xml.NodeSeq.Empty
 
   override def mainHTML: String = {
     scala.io.Source.fromFile(new File("E:\\reps\\compota\\src\\main\\resources\\console\\main.html")).getLines().mkString(System.lineSeparator())

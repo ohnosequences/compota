@@ -1,7 +1,7 @@
 package ohnosequences.compota.aws
 
 
-import ohnosequences.compota.console.Console
+import ohnosequences.compota.console.{AnyWorkerInfo, Console}
 import ohnosequences.compota.environment.InstanceId
 import ohnosequences.compota.graphs.QueueChecker
 import ohnosequences.compota.queues.AnyQueueOp
@@ -18,28 +18,29 @@ class AwsConsole[N <: AnyAwsNispero](awsCompota: AnyAwsCompota.ofN[N],
                                          controlQueueOp: AnyQueueOp,
                                          queueChecker: QueueChecker[AwsEnvironment]) extends
 Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp, queueChecker) {
-
-  override def getInstanceLog(instanceId: InstanceId): Try[String] = {
-
-  }
-
   override def compotaInfoPageDetailsTable: NodeSeq = ???
-
-  override def getInstanceStackTrace(id: InstanceId): Try[String] = ???
-
-  override def getSSHInstance(id: InstanceId): Try[String] = ???
-
-  override def getTerminateInstance(id: InstanceId): Try[String] = ???
 
   override def nisperoInfoDetails(nispero: N): NodeSeq = ???
 
   override def listWorkers(nispero: String, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ListWorkerInfo])] = ???
 
-  override type ListWorkerInfo = this.type
+  class AwsWorkerInfo extends AnyWorkerInfo {
+    override def instanceId: InstanceId = ???
+  }
+
+  override type ListWorkerInfo = AwsWorkerInfo
+
+  override def printLog(instanceId: String, namespace: String): NodeSeq = ???
 
   override def shutdown(): Unit = ???
 
-  override def getNamespaceLog(id: String): Try[Either[URL, String]] = ???
+  override def terminateInstance(instanceId: String): NodeSeq = ???
 
-  override def getInstanceLogRaw(instanceId: String): Try[Either[URL, String]] = ???
+  override def getLogRaw(instanceId: String, namespace: String): Try[Either[URL, String]] = ???
+
+  override def sidebar: NodeSeq = ???
+
+  override def sshInstance(instanceId: String): NodeSeq = xml.NodeSeq.Empty
+
+  override def stackTraceInstance(instanceId: String): NodeSeq = ???
 }

@@ -19,7 +19,7 @@ class LocalEnvironment(val instanceId: InstanceId,
                        val errorTable: LocalErrorTable,
                        val configuration: AnyLocalCompotaConfiguration,
                        val sendForceUnDeployCommand0: (LocalEnvironment, String, String) => Try[Unit],
-                       val environments: ConcurrentHashMap[Namespace, LocalEnvironment],
+                       val environments: ConcurrentHashMap[(InstanceId, Namespace), LocalEnvironment],
                        val rootEnvironment0: Option[LocalEnvironment],
                        val origin: Option[LocalEnvironment],
                        val localErrorCounts: AtomicInteger
@@ -33,7 +33,7 @@ class LocalEnvironment(val instanceId: InstanceId,
   }
 
 
-  override def subEnvironmentSync[R](subSpace: String)(statement: LocalEnvironment => R): Try[(LocalEnvironment, R)] = {
+  override def subEnvironmentSync[R](subSpace: String, instanceId: InstanceId = localEnvironment.instanceId)(statement: LocalEnvironment => R): Try[(LocalEnvironment, R)] = {
     Try {
       val newWorkingDirectory = new File(workingDirectory, subSpace)
       newWorkingDirectory.mkdir()
@@ -41,7 +41,7 @@ class LocalEnvironment(val instanceId: InstanceId,
         instanceId = instanceId,
         namespace = namespace./(subSpace),
         workingDirectory = newWorkingDirectory,
-        logger = logger.subLogger(subSpace, true),
+        logger = logger.subLogger(subSpace, reportToOriginal = true),
         executor = executor,
         errorTable = errorTable,
         configuration = configuration,

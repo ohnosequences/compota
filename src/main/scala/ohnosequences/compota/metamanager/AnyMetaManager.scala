@@ -99,7 +99,7 @@ trait AnyMetaManager {
         val logger = env.logger
         logger.debug("reading message from control queue")
         reader.waitForMessage(logger, {env.isStopped}).recoverWith { case t => {
-            env.reportError(Namespace.metaManager / Namespace.controlQueue, new Error("couldn't receive message from control queue", t))
+            env.reportError(new Error("couldn't receive message from control queue", t), env.namespace / Namespace.controlQueue)
             Failure(t)
           }
         }.flatMap {
@@ -111,13 +111,13 @@ trait AnyMetaManager {
             logger.debug("parsing message " + printMessage(message.id))
             //logger.info(message.getBody.toString)
             message.getBody.recoverWith { case t =>
-              env.reportError(Namespace.metaManager / Namespace.controlQueue, new Error("couldn't parse message " + printMessage(message.id) + " from control queue", t))
+              env.reportError(new Error("couldn't parse message " + printMessage(message.id) + " from control queue", t), env.namespace / Namespace.controlQueue)
               Failure(t)
             }.flatMap {
               case None => {
                 logger.warn("message " + printMessage(message.id) + " is deleted")
                 queueOp.deleteMessage(message).recoverWith { case t =>
-                  env.reportError(Namespace.metaManager / Namespace.controlQueue, new Error("couldn't delete message " + printMessage(message.id) + " from control queue", t))
+                  env.reportError(new Error("couldn't delete message " + printMessage(message.id) + " from control queue", t), env.namespace / message.id)
                   Failure(t)
                 }
               }
@@ -132,17 +132,17 @@ trait AnyMetaManager {
                     process(body, env, queueOp, queueOps, queueChecker) match {
                       case Failure(t) => {
                         //command processing failure
-                        env.reportError(Namespace.metaManager / body.prefix, t)
+                        env.reportError(t, env.namespace / message.id)
                       }
                       case Success(commands) => {
                         logger.debug("writing result: " + printMessage(commands.toString))
                         writer.writeRaw(commands.map { c => (printMessage(c.prefix) + "_" + System.currentTimeMillis(), c)}).recoverWith { case t =>
-                          env.reportError(Namespace.metaManager / Namespace.controlQueue, new Error("couldn't write message to control queue", t))
+                          env.reportError(new Error("couldn't write message to control queue", t), env.namespace / Namespace.controlQueue)
                           Failure(t)
                         }.flatMap { written =>
                           logger.debug("deleting message: " + printMessage(message.id))
                           queueOp.deleteMessage(message).recoverWith { case t =>
-                            env.reportError(Namespace.metaManager / Namespace.controlQueue, new Error("couldn't delete message " + printMessage(message.id) + " from control queue", t))
+                            env.reportError(new Error("couldn't delete message " + printMessage(message.id) + " from control queue", t), env.namespace / message.id)
                             Failure(t)
                           }
                         }
@@ -171,12 +171,11 @@ trait AnyMetaManager {
     while (!env.isStopped) {
 
         QueueChecker(env, compota.nisperoGraph).recoverWith { case t =>
-          env.reportError(Namespace.metaManager / "nispero_graph", new Error("failed to create nispero graph", t))
+          env.reportError(new Error("failed to create nispero graph", t), env.namespace / Namespace.queueChecker)
           Failure(t)
         }.flatMap { queueChecker =>
-
           compota.startedTime(env).recoverWith { case t =>
-            env.reportError(Namespace.metaManager / "init", new Error("failed detect compota starting time", t))
+            env.reportError(new Error("failed detect compota starting time", t), env.namespace / "start_time")
             Failure(t)
           }.flatMap { startedTime =>
             logger.debug("creating control queue context")
@@ -204,7 +203,7 @@ trait AnyMetaManager {
             }
           }
         }.recover { case t =>
-          env.reportError(Namespace.metaManager / Namespace.controlQueue / "init", new Error("Couldn't initiate control queue", t))
+          env.reportError(new Error("Couldn't initiate control queue", t), env.namespace / Namespace.controlQueue)
         }
       }
 

@@ -2,6 +2,8 @@ package ohnosequences.compota
 
 object Namespace {
 
+
+
   val separator = "."
 
   val root = Namespace(List[String]())
@@ -9,6 +11,8 @@ object Namespace {
   val metaManager = "metamanager"
 
   val controlQueue = "control_queue"
+
+  val queueChecker = "queue_checker"
 
   val terminationDaemon = "termination_daemon"
 
@@ -19,6 +23,14 @@ object Namespace {
   val worker = "worker"
 
   def unapply(list: List[String]): Namespace = Namespace(list)
+
+  def apply(s: String): Namespace = {
+    if (s.isEmpty) {
+      root
+    } else {
+      Namespace(s.split('.').toList)
+    }
+  }
 }
 
 

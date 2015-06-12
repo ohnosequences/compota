@@ -54,10 +54,11 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
   def launchLogUploader(): Unit = {
     initialEnvironment.map { env =>
       env.logger.info("starting log uploader")
-      configuration.loggingLocation(env.instanceId) match {
+
+      env.logger.loggingDestination match {
         case None => env.logger.info("log uploader is disabled")
         case Some(loggerDestination) => {
-          env.subEnvironmentAsync("logUploader") { logEnv =>
+          env.subEnvironmentAsync(Namespace.logUploader) { logEnv =>
             @tailrec
             def launchLogUploaderRec(timeout: Duration = configuration.logUploaderTimeout): Unit = {
               if(env.isStopped) {
@@ -67,7 +68,7 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
                 Thread.sleep(timeout.toMillis)
                 env.logger.info("uploading log " + logEnv.logger.logFile.getAbsolutePath + " to " + loggerDestination)
                 logEnv.logger.uploadLog() match {
-                  case Failure(t) => logEnv.reportError(Namespace.logUploader, t)
+                  case Failure(t) => logEnv.reportError(t)
                   case Success(uploaded) => launchLogUploaderRec(timeout)
                 }
               }
@@ -100,13 +101,14 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
           ec2InstanceId,
           configuration.loggingDirectory,
           "log.txt",
-          configuration.loggingLocation(ec2InstanceId),
+          configuration.loggingDestination(InstanceId(ec2InstanceId), Namespace.root),
           debug = configuration.loggingDebug,
           printToConsole = configuration.loggersPrintToConsole
         ).flatMap { logger =>
           AwsErrorTable.apply(logger, configuration.errorTable, awsClients).map { errorTable =>
             new AwsEnvironment(
               instanceId = InstanceId(ec2InstanceId),
+              namespace = Namespace.root,
               configuration = configuration,
               awsClients = awsClients,
               logger = logger,
@@ -114,7 +116,7 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
               executor = executor,
               errorTable = errorTable,
               sendForceUnDeployCommand0 = sendForceUnDeployCommand,
-              environments = new ConcurrentHashMap[InstanceId, AwsEnvironment],
+              environments = new ConcurrentHashMap[(InstanceId, Namespace), AwsEnvironment](),
               rootEnvironment0 = None,
               origin = None,
               localErrorCounts = new AtomicInteger(0)

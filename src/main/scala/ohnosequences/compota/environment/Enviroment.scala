@@ -24,24 +24,24 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
 
   def rootEnvironment: E
 
-  val environments: ConcurrentHashMap[Namespace, E]
+  val environments: ConcurrentHashMap[(InstanceId, Namespace), E]
 
-  def subEnvironmentSync[R](subSpace: String)(statement: E => R): Try[(E, R)]
+  def subEnvironmentSync[R](subSpace: String, instanceId: InstanceId = anyEnvironment.instanceId)(statement: E => R): Try[(E, R)]
 
-  def subEnvironmentAsync(subSpace: String)(statement: E => Unit): Try[E] = {
+  def subEnvironmentAsync(subSpace: String, instanceId: InstanceId = anyEnvironment.instanceId)(statement: E => Unit): Try[E] = {
     subEnvironmentSync(subSpace) { env =>
       executor.execute(new Runnable {
         override def run(): Unit = {
           val oldName = Thread.currentThread().getName
           Thread.currentThread().setName(env.namespace.toString)
           env.logger.debug("changing thread name to " + instanceId.id)
-          env.environments.put(env.namespace, env)
+          env.environments.put((instanceId, env.namespace), env)
           Try {
             statement(env)
           }
           //env.reportError()
           Thread.currentThread().setName(oldName)
-          env.environments.remove(env.namespace)
+          env.environments.remove((instanceId, env.namespace))
         }
       })
     }.map(_._1)
@@ -69,12 +69,12 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
    * all repeats are here, "5 errors - reboot,  10 errors - undeplot compota
    * shouldn't do nothing if env is terminated
    */
-  def reportError(t: Throwable, subSpace: Option[String]): Unit = {
+  def reportError(t: Throwable, namespace: Namespace = namespace): Unit = {
 
-    val namespace = subSpace match {
-      case None => anyEnvironment.namespace
-      case Some(sub) => anyEnvironment.namespace / sub
-    }
+//    val namespace = subSpace match {
+//      case None => anyEnvironment.namespace
+//      case Some(sub) => anyEnvironment.namespace / sub
+//    }
 
     val sb = new StringBuilder
     logger.printThrowable(t, { e =>

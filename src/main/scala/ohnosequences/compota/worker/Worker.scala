@@ -1,6 +1,6 @@
 package ohnosequences.compota.worker
 
-import ohnosequences.compota.Instructions
+import ohnosequences.compota.{Namespace, Instructions}
 import ohnosequences.compota.environment.AnyEnvironment
 import ohnosequences.compota.queues.{AnyQueue, AnyQueueOp}
 import org.apache.commons.io.FileUtils
@@ -110,7 +110,7 @@ class Worker[In, Out, Env <: AnyEnvironment[Env], InContext, OutContext, IQ <: A
               case Some(input) =>
                 logger.info("received: " + input.toString.take(100) + " id: " + message.id)
 
-                env.subEnvironmentSync(message.id) { env =>
+                env.subEnvironmentSync(Left(message.id)) { env =>
                   val logger = env.logger
 
                   logger.debug("running " + nisperoName + " instructions")

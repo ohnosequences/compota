@@ -50,7 +50,7 @@ object wordCountCompotaConfiguration extends AnyLocalCompotaConfiguration {
   override val loggerDebug: Boolean = true
   override val timeout= Duration(100, SECONDS)
   override val terminationDaemonIdleTime =  Duration(10, SECONDS)
-  override val visibilityTimeout: Duration = Duration(5, SECONDS)
+  override val visibilityTimeout: Duration = Duration(15, SECONDS)
 
   override def errorThreshold: Int = 3
 }

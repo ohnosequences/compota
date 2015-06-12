@@ -23,7 +23,7 @@ class ErrorTableTest {
           fail(error.toString)
           Failure(error)
         }.foreach { table =>
-          val namespace = new Namespace("test") / "errorTable"
+          val namespace = Namespace("test") / "errorTable"
           val count = 50
           for (i <- 1 to count) {
             val testError = new Error("test error " + i)

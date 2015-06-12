@@ -1,6 +1,6 @@
 package ohnosequences.compota.metamanager
 
-import ohnosequences.compota.TerminationDaemon
+import ohnosequences.compota.{Namespace, TerminationDaemon}
 import ohnosequences.compota.console.AnyConsole
 import ohnosequences.compota.graphs.QueueChecker
 import ohnosequences.compota.queues.AnyQueueOp
@@ -35,7 +35,7 @@ trait BaseMetaManager extends AnyMetaManager {
     command match {
 
       case LaunchConsole => {
-        env.subEnvironmentAsync("console") { env =>
+        env.subEnvironmentAsync(Left(Namespace.console)) { env =>
           compota.launchConsole(queueChecker, controlQueueOp, env)
         }.map { tEnv =>
           List[BaseMetaManagerCommand](LaunchTerminationDaemon)
@@ -43,7 +43,7 @@ trait BaseMetaManager extends AnyMetaManager {
       }
 
       case LaunchTerminationDaemon => {
-        env.subEnvironmentAsync("terminationDaemon") { env =>
+        env.subEnvironmentAsync(Left(Namespace.terminationDaemon)) { env =>
           compota.launchTerminationDaemon(queueChecker, env)
         }.map { tEnv =>
           List[BaseMetaManagerCommand](AddTasks)

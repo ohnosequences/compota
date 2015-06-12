@@ -9,7 +9,9 @@ import ohnosequences.logging.Logger
 import java.io.File
 import scala.util.{Success, Failure, Try}
 
-case class InstanceId(id: String)
+case class InstanceId(id: String) {
+  override def toString: String = id
+}
 //{
 //  def subInstance(subId: String) = InstanceId(id + "_" + subId)
 //}
@@ -26,22 +28,21 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
 
   val environments: ConcurrentHashMap[(InstanceId, Namespace), E]
 
-  def subEnvironmentSync[R](subSpace: String, instanceId: InstanceId = anyEnvironment.instanceId)(statement: E => R): Try[(E, R)]
+  def subEnvironmentSync[R](subspaceOrInstance: Either[String, InstanceId])(statement: E => R): Try[(E, R)]
 
-  def subEnvironmentAsync(subSpace: String, instanceId: InstanceId = anyEnvironment.instanceId)(statement: E => Unit): Try[E] = {
-    subEnvironmentSync(subSpace) { env =>
+  def subEnvironmentAsync(subspaceOrInstance: Either[String, InstanceId])(statement: E => Unit): Try[E] = {
+    subEnvironmentSync(subspaceOrInstance) { env =>
       executor.execute(new Runnable {
         override def run(): Unit = {
           val oldName = Thread.currentThread().getName
-          Thread.currentThread().setName(env.namespace.toString)
           env.logger.debug("changing thread name to " + instanceId.id)
-          env.environments.put((instanceId, env.namespace), env)
+         // env.environments.put((instanceId, env.namespace), env)
           Try {
             statement(env)
           }
           //env.reportError()
           Thread.currentThread().setName(oldName)
-          env.environments.remove((instanceId, env.namespace))
+         // env.environments.remove((instanceId, env.namespace))
         }
       })
     }.map(_._1)

@@ -71,6 +71,9 @@ class AwsWordCount {
 
     override def metadata: AnyMetadata = compotaMetadata
 
+
+    override def logUploaderTimeout: Duration = Duration(1, MINUTES)
+
     override val loggerDebug: Boolean = true
     override val deleteErrorQueue: Boolean = false
     override val timeout: Duration = Duration(1, HOURS)

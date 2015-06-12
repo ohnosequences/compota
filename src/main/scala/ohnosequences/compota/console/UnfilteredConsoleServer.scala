@@ -61,6 +61,17 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
       HtmlCustom(mainPage)
     }
 
+
+    case GET(Path("/namespacePage")) => {
+
+      val page = console.mainHTML.mkString
+        .replace("@main", console.namespacePage.toString())
+        .replace("@sidebar", console.sidebar.toString())
+        .replace("$name$", console.name)
+
+      HtmlCustom(page)
+    }
+
     case GET(Path(Seg("errors" :: Nil))) => {
       ResponseString(console.printErrorTable(None).toString())
     }

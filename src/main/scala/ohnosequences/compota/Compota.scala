@@ -45,7 +45,7 @@ trait AnyCompota {
 
   def launchMetaManager(): Try[CompotaEnvironment] = {
     initialEnvironment.flatMap { iEnv =>
-      iEnv.subEnvironmentAsync("metamanager") { env =>
+      iEnv.subEnvironmentAsync(Left(Namespace.metaManager)) { env =>
         metaManager.launchMetaManager(env)
       }
     }
@@ -58,7 +58,7 @@ trait AnyCompota {
 
   def launchWorker(nispero: CompotaNispero): Try[CompotaEnvironment] = {
     initialEnvironment.flatMap { iEnv =>
-      iEnv.subEnvironmentAsync("worker") { env =>
+      iEnv.subEnvironmentAsync(Left(Namespace.worker)) { env =>
         nispero.worker.start(env)
       }
     }
@@ -118,7 +118,7 @@ trait AnyCompota {
   def deleteManager(env: CompotaEnvironment): Try[Unit]
 
   def launchTerminationDaemon(queueChecker: QueueChecker[CompotaEnvironment], env: CompotaEnvironment): Try[TerminationDaemon[CompotaEnvironment]] = {
-    env.logger.info("TERMINATION DAEMON IS HERE!")
+    //env.logger.info("TERMINATION DAEMON IS HERE!")
     startedTime(env).flatMap { t =>
       val td = new TerminationDaemon[CompotaEnvironment](
         compota = anyCompota,

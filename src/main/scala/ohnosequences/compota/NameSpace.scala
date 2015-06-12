@@ -12,6 +12,8 @@ object Namespace {
 
   val controlQueue = "control_queue"
 
+  val console = "console"
+
   val queueChecker = "queue_checker"
 
   val terminationDaemon = "termination_daemon"

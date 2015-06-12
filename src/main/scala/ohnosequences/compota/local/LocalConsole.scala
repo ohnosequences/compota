@@ -42,7 +42,7 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
     </ul>
       <ul class="nav nav-sidebar">
         <li><a href="/errorsPage">errors</a></li>
-        <li><a href="/namespaces">namespaces</a></li>
+        <li><a href="/namespacePage">namespaces</a></li>
         <li><a href="/threads">threads</a></li>
         <li><a href="#" class="undeploy">undeploy</a></li>
       </ul>
@@ -144,9 +144,13 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
   }
 
 
+  def printNamespaceTable(): NodeSeq = {
+    logger.info(localCompota.environments.toString)
 
-
-
+    localCompota.environments.toList.map { case ((inst, ns), env) =>
+      printNamespaceItem(env)
+    }
+  }
 
   override def stackTraceInstance(instanceId: String): NodeSeq = {
     preResult(localCompota.getStackTrace(InstanceId(instanceId)))

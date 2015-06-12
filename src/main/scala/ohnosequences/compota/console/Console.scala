@@ -7,7 +7,7 @@ import ohnosequences.compota.aws.queues.DynamoDBQueueOP
 import ohnosequences.compota.graphs.{QueueChecker, NisperoGraph}
 import ohnosequences.compota._
 import ohnosequences.compota.environment.{AnyEnvironment, InstanceId}
-import ohnosequences.compota.local.LocalQueueOp
+import ohnosequences.compota.local.{LocalEnvironment, LocalQueueOp}
 import ohnosequences.compota.queues.{AnyQueueOp, AnyQueue}
 import ohnosequences.logging.Logger
 
@@ -28,6 +28,8 @@ abstract class AnyConsole {
   def isHTTPS = true
 
   def errorsPage: NodeSeq
+
+  def namespacePage: NodeSeq
 
   def nisperoInfoPage(nisperoName: String): NodeSeq
 
@@ -139,6 +141,39 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
 //  override def printInstanceStackTrace(instanceId: String): NodeSeq = {
 //    preResult(getInstanceStackTrace(InstanceId(instanceId)))
 //  }
+
+
+  override def namespacePage: NodeSeq = {
+    <h2>Instances and namespaces</h2>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th class="col-md-3">instance</th>
+            <th class="col-md-3">namespace</th>
+            <th class="col-md-3">stack trace</th>
+          </tr>
+        </thead>
+        <tbody id ="namspacesTableBody">
+          {printNamespaceTable()}
+        </tbody>
+      </table>
+  }
+
+  def printNamespaceTable(): NodeSeq
+
+  def printNamespaceItem(env: LocalEnvironment): Node = {
+    <tr>
+      <td>
+        <a href={"/logging/raw/" + env.instanceId.id}>{env.instanceId.id}</a>
+      </td>
+      <td>
+        <a href={"/logging/raw/" + env.instanceId.id + "/" + env.namespace}>{env.namespace.toString}</a>
+      </td>
+      <td>
+        <a href={"/instance/" + env.instanceId.id + "/" + "stackTrace"}>stack trace</a>
+      </td>
+    </tr>
+  }
 
 
   def compotaInfoPageHeader: NodeSeq = {
@@ -342,7 +377,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   def printErrorTableItem(lastToken: Option[String], item: ErrorTableItem): Node = {
     <tr data-lastToken={lastToken.getOrElse("")}>
       <td>
-        <a href={"/logging/" + item.instanceId + "/" + item.namespace.toString}>{item.namespace.toString}</a>
+        <a href={"/logging/" + item.instanceId.id + "/" + item.namespace.toString}>{item.namespace.toString}</a>
       </td>
       <td>
         <a href={"/logging/" + item.instanceId.id}>{item.instanceId.id}</a>

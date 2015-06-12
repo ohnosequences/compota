@@ -32,26 +32,55 @@ class LocalEnvironment(val instanceId: InstanceId,
     case Some(env) => env
   }
 
-
-  override def subEnvironmentSync[R](subSpace: String, instanceId: InstanceId = localEnvironment.instanceId)(statement: LocalEnvironment => R): Try[(LocalEnvironment, R)] = {
+//subSpace: String, instanceId: InstanceId = localEnvironment.instanceId
+  override def subEnvironmentSync[R](subspaceOrInstance: Either[String, InstanceId])(statement: LocalEnvironment => R): Try[(LocalEnvironment, R)] = {
     Try {
-      val newWorkingDirectory = new File(workingDirectory, subSpace)
-      newWorkingDirectory.mkdir()
-      val env = new LocalEnvironment(
-        instanceId = instanceId,
-        namespace = namespace./(subSpace),
-        workingDirectory = newWorkingDirectory,
-        logger = logger.subLogger(subSpace, reportToOriginal = true),
-        executor = executor,
-        errorTable = errorTable,
-        configuration = configuration,
-        sendForceUnDeployCommand0 = sendForceUnDeployCommand0,
-        environments = environments,
-        rootEnvironment0 = Some(rootEnvironment),
-        origin = Some(localEnvironment),
-        localErrorCounts = localErrorCounts
-      )
-      (env, statement(env))
+      subspaceOrInstance match {
+        case Left(subspace) => {
+          val newWorkingDirectory = new File(workingDirectory, subspace)
+          newWorkingDirectory.mkdir()
+          new LocalEnvironment(
+            instanceId = instanceId,
+            namespace = namespace./(subspace),
+            workingDirectory = newWorkingDirectory,
+            logger = logger.subLogger(subspace, reportToOriginal = true),
+            executor = executor,
+            errorTable = errorTable,
+            configuration = configuration,
+            sendForceUnDeployCommand0 = sendForceUnDeployCommand0,
+            environments = environments,
+            rootEnvironment0 = Some(rootEnvironment),
+            origin = Some(localEnvironment),
+            localErrorCounts = localErrorCounts
+          )
+        }
+        case Right(instance) => {
+          val newWorkingDirectory = new File(workingDirectory, instance.id)
+          newWorkingDirectory.mkdir()
+          new LocalEnvironment(
+            instanceId = instance,
+            namespace = Namespace.root,
+            workingDirectory = newWorkingDirectory,
+            logger = logger.subLogger(instance.id, reportToOriginal = true),
+            executor = executor,
+            errorTable = errorTable,
+            configuration = configuration,
+            sendForceUnDeployCommand0 = sendForceUnDeployCommand0,
+            environments = environments,
+            rootEnvironment0 = Some(rootEnvironment),
+            origin = Some(localEnvironment),
+            localErrorCounts = localErrorCounts
+          )
+        }
+      }
+    }.flatMap { env =>
+      environments.put((env.instanceId, env.namespace), env)
+      val res = Try {
+        logger.info(environments.toString)
+        (env, statement(env))
+      }
+      environments.remove((env.instanceId, env.namespace))
+      res
     }
   }
 

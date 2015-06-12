@@ -40,27 +40,54 @@ class AwsEnvironment(val instanceId: InstanceId,
     }
   }
 
-  override def subEnvironmentSync[R](suffix: String, instanceId: InstanceId = awsEnvironment.instanceId)(statement: AwsEnvironment => R) : Try[(AwsEnvironment, R)] = {
+  override def subEnvironmentSync[R](subspaceOrInstance: Either[String, InstanceId])(statement: AwsEnvironment => R) : Try[(AwsEnvironment, R)] = {
     Try {
-      logger.debug("creating working directory: " + new File(workingDirectory, suffix).getAbsolutePath)
-      val newWorkingDir = new File(workingDirectory, suffix)
-      newWorkingDir.mkdir()
-      val env = new AwsEnvironment(
-        instanceId = instanceId,
-        namespace = namespace / suffix,
-        configuration = configuration,
-        awsClients = awsClients,
-        logger = logger.subLogger(suffix, reportOriginal = true, configuration.loggingDestination(instanceId, namespace / suffix)),
-        workingDirectory = newWorkingDir,
-        executor = executor,
-        errorTable = errorTable,
-        sendForceUnDeployCommand0 = sendForceUnDeployCommand0,
-        environments = environments,
-        rootEnvironment0 = Some(rootEnvironment),
-        origin = Some(awsEnvironment),
-        localErrorCounts = localErrorCounts
-      )
-      (env, statement(env))
+      subspaceOrInstance match {
+        case Left(subspace) => {
+          logger.debug("creating working directory: " + new File(workingDirectory, subspace).getAbsolutePath)
+          val newWorkingDir = new File(workingDirectory, subspace)
+          newWorkingDir.mkdir()
+          val env = new AwsEnvironment(
+            instanceId = instanceId,
+            namespace = namespace / subspace,
+            configuration = configuration,
+            awsClients = awsClients,
+            logger = logger.subLogger(subspace, reportOriginal = true, configuration.loggingDestination(instanceId, namespace / subspace)),
+            workingDirectory = newWorkingDir,
+            executor = executor,
+            errorTable = errorTable,
+            sendForceUnDeployCommand0 = sendForceUnDeployCommand0,
+            environments = environments,
+            rootEnvironment0 = Some(rootEnvironment),
+            origin = Some(awsEnvironment),
+            localErrorCounts = localErrorCounts
+          )
+          (env, statement(env))
+        }
+        case Right(instance) => {
+          logger.debug("creating working directory: " + new File(workingDirectory, instance.id).getAbsolutePath)
+          val newWorkingDir = new File(workingDirectory, instance.id)
+          newWorkingDir.mkdir()
+          val env = new AwsEnvironment(
+            instanceId = instance,
+            namespace = Namespace.root,
+            configuration = configuration,
+            awsClients = awsClients,
+            logger = logger.subLogger(instance.id, reportOriginal = true, configuration.loggingDestination(instanceId, namespace / instance.id)),
+            workingDirectory = newWorkingDir,
+            executor = executor,
+            errorTable = errorTable,
+            sendForceUnDeployCommand0 = sendForceUnDeployCommand0,
+            environments = environments,
+            rootEnvironment0 = Some(rootEnvironment),
+            origin = Some(awsEnvironment),
+            localErrorCounts = localErrorCounts
+          )
+          (env, statement(env))
+        }
+      }
+
+
     }
   }
 

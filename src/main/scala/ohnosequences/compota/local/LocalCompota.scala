@@ -88,8 +88,8 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
   def getLog(logger: Logger, instanceId: InstanceId, namespace: Namespace): Try[String] = {
     logger.info("looking for namespace " + namespace.toString)
    // logger.info("known instances: " + environments.keys().toList)
-    Option(environments.get(namespace)) match {
-      case None => Failure(new Error("namespace " + namespace.toString + " not found"))
+    Option(environments.get((instanceId, namespace))) match {
+      case None => Failure(new Error("instance :" + instanceId.id + " with namespace: " + namespace.toString + " not found"))
       case Some(env) => {
         Try {
           val log = scala.io.Source.fromFile(env.logger.logFile).getLines().mkString(System.lineSeparator())
@@ -104,9 +104,9 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
     "worker_" + nispero.configuration.name + "_" + id
   }
 
-  private def workerNamespace(nispero: AnyLocalNispero, id: Int): Namespace = {
-    Namespace.root / workerSubspace(nispero, id)
-  }
+//  private def workerNamespace(nispero: AnyLocalNispero, id: Int): Namespace = {
+//    Namespace.root / workerSubspace(nispero, id)
+//  }
 
   private def workerInstanceNamespace(nispero: AnyLocalNispero, id: Int): (InstanceId, Namespace) = {
     val s = workerSubspace(nispero, id)
@@ -116,7 +116,7 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
   def launchWorker(nispero: AnyLocalNispero, id: Int): Try[LocalEnvironment] = {
     val subId = workerSubspace(nispero, id)
     initialEnvironment.flatMap { iEnv =>
-      iEnv.subEnvironmentAsync(subId, instanceId = InstanceId(subId)) { env =>
+      iEnv.subEnvironmentAsync(Right(InstanceId(subId))) { env =>
         nispero.worker.start(env)
       }
     }
@@ -153,7 +153,7 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
     Try {
       val res = new ListBuffer[CompotaEnvironment]()
       for (i <- 1 to nispero.configuration.workers) {
-        Option(environments.get(workerNamespace(nispero, i))).foreach { e =>
+        Option(environments.get(workerInstanceNamespace(nispero, i))).foreach { e =>
           res += e
         }
       }

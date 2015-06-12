@@ -32,6 +32,9 @@ Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp
 
   override def printLog(instanceId: String, namespace: String): NodeSeq = ???
 
+
+  override def printNamespaceTable(): NodeSeq = ???
+
   override def shutdown(): Unit = ???
 
   override def terminateInstance(instanceId: String): NodeSeq = ???

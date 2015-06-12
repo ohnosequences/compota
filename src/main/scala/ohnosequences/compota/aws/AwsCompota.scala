@@ -58,7 +58,7 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
       env.logger.loggingDestination match {
         case None => env.logger.info("log uploader is disabled")
         case Some(loggerDestination) => {
-          env.subEnvironmentAsync(Namespace.logUploader) { logEnv =>
+          env.subEnvironmentAsync(Left(Namespace.logUploader)){ logEnv =>
             @tailrec
             def launchLogUploaderRec(timeout: Duration = configuration.logUploaderTimeout): Unit = {
               if(env.isStopped) {

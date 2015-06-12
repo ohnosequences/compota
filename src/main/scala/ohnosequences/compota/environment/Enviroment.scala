@@ -9,9 +9,10 @@ import ohnosequences.logging.Logger
 import java.io.File
 import scala.util.{Success, Failure, Try}
 
-case class InstanceId(id: String) {
-  def subInstance(subId: String) = InstanceId(id + "_" + subId)
-}
+case class InstanceId(id: String)
+//{
+//  def subInstance(subId: String) = InstanceId(id + "_" + subId)
+//}
 
 trait Env {
   val logger: Logger
@@ -19,34 +20,36 @@ trait Env {
   val workingDirectory: File
 }
 
-abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env {
+abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironment =>
 
   def rootEnvironment: E
 
-  val environments: ConcurrentHashMap[InstanceId, E]
+  val environments: ConcurrentHashMap[Namespace, E]
 
-  def subEnvironmentSync[R](suffix: String)(statement: E => R): Try[(E, R)]
+  def subEnvironmentSync[R](subSpace: String)(statement: E => R): Try[(E, R)]
 
-  def subEnvironmentAsync(suffix: String)(statement: E => Unit): Try[E] = {
-    subEnvironmentSync(suffix) { env =>
+  def subEnvironmentAsync(subSpace: String)(statement: E => Unit): Try[E] = {
+    subEnvironmentSync(subSpace) { env =>
       executor.execute(new Runnable {
         override def run(): Unit = {
           val oldName = Thread.currentThread().getName
-          Thread.currentThread().setName(suffix)
+          Thread.currentThread().setName(env.namespace.toString)
           env.logger.debug("changing thread name to " + instanceId.id)
-          env.environments.put(instanceId, env)
+          env.environments.put(env.namespace, env)
           Try {
             statement(env)
           }
           //env.reportError()
           Thread.currentThread().setName(oldName)
-          env.environments.remove(env.instanceId)
+          env.environments.remove(env.namespace)
         }
       })
     }.map(_._1)
   }
 
   def instanceId: InstanceId
+
+  def namespace: Namespace
 
   val errorTable: ErrorTable
 
@@ -66,7 +69,13 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env {
    * all repeats are here, "5 errors - reboot,  10 errors - undeplot compota
    * shouldn't do nothing if env is terminated
    */
-  def reportError(nameSpace: Namespace, t: Throwable): Unit = {
+  def reportError(t: Throwable, subSpace: Option[String]): Unit = {
+
+    val namespace = subSpace match {
+      case None => anyEnvironment.namespace
+      case Some(sub) => anyEnvironment.namespace / sub
+    }
+
     val sb = new StringBuilder
     logger.printThrowable(t, { e =>
       sb.append(e)
@@ -77,7 +86,7 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env {
     val localErrorCount = localErrorCounts.incrementAndGet()
      
     if (localErrorCount > math.min(configuration.errorThreshold, configuration.localErrorThreshold)) {
-      errorTable.getNamespaceErrorCount(nameSpace) match {
+      errorTable.getNamespaceErrorCount(namespace) match {
         case Failure(tt) => {
           logger.error("couldn't retrieve count from error table")
           errorTable.recover()
@@ -85,21 +94,21 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env {
           terminate()
         }
         case Success(count) if count >= configuration.errorThreshold => {
-          val message = "reached global error threshold for " + nameSpace.toString
+          val message = "reached global error threshold for " + namespace.toString
           val fullMessage = message + System.lineSeparator() + stackTrace
-          logger.error("reached global error threshold for " + nameSpace.toString)
+          logger.error("reached global error threshold for " + namespace.toString)
           sendForceUnDeployCommand("error threshold reached", fullMessage)
         }
         case Success(count) => {
-          logger.error("reached local error threshold for " + nameSpace.toString + " [" + count + "]")
+          logger.error("reached local error threshold for " + namespace.toString + " [" + count + "]")
           stop()
           terminate()
         }
       }
     } else {
-      logger.error(nameSpace.toString + " failed " + localErrorCount + " times [" + configuration.localErrorThreshold + "/" + configuration.errorThreshold + "]")
+      logger.error(namespace.toString + " failed " + localErrorCount + " times [" + configuration.localErrorThreshold + "/" + configuration.errorThreshold + "]")
       logger.debug(t)
-      errorTable.reportError(nameSpace, System.currentTimeMillis(), instanceId, t.toString, sb.toString())
+      errorTable.reportError(namespace, System.currentTimeMillis(), instanceId, t.toString, sb.toString())
     }
   }
 

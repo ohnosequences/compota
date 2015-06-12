@@ -3,6 +3,7 @@ package ohnosequences.compota.local
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ExecutorService, ConcurrentHashMap}
+import ohnosequences.compota.Namespace
 import ohnosequences.compota.environment.{AnyEnvironment, InstanceId}
 import ohnosequences.logging.{Logger, FileLogger}
 
@@ -11,13 +12,14 @@ import scala.collection.JavaConversions._
 
 
 class LocalEnvironment(val instanceId: InstanceId,
+                       val namespace: Namespace,
                        val workingDirectory: File,
                        val logger: FileLogger,
                        val executor: ExecutorService,
                        val errorTable: LocalErrorTable,
                        val configuration: AnyLocalCompotaConfiguration,
                        val sendForceUnDeployCommand0: (LocalEnvironment, String, String) => Try[Unit],
-                       val environments: ConcurrentHashMap[InstanceId, LocalEnvironment],
+                       val environments: ConcurrentHashMap[Namespace, LocalEnvironment],
                        val rootEnvironment0: Option[LocalEnvironment],
                        val origin: Option[LocalEnvironment],
                        val localErrorCounts: AtomicInteger
@@ -31,14 +33,15 @@ class LocalEnvironment(val instanceId: InstanceId,
   }
 
 
-  override def subEnvironmentSync[R](id: String)(statement: LocalEnvironment => R): Try[(LocalEnvironment, R)] = {
+  override def subEnvironmentSync[R](subSpace: String)(statement: LocalEnvironment => R): Try[(LocalEnvironment, R)] = {
     Try {
-      val newWorkingDirectory = new File(workingDirectory, id)
+      val newWorkingDirectory = new File(workingDirectory, subSpace)
       newWorkingDirectory.mkdir()
       val env = new LocalEnvironment(
-        instanceId = instanceId.subInstance(id),
+        instanceId = instanceId,
+        namespace = namespace./(subSpace),
         workingDirectory = newWorkingDirectory,
-        logger = logger.subLogger(id, true),
+        logger = logger.subLogger(subSpace, true),
         executor = executor,
         errorTable = errorTable,
         configuration = configuration,

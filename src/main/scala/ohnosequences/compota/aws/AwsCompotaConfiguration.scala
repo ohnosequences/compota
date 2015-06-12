@@ -5,9 +5,11 @@ import java.io.File
 import ohnosequences.awstools.autoscaling._
 import ohnosequences.awstools.ec2.{InstanceType, InstanceSpecs}
 import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.compota.{AnyNisperoConfiguration, AnyCompotaConfiguration}
+import ohnosequences.compota.environment.InstanceId
+import ohnosequences.compota.{Namespace, AnyNisperoConfiguration, AnyCompotaConfiguration}
 import ohnosequences.compota.aws.deployment.{AnyMetadata, Metadata, userScriptGenerator}
 
+import scala.concurrent.duration.Duration
 
 
 trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
@@ -41,6 +43,8 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
   def errorTable: String = Resources.errorTable(metadata)
 
   def loggerBucket: String = Resources.loggerBucket(metadata)
+
+  def logUploaderTimeout: Duration
 
   def controlQueue: String = Resources.controlQueue(metadata)
 
@@ -77,6 +81,18 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
   def workerPurchaseModel: PurchaseModel = SpotAuto
 
   override def errorThreshold: Int = 10
+
+  def loggingDestination(instanceId: InstanceId, namespace: Namespace): Option[ObjectAddress] = (instanceId, namespace) match {
+    case (id, Namespace.root) => {
+      //instance log
+      Some(ObjectAddress(loggerBucket, id.id))
+    }
+    case (id, Namespace(Namespace.worker :: taskId :: Nil)) => {
+      //task log
+      Some(ObjectAddress(loggerBucket, taskId) / id.id)
+    }
+    case _ => None
+  }
 }
 
 //class CompotaConfiguration(val name: String) extends CompotaConfigurationAux

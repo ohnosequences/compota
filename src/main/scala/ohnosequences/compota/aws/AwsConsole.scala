@@ -20,7 +20,7 @@ class AwsConsole[N <: AnyAwsNispero](awsCompota: AnyAwsCompota.ofN[N],
 Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp, queueChecker) {
 
   override def getInstanceLog(instanceId: InstanceId): Try[String] = {
-    
+
   }
 
   override def compotaInfoPageDetailsTable: NodeSeq = ???

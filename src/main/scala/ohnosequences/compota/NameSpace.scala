@@ -1,33 +1,51 @@
 package ohnosequences.compota
 
 object Namespace {
+
   val separator = "."
 
-  val metaManager = new Namespace("metamanager")
+  val root = Namespace(List[String]())
 
-  val controlQueue = new Namespace("control_queue")
+  val metaManager = "metamanager"
 
-  val terminationDaemon = new Namespace("termination_daemon")
+  val controlQueue = "control_queue"
 
-  val unDeployActions = new Namespace("undeploy_actions")
+  val terminationDaemon = "termination_daemon"
 
-  val worker = new Namespace("worker")
+  val unDeployActions = "undeploy_actions"
+
+  val logUploader = "logUploader"
+
+  val worker = "worker"
+
+  def unapply(list: List[String]): Namespace = Namespace(list)
 }
 
-case class Namespace(stringRep: String) {  namespace =>
-  def /(subSpace: Namespace): Namespace = {
-    new Namespace(stringRep + Namespace.separator + subSpace.stringRep)
-  }
+
+
+case class Namespace(parts: List[String]) {  namespace =>
+//  def /(subSpace: Namespace): Namespace = {
+//    new Namespace(stringRep + Namespace.separator + subSpace.stringRep, parts ++ List(stringRep))
+//  }
+
+
 
   def /(subSpace: String): Namespace = {
-    new Namespace(stringRep + Namespace.separator + subSpace)
+    Namespace(parts ++ List(subSpace))
+  }
+
+  def /(subSpace: Namespace): Namespace = {
+    Namespace(parts ++ subSpace.parts)
   }
 
   override def toString: String = {
-    stringRep
+    parts match {
+      case Nil => ""
+      case part :: Nil => part
+      case part :: tail => parts.reduce(_ + Namespace.separator  + _)
+    }
   }
 
-  def toS3Key = stringRep.reverse
 }
 
 

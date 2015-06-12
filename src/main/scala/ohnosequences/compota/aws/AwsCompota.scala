@@ -9,12 +9,13 @@ import ohnosequences.compota.aws.metamanager.AwsMetaManager
 import ohnosequences.compota.console.{UnfilteredConsoleServer, AnyConsole}
 import ohnosequences.compota.environment.InstanceId
 import ohnosequences.compota.graphs.{QueueChecker}
-import ohnosequences.compota.local.LocalConsole
 import ohnosequences.compota.metamanager.{ForceUnDeploy, UnDeploy}
 import ohnosequences.compota.queues._
-import ohnosequences.compota.{AnyCompota}
-import ohnosequences.logging.{S3Logger, FileLogger}
+import ohnosequences.compota.{Namespace, AnyCompota}
+import ohnosequences.logging.{S3Logger}
 
+import scala.annotation.tailrec
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object AnyAwsCompota {
@@ -50,6 +51,34 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
     }
   }
 
+  def launchLogUploader(): Unit = {
+    initialEnvironment.map { env =>
+      env.logger.info("starting log uploader")
+      configuration.loggingLocation(env.instanceId) match {
+        case None => env.logger.info("log uploader is disabled")
+        case Some(loggerDestination) => {
+          env.subEnvironmentAsync("logUploader") { logEnv =>
+            @tailrec
+            def launchLogUploaderRec(timeout: Duration = configuration.logUploaderTimeout): Unit = {
+              if(env.isStopped) {
+                env.logger.info("log uploader stopped")
+                Success(())
+              } else {
+                Thread.sleep(timeout.toMillis)
+                env.logger.info("uploading log " + logEnv.logger.logFile.getAbsolutePath + " to " + loggerDestination)
+                logEnv.logger.uploadLog() match {
+                  case Failure(t) => logEnv.reportError(Namespace.logUploader, t)
+                  case Success(uploaded) => launchLogUploaderRec(timeout)
+                }
+              }
+            }
+            launchLogUploaderRec()
+          }
+        }
+      }
+    }
+
+  }
 
   override def launchConsole(nisperoGraph: QueueChecker[CompotaEnvironment], controlQueue: AnyQueueOp, env: CompotaEnvironment): Try[AnyConsole] = {
     Try {
@@ -71,7 +100,7 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
           ec2InstanceId,
           configuration.loggingDirectory,
           "log.txt",
-          configuration.loggerBucket,
+          configuration.loggingLocation(ec2InstanceId),
           debug = configuration.loggingDebug,
           printToConsole = configuration.loggersPrintToConsole
         ).flatMap { logger =>

@@ -95,9 +95,6 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
   }
 }
 
-//class CompotaConfiguration(val name: String) extends CompotaConfigurationAux
-
-
 abstract class AwsNisperoConfiguration extends AnyNisperoConfiguration {
 
   def name: String

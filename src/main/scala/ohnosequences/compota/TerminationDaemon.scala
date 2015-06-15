@@ -31,7 +31,10 @@ class TerminationDaemon[E <: AnyEnvironment[E]](compota: AnyCompota.ofE[E], queu
             compota.sendForceUnDeployCommand(env, "timeout", message).recoverWith { case t =>
               env.reportError( new Error("couldn't send force undeploy command", t), env.namespace / "send_force_undeploy")
                 Failure(t)
+            }.map { sent =>
+              env.stop()
             }
+
           } else {
             compota.compotaUnDeployActionContext.get() match {
               case None => {

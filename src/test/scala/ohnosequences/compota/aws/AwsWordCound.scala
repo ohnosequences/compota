@@ -5,8 +5,9 @@ import ohnosequences.compota.aws.deployment.{AnyMetadata, Metadata}
 import ohnosequences.compota.aws.queues.DynamoDBQueue
 import ohnosequences.compota.environment.Env
 import ohnosequences.compota.local.LocalNispero
+import ohnosequences.compota.queues.InMemoryQueueReducer
 import ohnosequences.compota.serialization.{intSerializer, stringSerializer}
-import ohnosequences.compota.{InMemoryQueueReducer, Instructions}
+import ohnosequences.compota.Instructions
 import ohnosequences.compota.monoid.{stringMonoid, intMonoid}
 import ohnosequences.logging.{ConsoleLogger, Logger}
 import org.junit.Test
@@ -120,14 +121,10 @@ class AwsWordCount {
 
     override def prepareUnDeployActions(env: AwsEnvironment): Try[Int] = Success(1000)
 
-
     override def configurationChecks(env: AwsEnvironment): Try[Boolean] = {
-      Try{
-        configuration.metadata.testJarUrl.exists { s =>
-          ObjectAddress(s).map { obj =>
-            env.awsClients.s3.objectExists(obj, Some(env.logger))
-          }.getOrElse(false)
-        }
+      configuration.metadata.testJarUrl match {
+        case None => Success(false)
+        case Some(jarLocation) => ObjectAddress(jarLocation).flatMap(env.awsClients.s3.objectExists)
       }
     }
 

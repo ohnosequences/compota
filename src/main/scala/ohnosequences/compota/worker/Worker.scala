@@ -110,7 +110,7 @@ class Worker[In, Out, Env <: AnyEnvironment[Env], InContext, OutContext, IQ <: A
               case Some(input) =>
                 logger.info("received: " + input.toString.take(100) + " id: " + message.id)
 
-                env.subEnvironmentSync(Left(message.id)) { env =>
+                env.subEnvironmentSync(Left(message.id), async = false) { env =>
                   val logger = env.logger
 
                   logger.debug("running " + nisperoName + " instructions")

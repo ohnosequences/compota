@@ -24,12 +24,12 @@ case class AuthWithLogging(users: Users, logger: Logger) {
         //println(req.uri)
         logger.info(req.uri)
         Cycle.Intent.complete(intent)(req)
-      case _ =>
+      case unAuth =>
         Unauthorized ~> WWWAuthenticate( """Basic realm="/"""")
     }
 }
 
-case class HtmlCustom(s: String) extends ComposeResponse(HtmlContent ~> ResponseString(s))
+case class HtmlCustom(s: String) extends ComposeResponse[Any](HtmlContent ~> ResponseString(s))
 
 @io.netty.channel.ChannelHandler.Sharable
 class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
@@ -93,6 +93,22 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
       ResponseString(console.printMessages(queueName, Some(lastToken)).toString())
     }
 
+    case GET(Path(Seg("logging" :: "raw" :: instanceId :: Nil))) => {
+      console.getLogRaw(instanceId) match {
+        case Success(Left(url)) => Redirect(url.toString)
+        case Success(Right(log)) => ResponseString(log)
+        case Failure(t) => NotFound
+      }
+    }
+
+    case GET(Path(Seg("logging" :: "raw" :: instanceId :: namespace :: Nil))) => {
+      console.getLogRaw(instanceId, namespace) match {
+        case Success(Left(url)) => Redirect(url.toString)
+        case Success(Right(log)) => ResponseString(log)
+        case Failure(t) => NotFound
+      }
+    }
+
     case GET(Path(Seg("logging" :: instanceId :: Nil))) => {
       ResponseString(console.printLog(instanceId).toString())
     }
@@ -115,29 +131,19 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
     }
 
 
-    case GET(Path(Seg("logging" :: "raw" :: instanceId :: Nil))) => {
-      console.getLogRaw(instanceId) match {
-        case Success(Left(url)) => Redirect(url.toString)
-        case Success(Right(log)) => ResponseString(log)
-        case Failure(t) => NotFound
-      }
-    }
 
-    case GET(Path(Seg("logging" :: "raw" :: instanceId :: namespace :: Nil))) => {
-      console.getLogRaw(instanceId, namespace) match {
-        case Success(Left(url)) => Redirect(url.toString)
-        case Success(Right(log)) => ResponseString(log)
-        case Failure(t) => NotFound
-      }
-    }
 
 
     case GET(Path(Seg("instance" :: id :: "ssh" :: Nil))) => {
       ResponseString(console.sshInstance(id).toString)
     }
 
-    case GET(Path(Seg("instance" :: id :: "stackTrace" :: Nil))) => {
-      ResponseString(console.stackTraceInstance(id).toString)
+    case GET(Path(Seg("stackTrace" :: id :: namespace :: Nil))) => {
+      ResponseString(console.stackTraceInstance(id, namespace).toString)
+    }
+
+    case GET(Path(Seg("stackTrace" :: id :: Nil))) => {
+      ResponseString(console.stackTraceInstance(id, "").toString)
     }
 
     case GET(Path(Seg("error" :: "message" :: namespase :: timestamp :: instanceId ::  Nil))) => {

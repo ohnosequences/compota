@@ -4,7 +4,8 @@ import java.util.concurrent.atomic.AtomicReference
 
 import ohnosequences.compota.environment.Env
 import ohnosequences.compota.graphs.QueueChecker
-import ohnosequences.compota.{TerminationDaemon, InMemoryQueueReducerLocal, InMemoryQueueReducer, Instructions}
+import ohnosequences.compota.queues.InMemoryQueueReducerLocal
+import ohnosequences.compota.{TerminationDaemon, Instructions}
 import ohnosequences.compota.monoid.{stringMonoid, intMonoid}
 import ohnosequences.logging.{ConsoleLogger, Logger}
 import org.junit.Test
@@ -31,7 +32,7 @@ object splitInstructions extends Instructions[String, String] {
   override type Context = Unit
 
   override def solve(env: Env, context: Unit, input: String): Try[List[String]] = {
-   // Thread.sleep(200000)
+    Thread.sleep(200000)
     Success(input.split("\\s+").toList)
   }
 
@@ -85,9 +86,9 @@ class LocalCompotaTest {
     val s = System.currentTimeMillis() + 1
 
     override def prepareUnDeployActions(env: wordLenghtCompota.CompotaEnvironment): Try[Int] = {
-      Failure(new Error("intentional"))
+    //  Failure(new Error("intentional "))
 
-      //Success(1000)
+      Success(1000)
     }
 
     override def addTasks(env: CompotaEnvironment): Try[Unit] = {
@@ -103,7 +104,7 @@ class LocalCompotaTest {
       val writer = op.writer.get
       writer.writeMessages("1", input)
      // env.logger.info(env.errorTable.listErrors(None, None).toString)
-      Failure(new Error("intentional"))
+     // Failure(new Error("intentional"))
 
     }
 

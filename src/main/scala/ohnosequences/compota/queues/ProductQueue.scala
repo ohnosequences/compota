@@ -235,7 +235,7 @@ trait AnyProductQueue extends AnyQueue { anyproductQueue =>
         case Failure(t) => yQueueOp.get(key).map { yEl =>
           (xMonoid.unit, yEl)
         }
-        case Success(xEl) =>  Success(xEl, yMonoid.unit)
+        case Success(xEl) =>  Success((xEl, yMonoid.unit))
       }
     }
 

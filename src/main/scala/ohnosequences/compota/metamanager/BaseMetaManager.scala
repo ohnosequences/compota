@@ -12,7 +12,7 @@ trait BaseMetaManager extends AnyMetaManager {
 
   override type MetaManagerCommand = BaseMetaManagerCommand
 
-  override def initMessage(): BaseMetaManagerCommand = LaunchConsole
+  override def initMessage: BaseMetaManagerCommand = LaunchConsole
 
   def sendMessageToControlQueue(env: MetaManagerEnvironment, command: BaseMetaManagerCommand): Try[Unit] = {
     Success(()).flatMap { u =>

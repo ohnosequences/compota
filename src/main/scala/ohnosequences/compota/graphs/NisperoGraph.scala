@@ -6,7 +6,7 @@ import ohnosequences.compota.environment.AnyEnvironment
 import ohnosequences.compota.queues._
 
 import scala.collection.mutable
-import scala.util.Try
+import scala.util.{Success, Try}
 
 object NisperoGraph {
   def apply[E <: AnyEnvironment[E]](nisperos: Map[String, AnyNispero.of[E]]): NisperoGraph[E] = {
@@ -29,15 +29,15 @@ class NisperoGraph[E <: AnyEnvironment[E]](
                                             val nisperos: Map[String, AnyNispero.of[E]]
                                             ) {
 
-  val sortedQueues: List[Node[String]] = graph.sort
+  //val sortedQueues: List[Node[String]] = graph.sort
 
-  val notLeafsQueues: List[String] = sortedQueues.filterNot(graph.out(_).isEmpty).map(_.label)
+  //val notLeafsQueues: List[String] = sortedQueues.filterNot(graph.out(_).isEmpty).map(_.label)
 
 }
 
 object QueueChecker {
   def apply[E <: AnyEnvironment[E]](env: E, nisperoGraph: NisperoGraph[E]): Try[QueueChecker[E]] = {
-    Try {
+    Success(()).flatMap { u =>
       val queueOps = new mutable.HashMap[String, AnyQueueOp]()
       nisperoGraph.nisperos.foreach { case (name, nispero) =>
         val inputQueueOp = nispero.inputQueue.create(nispero.inputContext(env)).get
@@ -52,9 +52,13 @@ object QueueChecker {
         }
       }
 
-      new QueueChecker(nisperoGraph, queueOps.toMap, nisperoGraph.notLeafsQueues.map { queueName =>
-        queueOps.get(queueName).get
-      })
+      nisperoGraph.graph.sort().map { sortedQueues =>
+        val notLeafsQueues: List[String] = sortedQueues.filterNot(nisperoGraph.graph.out(_).isEmpty).map(_.label)
+
+        new QueueChecker(nisperoGraph, queueOps.toMap, notLeafsQueues.map { queueName =>
+          queueOps(queueName)
+        })
+      }
     }
   }
 }

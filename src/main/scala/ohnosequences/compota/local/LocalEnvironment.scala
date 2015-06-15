@@ -33,7 +33,7 @@ class LocalEnvironment(val instanceId: InstanceId,
   }
 
 //subSpace: String, instanceId: InstanceId = localEnvironment.instanceId
-  override def subEnvironmentSync[R](subspaceOrInstance: Either[String, InstanceId])(statement: LocalEnvironment => R): Try[(LocalEnvironment, R)] = {
+  override def subEnvironmentSync[R](subspaceOrInstance: Either[String, InstanceId], async: Boolean)(statement: LocalEnvironment => R): Try[(LocalEnvironment, R)] = {
     Try {
       subspaceOrInstance match {
         case Left(subspace) => {
@@ -43,7 +43,7 @@ class LocalEnvironment(val instanceId: InstanceId,
             instanceId = instanceId,
             namespace = namespace./(subspace),
             workingDirectory = newWorkingDirectory,
-            logger = logger.subLogger(subspace, reportToOriginal = true),
+            logger = logger.subLogger(subspace),
             executor = executor,
             errorTable = errorTable,
             configuration = configuration,
@@ -61,7 +61,7 @@ class LocalEnvironment(val instanceId: InstanceId,
             instanceId = instance,
             namespace = Namespace.root,
             workingDirectory = newWorkingDirectory,
-            logger = logger.subLogger(instance.id, reportToOriginal = true),
+            logger = logger.subLogger(instance.id),
             executor = executor,
             errorTable = errorTable,
             configuration = configuration,
@@ -76,13 +76,17 @@ class LocalEnvironment(val instanceId: InstanceId,
     }.flatMap { env =>
       environments.put((env.instanceId, env.namespace), env)
       val res = Try {
-        logger.info(environments.toString)
+        //logger.info(environments.toString)
         (env, statement(env))
       }
-      environments.remove((env.instanceId, env.namespace))
+      if (!async) {
+        environments.remove((env.instanceId, env.namespace))
+      }
       res
     }
   }
+
+
 
 
   override def terminate(): Unit = {
@@ -101,7 +105,8 @@ class LocalEnvironment(val instanceId: InstanceId,
 
   def getThreadInfo: Option[(Thread, Array[StackTraceElement])] = {
     Thread.getAllStackTraces.find { case (t, st) =>
-      t.getName.equals(instanceId.id)
+     // logger.info("locking for " + threadName)
+      t.getName.equals(threadName)
     }
   }
 }

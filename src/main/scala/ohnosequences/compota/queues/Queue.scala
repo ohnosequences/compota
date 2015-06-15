@@ -209,32 +209,67 @@ trait AnyQueueOp {
 
   def delete(): Try[Unit]
 
-  def forEachId[T](f: String => T): Try[Unit] = {
-
+  def foldLeftId[T](z: T)(f: (T, String) => Try[T]): Try[T] = {
     @tailrec
-    def forEachRec(f: String => T, lastKey: Option[String]): Try[Unit] = {
+    def foldLeftIdRec(c: T, lastKey: Option[String]): Try[T] = {
       list(lastKey = None, limit = None) match {
         case Success((None, list)) => {
           //the last chunk
-          Success(list.foreach(f))
+          list.foldLeft[Try[T]](Success(c)) {
+            case (Failure(t), id) => Failure(t)
+            case (Success(t), id) => f(t, id)
+          }
         }
         case Success((last, list)) => {
-          list.foreach(f)
-          forEachRec(f, last)
+          list.foldLeft[Try[T]](Success(c)) {
+            case (Failure(t), id) => Failure(t)
+            case (Success(t), id) => f(t, id)
+          } match {
+            case Success(newC) => foldLeftIdRec(newC, last)
+            case failure => failure
+          }
         }
         case Failure(t) => Failure(t)
       }
     }
+    foldLeftIdRec(z, None)
+  }
 
-    forEachRec(f, None)
+
+  def foldLeft[T](z: T)(f: (T, QueueOpElement) => Try[T]): Try[T] = {
+    foldLeftId(z) { case (c, id) =>
+      get(id).flatMap { el =>
+        f(c, el)
+      }
+    }
+  }
+
+  def forEachId(f: String => Unit): Try[Unit] = {
+
+//    @tailrec
+//    def forEachRec(f: String => T, lastKey: Option[String]): Try[Unit] = {
+//      list(lastKey = None, limit = None) match {
+//        case Success((None, list)) => {
+//          //the last chunk
+//          Success(list.foreach(f))
+//        }
+//        case Success((last, list)) => {
+//          list.foreach(f)
+//          forEachRec(f, last)
+//        }
+//        case Failure(t) => Failure(t)
+//      }
+//    }
+
+    foldLeftId(()) { case (u, id) =>
+      Try{f(id)}
+    }
 
   }
 
-  def forEach[T](f: (String, QueueOpElement) => T): Try[Unit] = {
-    Try {
-      forEachId { id =>
-        f(id, get(id).get)
-      }
+  def forEach(f: (String, QueueOpElement) => Unit): Try[Unit] = {
+    forEachId { id =>
+      f(id, get(id).get)
     }
   }
 
@@ -242,7 +277,7 @@ trait AnyQueueOp {
 
 }
 
-object AnyQueueOp {
+object  AnyQueueOp {
   type of[E, M <: AnyQueueMessage.of[E], QR <: AnyQueueReader.of[E, M], QW <: AnyQueueWriter.of[E]] = AnyQueueOp {
     type QueueOpElement = E
     type QueueOpQueueMessage = M

@@ -77,7 +77,7 @@ trait AnyCompota {
   def launch(): Try[CompotaEnvironment]
 
   def main(args: Array[String]): Unit = {
-    val logger = new ConsoleLogger("compotaCLI", false, None)
+    val logger = new ConsoleLogger("compotaCLI", false)
     args.toList match {
       case "run" :: "worker" :: name :: Nil => launchWorker(name)
       case "run" :: "metamanager" :: Nil => launchMetaManager()
@@ -134,16 +134,16 @@ trait AnyCompota {
 }
 
 object AnyCompota {
-  type of2[E <: AnyEnvironment[E], U] = AnyCompota { type CompotaEnvironment = E ; type CompotaUnDeployActionContext = U  }
+  type of2[E <: AnyEnvironment[E], U] = AnyCompota {type CompotaEnvironment = E; type CompotaUnDeployActionContext = U}
   type of[E <: AnyEnvironment[E], N <: AnyNispero.of[E]] = AnyCompota {
-    type CompotaEnvironment = E ;
-    type CompotaNispero = N  }
+    type CompotaEnvironment = E
+    type CompotaNispero = N}
   type of3[E <: AnyEnvironment[E], U, N <: AnyNispero.of[E]] = AnyCompota {
     type CompotaEnvironment = E
     type CompotaUnDeployActionContext = U
     type CompotaNispero = N
   }
-  type ofE[E <: AnyEnvironment[E]] = AnyCompota { type CompotaEnvironment = E}
+  type ofE[E <: AnyEnvironment[E]] = AnyCompota {type CompotaEnvironment = E}
 
 }
 

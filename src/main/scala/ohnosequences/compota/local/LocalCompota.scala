@@ -40,34 +40,32 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
 
   val environments = new ConcurrentHashMap[(InstanceId, Namespace), LocalEnvironment]()
 
-  private val initialEnvironment_ = new AtomicReference[Option[LocalEnvironment]](None)
-  override def initialEnvironment: Try[LocalEnvironment] = {
-    initialEnvironment_.get match {
-      case Some(env) => Success(env)
-      case None => {
-        FileLogger(configuration.initialEnvironmentId.id,
-          configuration.loggingDirectory,
-          "log.txt",
-          configuration.loggerDebug,
-          printToConsole = configuration.loggersPrintToConsole
-        ).map { logger =>
-          configuration.workingDirectory.mkdir()
-          new LocalEnvironment(
-            instanceId = configuration.initialEnvironmentId,
-            namespace = Namespace.root,
-            workingDirectory = configuration.workingDirectory,
-            logger = logger,
-            executor = executor,
-            errorTable = errorTable,
-            configuration = configuration,
-            sendForceUnDeployCommand0 = sendForceUnDeployCommand,
-            environments = environments,
-            rootEnvironment0 = None,
-            origin = None,
-            localErrorCounts = new AtomicInteger(0)
-          )
-        }
-      }
+  override lazy val initialEnvironment: Try[LocalEnvironment] = {
+    FileLogger(configuration.initialEnvironmentId.id,
+      configuration.loggingDirectory,
+      "log.txt",
+      configuration.loggerDebug,
+      printToConsole = configuration.loggersPrintToConsole
+    ).map { logger =>
+      configuration.workingDirectory.mkdir()
+      val env = new LocalEnvironment(
+        instanceId = configuration.initialEnvironmentId,
+        namespace = Namespace.root,
+        workingDirectory = configuration.workingDirectory,
+        logger = logger,
+        executor = executor,
+        errorTable = errorTable,
+        configuration = configuration,
+        sendForceUnDeployCommand0 = sendForceUnDeployCommand,
+        environments = environments,
+        rootEnvironment0 = None,
+        origin = None,
+        localErrorCounts = new AtomicInteger(0)
+      )
+      environments.put((env.instanceId, env.namespace), env)
+      //initialEnvironmentRef.se
+      env.logger.info("initial environment started")
+      env
     }
   }
 
@@ -163,7 +161,7 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
 
   def printThreads(): Unit = {
     Thread.getAllStackTraces.foreach { case (thread, sts) =>
-      println(thread + ":" + thread.getState)
+      println(thread.toString + ":" + thread.getState)
       sts.foreach { st =>
         println("      " + st.toString)
       }
@@ -175,7 +173,7 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
       case None => Failure(new Error("instance " + instance.id + " with namespace " + namespace.toString + " does not exist"))
       case Some(e) => {
         e.getThreadInfo match {
-          case None => Failure(new Error("couldn't get stack trace for " + namespace.toString))
+          case None => Failure(new Error("couldn't get stack trace for instance: " + instance.id + " namespace: " + namespace.toString))
           case Some((t, a)) => {
             val stackTrace = new StringBuffer()
             a.foreach { s =>
@@ -188,25 +186,6 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
     }
   }
 
-  def getStackTrace(instance: InstanceId): Try[String] = {
-    environments.find { case ((inst, ns), env) =>
-      instance.id.equals(inst.id)
-    } match {
-      case None => Failure(new Error("instance " + instance.id + " does not exist"))
-      case Some(((inst, ns), env)) => {
-        env.getThreadInfo match {
-          case None => Failure(new Error("couldn't get stack trace for " + instance.id))
-          case Some((t, a)) => {
-            val stackTrace = new StringBuffer()
-            a.foreach { s =>
-              stackTrace.append("at " + s.toString + System.lineSeparator())
-            }
-            Success(stackTrace.toString)
-          }
-        }
-      }
-    }
-  }
 
 
   override def deleteManager(env: CompotaEnvironment): Try[Unit] = {

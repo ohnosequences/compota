@@ -28,21 +28,26 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
 
   val environments: ConcurrentHashMap[(InstanceId, Namespace), E]
 
-  def subEnvironmentSync[R](subspaceOrInstance: Either[String, InstanceId])(statement: E => R): Try[(E, R)]
+  def subEnvironmentSync[R](subspaceOrInstance: Either[String, InstanceId], async: Boolean)(statement: E => R): Try[(E, R)]
+
+  def threadName: String = instanceId.id + "." + namespace.toString
 
   def subEnvironmentAsync(subspaceOrInstance: Either[String, InstanceId])(statement: E => Unit): Try[E] = {
-    subEnvironmentSync(subspaceOrInstance) { env =>
+    subEnvironmentSync(subspaceOrInstance, async = true) { env =>
       executor.execute(new Runnable {
         override def run(): Unit = {
           val oldName = Thread.currentThread().getName
-          env.logger.debug("changing thread name to " + instanceId.id)
-         // env.environments.put((instanceId, env.namespace), env)
+          env.logger.debug("changing thread name from " + Thread.currentThread().getName + " to " + env.threadName)
+          Thread.currentThread().setName(env.threadName)
+          env.logger.debug("new name: " + Thread.currentThread().getName)
           Try {
             statement(env)
           }
           //env.reportError()
+          env.logger.debug("finishing " + env.threadName)
+          env.logger.debug("changing thread name to " + oldName)
           Thread.currentThread().setName(oldName)
-         // env.environments.remove((instanceId, env.namespace))
+          env.environments.remove((env.instanceId, env.namespace))
         }
       })
     }.map(_._1)

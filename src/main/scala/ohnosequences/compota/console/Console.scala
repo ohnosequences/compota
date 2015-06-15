@@ -61,7 +61,7 @@ abstract class AnyConsole {
 
   def sshInstance(instanceId: String): NodeSeq
 
-  def stackTraceInstance(instanceId: String): NodeSeq
+  def stackTraceInstance(instanceId: String, namespace: String): NodeSeq
 
   def getMessage(queue: String, id: String): Try[Either[URL, String]]
 
@@ -170,7 +170,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
         <a href={"/logging/raw/" + env.instanceId.id + "/" + env.namespace}>{env.namespace.toString}</a>
       </td>
       <td>
-        <a href={"/instance/" + env.instanceId.id + "/" + "stackTrace"}>stack trace</a>
+        <a href={"/stackTrace/" + env.instanceId.id + "/" + env.namespace}>stack trace</a>
       </td>
     </tr>
   }

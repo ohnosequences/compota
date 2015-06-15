@@ -145,15 +145,15 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
 
 
   def printNamespaceTable(): NodeSeq = {
-    logger.info(localCompota.environments.toString)
+   // logger.info(localCompota.environments.toString)
 
     localCompota.environments.toList.map { case ((inst, ns), env) =>
       printNamespaceItem(env)
     }
   }
 
-  override def stackTraceInstance(instanceId: String): NodeSeq = {
-    preResult(localCompota.getStackTrace(InstanceId(instanceId)))
+  override def stackTraceInstance(instanceId: String, namespace: String): NodeSeq = {
+    preResult(localCompota.getStackTrace(InstanceId(instanceId), Namespace(namespace)))
   }
 
   override def sshInstance(instanceId: String): NodeSeq = xml.NodeSeq.Empty

@@ -45,5 +45,5 @@ Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp
 
   override def sshInstance(instanceId: String): NodeSeq = xml.NodeSeq.Empty
 
-  override def stackTraceInstance(instanceId: String): NodeSeq = ???
+  override def stackTraceInstance(instanceId: String, namespace: String): NodeSeq = ???
 }

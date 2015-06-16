@@ -10,12 +10,27 @@ import unfiltered.response._
 import unfiltered.request.{BasicAuth, Path, Seg, GET}
 import unfiltered.netty.cycle.{Plan, SynchronousExecution}
 
-import scala.util.{Failure, Success}
+import scala.util.{Try, Failure, Success}
 
 
 trait Users {
   def auth(u: String, p: String): Boolean
 }
+
+//object Decode {
+//  import java.net.URLDecoder
+//  import java.nio.charset.Charset
+//
+//  trait Extract {
+//    def charset: Charset
+//    def unapply(raw: String) =
+//      Try(URLDecoder.decode(raw, charset.name())).toOption
+//  }
+//
+//  object utf8 extends Extract {
+//    val charset = Charset.forName("utf8")
+//  }
+//}
 
 case class AuthWithLogging(users: Users, logger: Logger) {
   def apply[A, B](intent: Cycle.Intent[A, B]) =
@@ -93,15 +108,7 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
       ResponseString(console.printMessages(queueName, Some(lastToken)).toString())
     }
 
-    case GET(Path(Seg("logging" :: "raw" :: instanceId :: Nil))) => {
-      console.getLogRaw(instanceId) match {
-        case Success(Left(url)) => Redirect(url.toString)
-        case Success(Right(log)) => ResponseString(log)
-        case Failure(t) => NotFound
-      }
-    }
-
-    case GET(Path(Seg("logging" :: "raw" :: instanceId :: namespace :: Nil))) => {
+    case GET(Path(Seg("logging" :: "raw" :: instanceId :: namespace))) => {
       console.getLogRaw(instanceId, namespace) match {
         case Success(Left(url)) => Redirect(url.toString)
         case Success(Right(log)) => ResponseString(log)
@@ -109,14 +116,21 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
       }
     }
 
-    case GET(Path(Seg("logging" :: instanceId :: Nil))) => {
-      ResponseString(console.printLog(instanceId).toString())
-    }
-
-    case GET(Path(Seg("logging" :: instanceId :: namespace :: Nil))) => {
+    case GET(Path(Seg("logging" :: instanceId :: namespace))) => {
       ResponseString(console.printLog(instanceId, namespace).toString())
     }
 
+    case GET(Path(Seg("instance" :: "ssh" :: instanceId :: namespace))) => {
+      ResponseString(console.sshInstance(instanceId, namespace).toString)
+    }
+
+    case GET(Path(Seg("instance" :: "stackTrace" :: id :: namespace))) => {
+      ResponseString(console.stackTraceInstance(id, namespace).toString)
+    }
+
+    case GET(Path(Seg("instance" ::  "terminate" :: id :: namespace))) => {
+      ResponseString(console.terminateInstance(id, namespace).toString)
+    }
 
     case GET(Path(Seg("queue" :: queueName ::  "message" :: id :: Nil))) => {
       console.getMessage(queueName, id) match {
@@ -126,49 +140,35 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
       }
     }
 
-    case GET(Path(Seg("instance" :: id :: "terminate" :: Nil))) => {
-      ResponseString(console.terminateInstance(id).toString)
-    }
-
-
-
-
-
-    case GET(Path(Seg("instance" :: id :: "ssh" :: Nil))) => {
-      ResponseString(console.sshInstance(id).toString)
-    }
-
-    case GET(Path(Seg("stackTrace" :: id :: namespace :: Nil))) => {
-      ResponseString(console.stackTraceInstance(id, namespace).toString)
-    }
-
-    case GET(Path(Seg("stackTrace" :: id :: Nil))) => {
-      ResponseString(console.stackTraceInstance(id, "").toString)
-    }
-
-    case GET(Path(Seg("error" :: "message" :: namespase :: timestamp :: instanceId ::  Nil))) => {
-      console.getErrorMessage(namespase, timestamp, instanceId) match {
+    case GET(Path(Seg("error" :: "message" :: timestamp :: instanceId :: namespace))) => {
+      console.getErrorMessage(instanceId, namespace, timestamp) match {
         case Success(s) => ResponseString(s)
         case Failure(t) => NotFound
       }
     }
 
-    case GET(Path(Seg("error" :: "stackTrace" :: namespase :: timestamp :: instanceId ::  Nil))) => {
-      console.getErrorStackTrace(namespase, timestamp, instanceId) match {
+    case GET(Path(Seg("error" :: "stackTrace" :: timestamp :: instanceId :: namespace))) => {
+      console.getErrorStackTrace(instanceId, namespace, timestamp) match {
         case Success(s) => ResponseString(s)
         case Failure(t) => NotFound
       }
     }
-
 
     case GET(Path(Seg("nispero" :: nispero :: "workers" ::  Nil))) => {
-      ResponseString(console.printWorkers(nispero, None).toString())
+      ResponseString(console.printNisperoWorkers(nispero, None).toString())
     }
 
     case GET(Path(Seg("nispero" :: nispero :: "workers" ::  lastToken :: Nil))) => {
-      ResponseString(console.printWorkers(nispero, Some(lastToken)).toString())
+      ResponseString(console.printNisperoWorkers(nispero, Some(lastToken)).toString())
     }
 
+    case GET(Path(Seg("namespaces" :: Nil))) => {
+      ResponseString(console.printNamespaces(None).toString())
+    }
+
+    case GET(Path(Seg("namespaces" :: lastToken :: Nil))) => {
+      ResponseString(console.printNamespaces(Some(lastToken)).toString())
+    }
 
     case GET(Path("/threads")) => {
       val resp = new StringBuilder

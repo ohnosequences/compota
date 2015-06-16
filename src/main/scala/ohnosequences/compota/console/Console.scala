@@ -35,13 +35,15 @@ abstract class AnyConsole {
 
   def printErrorTable(lastToken: Option[String]): NodeSeq
 
-  def getErrorStackTrace(instanceId: String, namespace: String, timestamp: String): Try[String]
+  def getErrorStackTrace(instanceId: String, namespace: Seq[String], timestamp: String): Try[String]
 
-  def getErrorMessage(instanceId: String, namespace: String, timestamp: String): Try[String]
+  def getErrorMessage(instanceId: String, namespace: Seq[String], timestamp: String): Try[String]
 
   def sendForceUnDeployCommand(reason: String, message: String): Unit
 
-  def printWorkers(nispero: String, lastToken: Option[String]): NodeSeq
+  def printNisperoWorkers(nispero: String, lastToken: Option[String]): NodeSeq
+
+  def printNamespaces(lastToken: Option[String]): NodeSeq
 
   def printMessages(queueName: String, lastToken: Option[String]): NodeSeq
 
@@ -53,52 +55,54 @@ abstract class AnyConsole {
 
   def shutdown(): Unit
 
-  def getLogRaw(instanceId: String, namespace: String = ""): Try[Either[URL, String]]
+  def getLogRaw(instanceId: String, namespace: Seq[String]): Try[Either[URL, String]]
 
-  def printLog(instanceId: String, namespace: String = ""): NodeSeq
+  def printLog(instanceId: String, namespace: Seq[String]): NodeSeq
 
-  def terminateInstance(instanceId: String): NodeSeq
+  def terminateInstance(instanceId: String, namespace: Seq[String]): NodeSeq
 
-  def sshInstance(instanceId: String): NodeSeq
+  def sshInstance(instanceId: String, namespace: Seq[String]): NodeSeq
 
-  def stackTraceInstance(instanceId: String, namespace: String): NodeSeq
+  def stackTraceInstance(instanceId: String, namespace: Seq[String]): NodeSeq
 
   def getMessage(queue: String, id: String): Try[Either[URL, String]]
 
 }
 
-trait AnyWorkerInfo {
+trait AnyEnvironmentInfo {
 
   def instanceId: InstanceId
 
-  def printState: String = ""
+  def namespace: Namespace
+
+  def printState: NodeSeq
 
   def printConnectAction: NodeSeq = {
-    <a class="btn btn-info sshInstance" href="#" data-id={instanceId.id}>
+    <a class="btn btn-info sshInstance" href="#" data-instance={instanceId.id} data-namespace={namespace.getPath}>
       <i class="icon-refresh icon-white"></i>
       SSH</a>
   }
 
   def printTerminateAction: NodeSeq = {
-    <a class="btn btn-danger terminateInstance" href="#" data-id={instanceId.id}>
+    <a class="btn btn-danger terminateInstance" href="#" data-instance={instanceId.id} data-namespace={namespace.getPath}>
       <i class="icon-refresh icon-white"></i>
       Terminate</a>
   }
 
   def printStackTrace: NodeSeq = {
-    <a class="btn btn-info instanceStackTrace" href="#" data-id={instanceId.id}>
+    <a class="btn btn-info instanceStackTrace" href="#" data-instance={instanceId.id} data-namespace={namespace.getPath}>
       <i class="icon-refresh icon-white"></i>
       Stack trace</a>
   }
 
   def viewLog: NodeSeq = {
-    <a class="btn btn-info viewInstanceLog" href="#" data-id={instanceId.id}>
+    <a class="btn btn-info viewLog" href="#" data-instance={instanceId.id} data-namespace={namespace.getPath}>
       <i class="icon-refresh icon-white"></i>
       View Log</a>
   }
 
   def printInstance: Node = {
-    <p>{instanceId.id}</p>
+    <p>{instanceId.id + (if (namespace.toString.isEmpty) "" else "/" + namespace.getPath)}</p>
   }
 
 }
@@ -124,56 +128,6 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
     compotaInfoPageHeader ++ compotaInfoPageDetailsTable ++ compotaControlQueueDetails
   }
 
-//  def getLog()
-//
-//  override def printLog(instanceId: String, namespace: String): NodeSeq = {
-//    preResult(getLog(instanceId, namespace))
-//  }
-
- // def getTerminateInstance(id: InstanceId): Try[String]
-
-//  override def terminateInstance(id: String): NodeSeq = {
-//    preResult(getTerminateInstance(InstanceId(id)))
-//  }
-//
-//  def getInstanceStackTrace(id: InstanceId): Try[String]
-//
-//  override def printInstanceStackTrace(instanceId: String): NodeSeq = {
-//    preResult(getInstanceStackTrace(InstanceId(instanceId)))
-//  }
-
-
-  override def namespacePage: NodeSeq = {
-    <h2>Instances and namespaces</h2>
-      <table class="table table-striped">
-        <thead>
-          <tr>
-            <th class="col-md-3">instance</th>
-            <th class="col-md-3">namespace</th>
-            <th class="col-md-3">stack trace</th>
-          </tr>
-        </thead>
-        <tbody id ="namspacesTableBody">
-          {printNamespaceTable()}
-        </tbody>
-      </table>
-  }
-
-  def printNamespaceTable(): NodeSeq
-
-  def printNamespaceItem(env: LocalEnvironment): Node = {
-    <tr>
-      <td>
-        <a href={"/logging/raw/" + env.instanceId.id}>{env.instanceId.id}</a>
-      </td>
-      <td>
-        <a href={"/logging/raw/" + env.instanceId.id + "/" + env.namespace}>{env.namespace.toString}</a>
-      </td>
-      <td>
-        <a href={"/stackTrace/" + env.instanceId.id + "/" + env.namespace}>stack trace</a>
-      </td>
-    </tr>
-  }
 
 
   def compotaInfoPageHeader: NodeSeq = {
@@ -235,6 +189,8 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
 
+
+
   def compotaInfoPageDetailsTable: NodeSeq
 
   def compotaControlQueueDetails: NodeSeq = {
@@ -242,18 +198,6 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
     queueStatus(controlQueueOp)
   }
 
-//  def sidebar: NodeSeq = {
-//    <ul class="nav nav-sidebar">
-//      <li><a href="/"><strong>home</strong></a></li>
-//    </ul>
-//    <ul class="nav nav-sidebar">
-//      {nisperosLinks()}
-//    </ul>
-//      <ul class="nav nav-sidebar">
-//        <li><a href="/errorsPage">errors</a></li>
-//        <li><a href="#" class="undeploy">undeploy</a></li>
-//      </ul>
-//  }
 
   def nisperosLinks(): NodeSeq = {
     val l = for {(name, nispero) <- compota.nisperosNames}
@@ -346,10 +290,14 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
             <h2>instances</h2>
           </div>
           <table class="table table-striped topMargin20">
-            <tbody id="workerInstances">
-              {printWorkers(nisperoName, None)}
+            <tbody id="nisperoWorkersTableBody">
+              {printNisperoWorkers(nisperoName, None)}
             </tbody>
           </table>
+          <p><a class="btn btn-info loadMoreNisperoWorkers" href="#" data-nispero={nispero.configuration.name}>
+            <i class="icon-refresh icon-white"></i>
+            Show more
+          </a></p>
     }
   }
 
@@ -375,9 +323,9 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
   def printErrorTableItem(lastToken: Option[String], item: ErrorTableItem): Node = {
-    <tr data-lastToken={lastToken.getOrElse("")}>
+    <tr data-lasttoken={lastToken.getOrElse("")}>
       <td>
-        <a href={"/logging/" + item.instanceId.id + "/" + item.namespace.toString}>{item.namespace.toString}</a>
+        <a href={"/logging/" + item.instanceId.id + "/" + item.namespace.getPath}>{item.namespace.toString}</a>
       </td>
       <td>
         <a href={"/logging/" + item.instanceId.id}>{item.instanceId.id}</a>
@@ -386,19 +334,19 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
         {item.formattedTime()}
       </td>
       <td>
-        <a href={"/error/message/" + item.namespace.toString + "/" + item.timestamp + "/" + item.instanceId.id}>message</a>
+        <a href={"/error/message/" + item.timestamp + "/" + item.instanceId.id + "/" + item.namespace.getPath}>message</a>
       </td>
       <td>
-        <a href={"/error/stackTrace/" + item.namespace.toString + "/" + item.timestamp + "/" + item.instanceId.id}>stack trace</a>
+        <a href={"/error/stackTrace/" + item.timestamp + "/" + item.instanceId.id + "/" + item.namespace.getPath}>stack trace</a>
       </td>
     </tr>
   }
 
-  def getErrorStackTrace(namespace: String, timestamp: String, instanceId: String): Try[String] = {
+  override def getErrorStackTrace(instanceId: String, namespace: Seq[String], timestamp: String): Try[String] = {
     env.errorTable.getError(Namespace(namespace), timestamp.toLong, InstanceId(instanceId)).map(_.stackTrace)
   }
 
-  def getErrorMessage(namespace: String, timestamp: String, instanceId: String): Try[String] = {
+  override def getErrorMessage(instanceId: String, namespace: Seq[String], timestamp: String): Try[String] = {
     env.errorTable.getError(Namespace(namespace), timestamp.toLong, InstanceId(instanceId)).map(_.message)
   }
 
@@ -437,7 +385,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
   def printMessage(queueName: String, id: String, lastToken: Option[String]): Node = {
-    <tr data-lastToken={lastToken.getOrElse("")}>
+    <tr data-lasttoken={lastToken.getOrElse("")}>
       <td class="col-md-4">
         {id}
       </td>
@@ -445,7 +393,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
         <a href={"/queue/" + queueName + "/message/" + id}>download</a>
       </td>
       <td class="col-md-4">
-        <a href={"/logging/namespace/" + id}>log</a>
+        <a href={"/logging/raw/global/" + id}>log</a>
       </td>
     </tr>
   }
@@ -463,39 +411,37 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
 
-  type ListWorkerInfo <: AnyWorkerInfo
+  type EnvironmentInfo <: AnyEnvironmentInfo
 
-  def listWorkers(nispero: String, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ListWorkerInfo])]
+  def listNisperoWorkers(nispero: String, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[EnvironmentInfo])]
 
-  def printWorkers(nispero: String, lastToken: Option[String]): NodeSeq = {
-    listWorkers(nispero, lastToken, Some(10)) match {
-      case Failure(t) => printWorkerError(t, lastToken)
+  def printNisperoWorkers(nispero: String, lastToken: Option[String]): NodeSeq = {
+    listNisperoWorkers(nispero, lastToken, Some(3)) match {
+      case Failure(t) => printEnvironmentInfoError(t, lastToken)
+      case Success((newLastToken, list)) => list.map(printEnvironmentInfo(_, newLastToken))
 
-      case Success((newLastToken, list)) => {
-        list.map(printWorker(_, newLastToken))
-      }
     }
   }
 
   def errorTr(message: String, cols: Int, lastToken: Option[String]): NodeSeq = {
-    <tr class="danger" data-lastToken={lastToken.getOrElse("")}><td colspan={cols.toString}>{message}</td></tr>
+    <tr class="danger" data-lasttoken={lastToken.getOrElse("")}><td colspan={cols.toString}>{message}</td></tr>
   }
 
 
-  def printWorkerError(t: Throwable, lastToken: Option[String]): NodeSeq = {
+  def printEnvironmentInfoError(t: Throwable, lastToken: Option[String]): NodeSeq = {
     errorTr("error: " + t.toString, 3, lastToken)
   }
 
-  def printWorker(workerInfo: ListWorkerInfo, lastToken: Option[String]): Node = {
-    <tr data-lastToken={lastToken.getOrElse("")}>
+  def printEnvironmentInfo(environmentInfo: EnvironmentInfo, lastToken: Option[String]): Node = {
+    <tr data-lasttoken={lastToken.getOrElse("")}>
       <td class="col-md-4">
-        {workerInfo.printInstance}
+        {environmentInfo.printInstance}
       </td>
       <td class="col-md-4">
-        {workerInfo.printState}
+        {environmentInfo.printState}
       </td>
       <td class="col-md-4">
-        {workerInfo.printConnectAction ++ workerInfo.printTerminateAction ++ workerInfo.printStackTrace ++ workerInfo.viewLog}
+        {environmentInfo.printConnectAction ++ environmentInfo.printTerminateAction ++ environmentInfo.printStackTrace ++ environmentInfo.viewLog}
       </td>
     </tr>
   }

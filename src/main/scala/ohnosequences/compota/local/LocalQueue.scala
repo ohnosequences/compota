@@ -3,6 +3,8 @@ package ohnosequences.compota.local
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{ConcurrentSkipListMap}
 
+import ohnosequences.compota.console.Pagination
+
 import scala.concurrent.{ExecutionContext, Future}
 
 
@@ -102,7 +104,8 @@ class LocalQueueOp[T](val queue: LocalQueue[T], val ctx: LocalContext) extends Q
 
   //todo add limit support
   override def list(lastKey: Option[String], limit: Option[Int]): Try[(Option[String], List[String])] = {
-    Monkey.call(Success((None, queue.rawQueueP.keySet().toList)), queue.monkeyAppearanceProbability.list)
+    val idsList = queue.rawQueueP.keySet().toList
+    Monkey.call(Success(Pagination.listPagination(idsList, limit, lastKey)), queue.monkeyAppearanceProbability.list)
   }
 
   override def size: Try[Int] = {

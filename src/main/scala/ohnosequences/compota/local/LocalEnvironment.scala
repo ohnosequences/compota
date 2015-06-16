@@ -105,8 +105,14 @@ class LocalEnvironment(val instanceId: InstanceId,
 
   def getThreadInfo: Option[(Thread, Array[StackTraceElement])] = {
     Thread.getAllStackTraces.find { case (t, st) =>
-     // logger.info("locking for " + threadName)
+     //logger.info("locking for " + threadName)
       t.getName.equals(threadName)
+    } match {
+      case None => {
+        logger.debug("couldn't find " + threadName + " trying to find origin environment thread info: " + origin)
+        origin.flatMap(_.getThreadInfo)
+      }
+      case success => success
     }
   }
 }

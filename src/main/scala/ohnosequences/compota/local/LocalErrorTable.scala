@@ -1,5 +1,7 @@
 package ohnosequences.compota.local
 
+import ohnosequences.compota.console.Pagination
+
 import scala.collection.JavaConversions._
 import java.util.concurrent.ConcurrentHashMap
 
@@ -22,36 +24,11 @@ class LocalErrorTable extends ErrorTable {
   }
 
   override def listErrors(lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ErrorTableItem])] = {
-   // println(errors)
-    def listErrors(errors: List[((Namespace, (Long, InstanceId)), (String, String))]): Try[(Option[String], List[ErrorTableItem])] = {
-      Try {
-        limit match {
-          case Some(l) if l < errors.size - 1 => {
-            val key = errors(l)._1
-            val token = ErrorTableItem.keyToToken(key)
-            val items = errors.take(l).map { case (k, value) =>
-              ErrorTableItem(k, value)
-            }
-            (Some(token), items)
-          }
-          case _ => {
-            (None, errors.map { case (k, value) =>
-              ErrorTableItem(k, value)
-            })
-          }
-        }
+    Try {
+      val errorsList = errors.toList.map { case (key, value) =>
+        ErrorTableItem(key, value)
       }
-    }
-
-    lastToken match {
-      case None => listErrors(errors.toList)
-      case Some(lToken) => {
-        val list = errors.toList
-        val newErrors = list.drop(list.indexWhere { case (key, value) =>
-          ErrorTableItem.keyToToken(key).equals(lToken)
-        } + 1)
-        listErrors(newErrors)
-      }
+      Pagination.listPagination(errorsList, limit, lastToken)
     }
   }
 

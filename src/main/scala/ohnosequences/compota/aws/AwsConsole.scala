@@ -1,7 +1,8 @@
 package ohnosequences.compota.aws
 
 
-import ohnosequences.compota.console.{AnyWorkerInfo, Console}
+import ohnosequences.compota.Namespace
+import ohnosequences.compota.console.{AnyEnvironmentInfo, Console}
 import ohnosequences.compota.environment.InstanceId
 import ohnosequences.compota.graphs.QueueChecker
 import ohnosequences.compota.queues.AnyQueueOp
@@ -22,28 +23,35 @@ Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp
 
   override def nisperoInfoDetails(nispero: N): NodeSeq = ???
 
-  override def listWorkers(nispero: String, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ListWorkerInfo])] = ???
 
-  class AwsWorkerInfo extends AnyWorkerInfo {
+  class AwsWorkerInfo extends AnyEnvironmentInfo {
+    override def printState: NodeSeq = ???
+
+    override def namespace: Namespace = ???
+
     override def instanceId: InstanceId = ???
   }
 
-  override type ListWorkerInfo = AwsWorkerInfo
 
-  override def printLog(instanceId: String, namespace: String): NodeSeq = ???
+  override type EnvironmentInfo = AwsWorkerInfo
 
-
-  override def printNamespaceTable(): NodeSeq = ???
+  override def printLog(instanceId: String, namespace: Seq[String]): NodeSeq = ???
 
   override def shutdown(): Unit = ???
 
-  override def terminateInstance(instanceId: String): NodeSeq = ???
-
-  override def getLogRaw(instanceId: String, namespace: String): Try[Either[URL, String]] = ???
+  override def getLogRaw(instanceId: String, namespace: Seq[String]): Try[Either[URL, String]] = ???
 
   override def sidebar: NodeSeq = ???
 
-  override def sshInstance(instanceId: String): NodeSeq = xml.NodeSeq.Empty
+  override def stackTraceInstance(instanceId: String, namespace: Seq[String]): NodeSeq = ???
 
-  override def stackTraceInstance(instanceId: String, namespace: String): NodeSeq = ???
+  override def listNisperoWorkers(nispero: String, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[EnvironmentInfo])] = ???
+
+  override def namespacePage: NodeSeq = ???
+
+  override def printNamespaces(lastToken: Option[String]): NodeSeq = ???
+
+  override def terminateInstance(instanceId: String, namespace: Seq[String]): NodeSeq = ???
+
+  override def sshInstance(instanceId: String, namespace: Seq[String]): NodeSeq = ???
 }

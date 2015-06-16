@@ -2,9 +2,7 @@ package ohnosequences.compota
 
 object Namespace {
 
-
-
-  val separator = "."
+  val separator: Char = '|'
 
   val root = Namespace(List[String]())
 
@@ -26,13 +24,15 @@ object Namespace {
 
   def unapply(list: List[String]): Namespace = Namespace(list)
 
-  def apply(s: String): Namespace = {
+  def apply(s: String, separator: Char = Namespace.separator): Namespace = {
     if (s.isEmpty) {
       root
     } else {
-      Namespace(s.split('.').toList)
+      Namespace(s.split(separator).toList)
     }
   }
+
+  def apply(seq: Seq[String]): Namespace = Namespace(seq.toList)
 }
 
 
@@ -51,14 +51,20 @@ case class Namespace(parts: List[String]) {  namespace =>
   def /(subSpace: Namespace): Namespace = {
     Namespace(parts ++ subSpace.parts)
   }
-
-  override def toString: String = {
+  
+  def serialize(separator: Char = Namespace.separator): String = {
     parts match {
       case Nil => ""
       case part :: Nil => part
-      case part :: tail => parts.reduce(_ + Namespace.separator  + _)
+      case part :: tail => parts.reduce(_ + separator  + _)
     }
   }
+  
+  def getPath: String = {
+    serialize('/')
+  }
+
+  override def toString: String = getPath
 
 }
 

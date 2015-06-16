@@ -20,6 +20,8 @@ object wordLengthInstructions extends Instructions[String, Int] {
   override type Context = Unit
 
   override def solve(env: Env, context: Unit, input: String): Try[List[Int]] = {
+    Thread.sleep(200000)
+
     Success(List(input.length))
   }
 
@@ -32,7 +34,6 @@ object splitInstructions extends Instructions[String, String] {
   override type Context = Unit
 
   override def solve(env: Env, context: Unit, input: String): Try[List[String]] = {
-    Thread.sleep(200000)
     Success(input.split("\\s+").toList)
   }
 
@@ -49,7 +50,7 @@ object countsQueue extends LocalQueue[Int]("counts")
 object wordCountCompotaConfiguration extends AnyLocalCompotaConfiguration {
   override def name: String = "wordCount"
   override val loggerDebug: Boolean = true
-  override val timeout= Duration(100, SECONDS)
+  override val timeout= Duration(1000, SECONDS)
   override val terminationDaemonIdleTime =  Duration(10, SECONDS)
   override val visibilityTimeout: Duration = Duration(15, SECONDS)
 
@@ -76,7 +77,10 @@ class LocalCompotaTest {
 
   val result = new AtomicReference[Int]()
 
-  val input = List("a a a b b cc cc")
+  val inputS = "a a a b b cc cc"
+  val longInputS = inputS + inputS + inputS
+  val longLongInpitS = longInputS + longInputS + longInputS
+  val input = List(longLongInpitS)
 
   object reducer extends InMemoryQueueReducerLocal(countsQueue, intMonoid, result)
 

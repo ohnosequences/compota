@@ -86,15 +86,15 @@
     </div>
 </div>
 
-<div class="modal fade" id="viewInstanceLogModal" tabindex="-1" role="dialog" aria-labelledby="viewInstanceLogModalLabel" aria-hidden="true">
+<div class="modal fade" id="viewLogModal" tabindex="-1" role="dialog" aria-labelledby="viewLogModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-                <h4 class="modal-title" id="viewInstanceLogModalLabel">Instance log</h4>
+                <h4 class="modal-title" id="viewLogModalLabel">Log</h4>
             </div>
 
-            <div class="modal-body viewInstanceLogBody">
+            <div class="modal-body viewLogBody">
             </div>
 
 
@@ -145,7 +145,7 @@
                 </table>
                 </div>
                 <div class="vspace20"></div>
-                <p><a class="btn btn-info loadMoreMessages" href="#" data-queue="" data-lastToken="">
+                <p><a class="btn btn-info loadMoreMessages" href="#" data-queue="" data-lasttoken="">
                     <i class="icon-refresh icon-white"></i>
                     Show more
                 </a></p>
@@ -164,157 +164,167 @@
 <script src="https://netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
 <!-- Include all compiled plugins (below), or include individual files as needed -->
 <script>
-    $(document).ready(function() {
+    $(document).ready(function () {
+
+        if (!window.console) console = {};
+
+        console.log = console.log || function () {};
+        console.warn = console.warn || function () {};
+        console.error = console.error || function () {};
+        console.info = console.info || function () {};
+
+        console.info("Compota console loaded");
+
+        function bindSSHCommand() {
+            $('.sshInstance').click(function (event) {
+                var instance = $(event.target).data('instance');
+                var namespace = $(event.target).data('namespace');
+                sshInstance(instance, namespace)
+            });
+        }
+        bindSSHCommand();
+        function sshInstance(instance, namespace) {
+            console.info('sshInstance(' + instance + ', ' + namespace + ')');
+            $('.sshInstanceBody').load('/instance/ssh' + instance + '/' + namespace);
+            $('#sshInstanceModal').modal('show')
+        }
+
+        function bindTerminateInstance() {
+            $('.terminateInstance').click(function (event) {
+                var instance = $(event.target).data('instance');
+                var namespace = $(event.target).data('namespace');
+                terminateInstance(instance, namespace);
+            })
+        }
+        bindTerminateInstance();
+        function terminateInstance(instance, namespace) {
+            console.info('terminateInstance(' + instance + ', ' + namespace + ')');
+            $('.terminateFinal').data('instance', instance);
+            $('.terminateFinal').data('namespace', namespace);
+            $('.terminateInstanceBody').html('<p>Do you want to terminate instance ' + instance + '?</p>');
+            $('#terminateInstanceModal').modal('show')
+        }
+
+        function bindInstanceStackTrace() {
+            $('.instanceStackTrace').click(function (event) {
+                var instance = $(event.target).data('instance');
+                var namespace = $(event.target).data('namespace');
+                instanceStackTrace(instance, namespace);
+            })
+        }
+        bindInstanceStackTrace();
+        function instanceStackTrace(instance, namespace) {
+            console.info('instanceStackTrace(' + instance + ', ' + namespace + ')');
+            $('.instanceStackTraceBody').load('/instance/stackTrace/' + instance + '/' + namespace);
+            $('#instanceStackTraceModalLabel').text('Stack trace for instance ' + instance);
+            $('#instanceStackTraceModal').modal('show')
+        }
+
+        function bindViewLog() {
+            $('.viewLog').click(function (event) {
+                var instance = $(event.target).data('instance');
+                var namespace = $(event.target).data('namespace');
+                viewLog(instance, namespace);
+            })
+        }
+        bindViewLog();
+        function viewLog(instance, namespace) {
+            console.info('viewLog(' + instance + ', ' + namespace + ')');
+            $('.viewLogBody').load('/logging/' + instance + '/' + namespace);
+            $('#viewLogModalLabel').text('Log for ' + instance);
+            $('#viewLogModal').modal('show')
+        }
+
+        $('.undeploy').click(function (event) {
+            console.info('undeploy:');
+            $('.undeployBody').html('<p>Do you want to undeploy $name$?</p>');
+            $('#undeployModal').modal('show')
+        });
+
+        $('.undeployFinal').click(function (event) {
+            console.info('final undeploy:');
+            $('.undeployBody').load('/undeploy')
+        });
+
+        $('.terminateFinal').click(function (event) {
+            var instance = $(event.target).data('instance');
+            var namespace = $(event.target).data('namespace');
+            console.info('final terminate: ' + instance );
+            $('.terminateInstanceBody').load('/instance/terminate/' + instance + '/' + namespace)
+        });
+
+        $('.loadMoreMessages').click(function () {
+            var queue = $(event.target).data('queue');
+            var lastToken = $('#showMessagesTable').find('tr:last-child').data('lasttoken');
+            var query = '/queue/' + queue + '/messages';
+
+            if (lastToken) {
+                query += "/" + lastToken
+            }
+
+            console.info('loadMoreMessage: ' + query);
+            $.get(query, function (data) {
+                $('#showMessagesTable').append(data);
+                //deleteMessages();
+            })
+        });
+
+        $('.loadMoreNisperoWorkers').click(function () {
+            var lastToken = $('#nisperoWorkersTableBody').find('tr:last-child').data('lasttoken');
+            var nispero = $(event.target).data('nispero');
+            var query = '/nispero/' + nispero + '/workers';
+            if (lastToken) {
+                query += "/" + lastToken
+            }
+
+            console.info("loadMoreNisperoWorkers : " + query);
+            $.get(query, function (data) {
+                $('#nisperoWorkersTableBody').append(data)
+            })
+
+        });
+
+        $('.loadMoreNamespaces').click(function () {
+            var lastToken = $('#namespacesTableBody').find('tr:last-child').data('lasttoken');
+            var query = '/namespaces';
+            if (lastToken) {
+                query += "/" + lastToken
+            }
+
+            console.info("loadMoreNamespaces : " + query);
+            $.get(query, function (data) {
+                $('#namespacesTableBody').append(data)
+            })
+
+        });
+
+        $('.loadMoreErrors').click(function () {
+            var lastToken = $('#errorsTableBody').find('tr:last-child').data('lasttoken');
+
+            var query = '/errors';
+            if (lastToken) {
+                query += "/" + lastToken
+            }
+
+            console.info("loadMoreErrors : " + query);
+            $.get(query, function (data) {
+                $('#errorsTableBody').append(data)
+            })
+
+        });
+
+        $('.showQueueMessages').click(function (event) {
+            var queue = $(event.target).data('queue')
+            console.info('show messages: queue:' + queue);
+            $('#showMessagesModalLabel').text(queue + ' messages');
+            $('#showMessagesTable').load('/queue/' + queue + '/messages')
+
+            $('.loadMoreMessages').data('queue', queue)
+            $('#showMessagesModal').modal('show')
+        });
 
 
-    if (!window.console) console = {};
-    console.log = console.log || function(){};
-    console.warn = console.warn || function(){};
-    console.error = console.error || function(){};
-    console.info = console.info || function(){};
-
-    console.info("loaded")
-
-
-    function bindSSHCommand() {
-     $('.sshInstance').click(function(event){
-        var id  = $(event.target).data('id')
-        sshInstance(id)
-     });
-    }
-
-    bindSSHCommand();
-
-    function sshInstance(id) {
-       console.info("sshInstance(" + id + ")")
-       $('.sshInstanceBody').load('/instance/' + id + '/ssh')
-       $('#sshInstanceModal').modal('show')
-    }
-
-    function bindTerminateInstance() {
-       $('.terminateInstance').click(function(event){
-         var id  = $(event.target).data('id')
-         terminateInstance(id)
-       })
-    }
-
-    bindTerminateInstance();
-
-    function terminateInstance(id) {
-      console.info("terminateInstance(" + id + ")");
-      $('.terminateFinal').attr("id", id)
-      $('.terminateInstanceBody').html("<p>Do you want to terminate instance " + id + "?</p>")
-      $('#terminateInstanceModal').modal('show')
-    }
-
-    function bindInstanceStackTrace() {
-       $('.instanceStackTrace').click(function(event){
-         var id  = $(event.target).data('id')
-         instanceStackTrace(id)
-       })
-    }
-    bindInstanceStackTrace()
-
-    function instanceStackTrace(id) {
-      console.info("instanceStackTrace(" + id + ")");
-
-      $('.instanceStackTraceBody').load('/instance/' + id + '/stackTrace')
-      $('#instanceStackTraceModalLabel').text("Stack trace for " + id)
-      $('#instanceStackTraceModal').modal('show')
-    }
-
-    function bindViewInstanceLog() {
-       $('.viewInstanceLog').click(function(event){
-         var id  = $(event.target).data('id')
-         viewInstanceLog(id)
-       })
-    }
-    bindViewInstanceLog()
-
-    function viewInstanceLog(id) {
-      console.info("viewInstanceLog(" + id + ")");
-
-      $('.viewInstanceLogBody').load('/instance/' + id + '/log')
-      $('#viewInstanceLogModalLabel').text("Log for " + id)
-      $('#viewInstanceLogModal').modal('show')
-    }
-
-
-
-
-   // $('#refresh').click(function(){
-   //     console.info("refresh:");
-   //     $('#workerInstances').load("/nispero/$nispero$/workers", function() {
-   //        bindSSHCommand()
-   //        bindTerminateInstance()
-   //     });
-   // });
-
-
-    $('.undeploy').click(function(event){
-        console.info("undeploy:");
-        $('.undeployBody').html("<p>Do you want to undeploy $name$?</p>")
-        $('#undeployModal').modal('show')
     });
-
-    $('.undeployFinal').click(function(event){
-        console.info("final undeploy:");
-        $('.undeployBody').load("/undeploy")
-    });
-
-    $('.terminateFinal').click(function(event){
-        console.info("final terminate: " + event.target.id);
-        $('.terminateInstanceBody').load("/instance/" + event.target.id + '/terminate')
-    });
-
-     $('.loadMoreMessages').click(function(){
-             var q = $(event.target).data('queue')
-             var lastToken = $('#showMessagesTable tr:last-child').data('lastToken')
-             var query = '/queue/' + q + '/messages'
-
-             if(lastKey) {
-               query += "/" + lastKey
-             }
-
-             console.info("loadMoreMessage: " + query);
-             $.get(query, function(data) {
-                $('#showMessagesTable').append(data)
-                deleteMessages();
-             })
-
-
-     });
-
-     $('.loadMoreErrors').click(function(){
-       var lastToken = $('#errorsTableBody tr:last-child').data('lastToken')
-
-       var query = '/errors'
-       if(lastToken) {
-         query += "/" + lastToken
-       }
-
-       console.info("loadMoreErrors : " + query);
-       $.get(query, function(data) {
-          $('#errorsTableBody').append(data)
-       })
-
-     });
-
-
-
-    $('.showQueueMessages').click(function(event){
-       var q = $(event.target).data('queue')
-       console.info("show messages: queue:" + q);
-        $('#showMessagesModalLabel').text(q + " messages");
-        $('#showMessagesTable').load( '/queue/' + q + '/messages')
-
-        $('.loadMoreMessages').data('queue', q)
-        $('#showMessagesModal').modal('show')
-    });
-
-
-
-    });
-    </script>
+</script>
 </body>
 </html>

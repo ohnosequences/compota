@@ -63,21 +63,17 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
         localErrorCounts = new AtomicInteger(0)
       )
       environments.put((env.instanceId, env.namespace), env)
+      Thread.currentThread().setName(env.threadName)
       //initialEnvironmentRef.se
       env.logger.info("initial environment started")
       env
     }
   }
 
-  def terminateInstance(instance: InstanceId): Try[Unit] = {
-    environments.find { case ((inst, ns), env) =>
-      instance.id.equals(inst.id)
-    } match {
+  def terminateInstance(instance: InstanceId, namespace: Namespace): Try[Unit] = {
+    Option(environments.get((instance, namespace))) match {
       case None => Success(()) //so idempotent
-      case Some(((inst, ns), env)) => {
-        env.stop()
-        Success(())
-      }
+      case Some(env) => Try(env.stop())
     }
   }
 
@@ -108,7 +104,7 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
 
   private def workerInstanceNamespace(nispero: AnyLocalNispero, id: Int): (InstanceId, Namespace) = {
     val s = workerSubspace(nispero, id)
-    (InstanceId(s), Namespace.root / s)
+    (InstanceId(s), Namespace.root)
   }
 
   def launchWorker(nispero: AnyLocalNispero, id: Int): Try[LocalEnvironment] = {
@@ -142,15 +138,17 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
     //logger.debug("envs: " + )
     Try {
       for (i <- 1 to nispero.configuration.workers) {
-        terminateInstance(workerInstanceNamespace(nispero, i)._1).get
+        terminateInstance(workerInstanceNamespace(nispero, i)._1, workerInstanceNamespace(nispero, i)._2).get
       }
     }
   }
 
-  def listNisperoWorkers(nispero: CompotaNispero): Try[List[CompotaEnvironment]] = {
+  def listNisperoWorkers(logger: Logger, nispero: CompotaNispero): Try[List[CompotaEnvironment]] = {
     Try {
       val res = new ListBuffer[CompotaEnvironment]()
       for (i <- 1 to nispero.configuration.workers) {
+        logger.info("looking for " + workerInstanceNamespace(nispero, i))
+        //logger.info("in " + environments)
         Option(environments.get(workerInstanceNamespace(nispero, i))).foreach { e =>
           res += e
         }

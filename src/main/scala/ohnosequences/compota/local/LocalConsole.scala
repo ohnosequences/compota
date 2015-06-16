@@ -4,14 +4,13 @@ import java.io.File
 import java.net.URL
 
 import ohnosequences.compota.Namespace
-import ohnosequences.compota.console.{AnyWorkerInfo, Console}
+import ohnosequences.compota.console.{Pagination, AnyEnvironmentInfo, Console}
 import ohnosequences.compota.environment.InstanceId
-import ohnosequences.compota.graphs.{QueueChecker, NisperoGraph}
+import ohnosequences.compota.graphs.{QueueChecker}
 import ohnosequences.compota.queues.AnyQueueOp
-import ohnosequences.logging.Logger
 
 import scala.util.{Failure, Success, Try}
-import scala.xml.{Node, NodeSeq}
+import scala.xml.{NodeSeq}
 
 import scala.collection.JavaConversions._
 
@@ -23,13 +22,13 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
   Console[LocalEnvironment, N, AnyLocalCompota.of2[N]](localCompota, env, controlQueueOp, nisperoGraph) {
 
 
-  override def getLogRaw(instanceId: String, namespace: String): Try[Either[URL, String]] = {
+  override def getLogRaw(instanceId: String, namespace: Seq[String]): Try[Either[URL, String]] = {
     localCompota.getLog(env.logger, InstanceId(instanceId), Namespace(namespace)).map { s =>
       Right(s)
     }
   }
 
-  override def printLog(instanceId: String, namespace: String): NodeSeq = {
+  override def printLog(instanceId: String, namespace: Seq[String]): NodeSeq = {
     preResult(localCompota.getLog(env.logger, InstanceId(instanceId), Namespace(namespace)))
   }
 
@@ -53,56 +52,40 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
   }
 
 
-  override def terminateInstance(instanceId: String): NodeSeq = {
-    preResult(localCompota.terminateInstance(InstanceId(instanceId)).map(_ => "instance " + instanceId  + " terminated"))
+  override def terminateInstance(instanceId: String, namespace: Seq[String]): NodeSeq = {
+    preResult(localCompota.terminateInstance(InstanceId(instanceId), Namespace(namespace)).map(_ => "instance " + instanceId  + " terminated"))
   }
 
-  case class ListWorkerInfoLocal(env: LocalEnvironment) extends AnyWorkerInfo {
+  case class LocalEnvironmentInfo(env: LocalEnvironment) extends AnyEnvironmentInfo {
 
     override def instanceId: InstanceId = env.instanceId
 
-    override def printState: String = {
+
+    override def namespace: Namespace = env.namespace
+
+    override def printState: NodeSeq = {
       env.getThreadInfo match {
-        case Some((t, st)) => t.getState.toString
-        case None => "n/a"
+        case Some((t, st)) => <p>{t.getState.toString}</p>
+        case None => <p>n/a</p>
       }
     }
     override def printConnectAction: NodeSeq = xml.NodeSeq.Empty
   }
 
+  override type EnvironmentInfo = LocalEnvironmentInfo
 
-  override type ListWorkerInfo = ListWorkerInfoLocal
-
-  override def listWorkers(nisperoName: String, lastWorkerToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ListWorkerInfo])] = {
+  override def listNisperoWorkers(nisperoName: String, lastWorkerToken: Option[String], limit: Option[Int]): Try[(Option[String], List[LocalEnvironmentInfo])] = {
     localCompota.nisperosNames.get(nisperoName) match {
       case Some(nispero) => {
-        localCompota.listNisperoWorkers(nispero).flatMap { list =>
-          val workerInfo: List[ListWorkerInfoLocal] = list.map(ListWorkerInfoLocal)
-          lastWorkerToken match {
-            case None => listWorkers(workerInfo, limit)
-            case Some(l) => listWorkers(workerInfo.drop(l.toInt + 1), limit)
-          }
+        localCompota.listNisperoWorkers(env.logger, nispero).map { list =>
+          env.logger.info("get workers info: " + list)
+          val workerInfo: List[LocalEnvironmentInfo] = list.map(LocalEnvironmentInfo)
+          Pagination.listPagination(workerInfo, limit, lastWorkerToken)
         }
       }
       case None => Failure(new Error("couldn't find nispero " + nisperoName))
     }
   }
-
-  def listWorkers(workerInfo: List[ListWorkerInfo], limit: Option[Int]): Try[(Option[String], List[ListWorkerInfo])] = {
-    val (lastWorker, workerInfoList) = limit match {
-      case None => {
-        (None, workerInfo)
-      }
-      case Some(l) if l < workerInfo.size - 1 => {
-        (Some(l.toString), workerInfo.take(l))
-      }
-      case Some(l) => {
-        (Some(l.toString), workerInfo)
-      }
-    }
-    Success((lastWorker, workerInfoList))
-  }
-
 
   override def nisperoInfoDetails(nispero: N): NodeSeq = {
     <table class="table table-striped topMargin20">
@@ -143,20 +126,49 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
 
   }
 
+  override def namespacePage: NodeSeq = {
+    <h2>Instances and namespaces</h2>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th class="col-md-3">instance/namespace</th>
+            <th class="col-md-3">status</th>
+            <th class="col-md-3">actions</th>
+          </tr>
+        </thead>
+        <table class="table table-striped topMargin20">
+          <tbody id="namespacesTableBody">
+            {printNamespaces(None)}
+          </tbody>
+        </table>
+      </table>
+      <p><a class="btn btn-info loadMoreNamespaces" href="#">
+        <i class="icon-refresh icon-white"></i>
+        Show more
+      </a></p>
+  }
 
-  def printNamespaceTable(): NodeSeq = {
-   // logger.info(localCompota.environments.toString)
-
-    localCompota.environments.toList.map { case ((inst, ns), env) =>
-      printNamespaceItem(env)
+  def listNamespaces(lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[EnvironmentInfo])] = {
+    Try {
+      val namespaces: List[LocalEnvironmentInfo] = localCompota.environments.map { case ((instance, namespace), e) =>
+        new LocalEnvironmentInfo(e)
+      }.toList
+      Pagination.listPagination(namespaces, limit, lastToken)
     }
   }
 
-  override def stackTraceInstance(instanceId: String, namespace: String): NodeSeq = {
+  def printNamespaces(lastToken: Option[String]): NodeSeq = {
+    listNamespaces(lastToken, Some(5)) match {
+      case Failure(t) => printEnvironmentInfoError(t, lastToken)
+      case Success((newLastToken, list)) => list.map(printEnvironmentInfo(_, newLastToken))
+    }
+  }
+
+  override def stackTraceInstance(instanceId: String, namespace: Seq[String]): NodeSeq = {
     preResult(localCompota.getStackTrace(InstanceId(instanceId), Namespace(namespace)))
   }
 
-  override def sshInstance(instanceId: String): NodeSeq = xml.NodeSeq.Empty
+  override def sshInstance(instanceId: String, namespace: Seq[String]): NodeSeq = xml.NodeSeq.Empty
 
   override def mainHTML: String = {
     scala.io.Source.fromFile(new File("E:\\reps\\compota\\src\\main\\resources\\console\\main.html")).getLines().mkString(System.lineSeparator())

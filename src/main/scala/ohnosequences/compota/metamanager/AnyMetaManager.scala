@@ -5,7 +5,7 @@ import java.util.concurrent.{ConcurrentHashMap, Executors, ExecutorService}
 
 import ohnosequences.compota.environment.AnyEnvironment
 import ohnosequences.compota.graphs.{QueueChecker, NisperoGraph}
-import ohnosequences.compota.queues.{AnyQueue, AnyQueueOp, Queue, QueueOp}
+import ohnosequences.compota.queues._
 import ohnosequences.compota.{AnyNispero, TerminationDaemon, AnyCompota, Namespace}
 
 
@@ -13,6 +13,69 @@ import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
 import scala.concurrent._
+
+trait AnyMessageLoopContext extends AnyProcessContext {
+  type Command <: AnyMetaManagerCommand
+  type QueueContext
+  type QueueMessage <: AnyQueueMessage.of[Command]
+  val controlQueue: AnyQueue.of1[Command, QueueContext, QueueMessage]
+  def controlQueueOp: AnyQueueOp.of2[Command, QueueMessage]
+  val reader: AnyQueueReader.of[Command, QueueMessage]
+  val writer: AnyQueueWriter.of[Command]
+}
+
+object AnyMessageLoopContext {
+  type of4[E, Cmd, Ctx, M <: AnyQueueMessage.of[Cmd]] = AnyMessageLoopContext {
+    type Environment = E
+    type Command = Cmd
+    type QueueContext = Ctx
+    type QueueMessage = M
+  }
+}
+
+case class MessageLoopContext[
+  E <: AnyEnvironment[E],
+  Cmd <: AnyMetaManagerCommand,
+  Ctx,
+  M <: AnyQueueMessage.of[Cmd]
+//  C <: AnyQueue.of1[Cmd, Ctx, M]
+ ](
+  env: E,
+  queueOps: List[AnyQueueOp],
+  queueChecker: QueueChecker[E],
+  controlQueue: AnyQueue.of1[Cmd, Ctx, M],
+  controlQueueOp: AnyQueueOp.of2[Cmd, M],
+  reader: AnyQueueReader.of[Cmd, M],
+  writer: AnyQueueWriter.of[Cmd]
+) extends AnyMessageLoopContext {
+  override type Environment = E
+  override type Command = Cmd
+  override type QueueContext = Ctx
+  override type QueueMessage = M
+
+}
+
+trait AnyProcessContext {
+  type Environment <: AnyEnvironment[Environment]
+  val env: Environment
+  def controlQueueOp: AnyQueueOp
+  val queueOps: List[AnyQueueOp]
+  val queueChecker: QueueChecker[Environment]
+}
+
+object AnyMetaManagerContext {
+  type of[E <: AnyEnvironment[E]] = AnyProcessContext {
+    type Environment = E
+  }
+}
+
+case class ProcessContext[E <: AnyEnvironment[E]](env: E,
+                                                      controlQueueOp: AnyQueueOp,
+                                                      queueOps: List[AnyQueueOp],
+                                                      queueChecker: QueueChecker[E]
+                                                       ) extends AnyProcessContext {
+  override type Environment = E
+}
 
 //abstract manager without command queue manipulations
 
@@ -38,25 +101,7 @@ trait AnyMetaManager {
 
   def controlQueueContext(env: MetaManagerEnvironment): MetaManagerControlQueueContext
 
-  val runingTasks = new ConcurrentHashMap[String, AtomicInteger]()
-
-  def getProcessingTasks(): List[(String, Int)] = {
-    import scala.collection.JavaConversions._
-    runingTasks.filter { case (p, i) =>
-      i.get() > 0
-    }.map { case (p, i) =>
-      (p, i.get())
-    }.toList
-  }
-
-
-
-  def process(command: MetaManagerCommand,
-              env: MetaManagerEnvironment,
-              controlQueueOp: AnyQueueOp,
-              queueOps: List[AnyQueueOp],
-              queueChecker: QueueChecker[MetaManagerEnvironment]
-               ): Try[List[MetaManagerCommand]]
+  def process(command: MetaManagerCommand, ctx: AnyMetaManagerContext.of[MetaManagerEnvironment]): Try[List[MetaManagerCommand]]
 
   def printMessage(message: String): String = {
     message.split(System.lineSeparator()).toList match {
@@ -86,19 +131,14 @@ trait AnyMetaManager {
 
 
     @tailrec
-    def messageLoop(queueOp: AnyQueueOp.of[MetaManagerCommand, controlQueue.QueueQueueMessage, controlQueue.QueueQueueReader, controlQueue.QueueQueueWriter],
-                    reader: controlQueue.QueueQueueReader,
-                    writer: controlQueue.QueueQueueWriter,
-                    queueOps: List[AnyQueueOp],
-                    queueChecker: QueueChecker[MetaManagerEnvironment]): Unit = {
+    def messageLoop(ctx: AnyMessageLoopContext.of4[MetaManagerEnvironment, MetaManagerCommand, MetaManagerControlQueueContext, controlQueue.QueueQueueMessage]): Unit = {
 
       val executor = env.executor
-      //implicit val executionContext: ExecutionContext = ExecutionContext.fromExecutor(executor)
 
       if (!env.isStopped) {
         val logger = env.logger
         logger.debug("reading message from control queue")
-        reader.waitForMessage(logger, {env.isStopped}).recoverWith { case t => {
+        ctx.reader.waitForMessage(logger, {env.isStopped}).recoverWith { case t => {
             env.reportError(new Error("couldn't receive message from control queue", t), env.namespace / Namespace.controlQueue)
             Failure(t)
           }
@@ -116,7 +156,7 @@ trait AnyMetaManager {
             }.flatMap {
               case None => {
                 logger.warn("message " + printMessage(message.id) + " is deleted")
-                queueOp.deleteMessage(message).recoverWith { case t =>
+                ctx.controlQueueOp.deleteMessage(message).recoverWith { case t =>
                   env.reportError(new Error("couldn't delete message " + printMessage(message.id) + " from control queue", t), env.namespace / message.id)
                   Failure(t)
                 }
@@ -125,37 +165,35 @@ trait AnyMetaManager {
                 Try{env.executor.execute (  new Runnable {
                   override def toString: String = body.prefix + " executor"
                   override def run(): Unit = {
-                    runingTasks.putIfAbsent(body.prefix, new AtomicInteger())
-                    runingTasks.get(body.prefix).incrementAndGet()
 
                     logger.debug("processing message " + printMessage(body.toString))
-                    process(body, env, queueOp, queueOps, queueChecker) match {
+
+                    process(body, ctx) match {
                       case Failure(t) => {
                         //command processing failure
                         env.reportError(t, env.namespace / message.id)
                       }
                       case Success(commands) => {
                         logger.debug("writing result: " + printMessage(commands.toString))
-                        writer.writeRaw(commands.map { c => (printMessage(c.prefix) + "_" + System.currentTimeMillis(), c)}).recoverWith { case t =>
+                        ctx.writer.writeRaw(commands.map { c => (printMessage(c.prefix) + "_" + System.currentTimeMillis(), c)}).recoverWith { case t =>
                           env.reportError(new Error("couldn't write message to control queue", t), env.namespace / Namespace.controlQueue)
                           Failure(t)
                         }.flatMap { written =>
                           logger.debug("deleting message: " + printMessage(message.id))
-                          queueOp.deleteMessage(message).recoverWith { case t =>
+                          ctx.controlQueueOp.deleteMessage(message).recoverWith { case t =>
                             env.reportError(new Error("couldn't delete message " + printMessage(message.id) + " from control queue", t), env.namespace / message.id)
                             Failure(t)
                           }
                         }
                       }
                     }
-                    runingTasks.get(body.prefix).decrementAndGet()
                   }
                 })
                 }
             }
           }
         }
-        messageLoop(queueOp, reader, writer, queueOps, queueChecker)
+        messageLoop(ctx)
       } else {
         env.logger.info("environment stopped")
         Success(())
@@ -189,13 +227,8 @@ trait AnyMetaManager {
                   logger.info("writing init message: " + printMessage(initMessage.toString))
                   writer.writeRaw(List((printMessage(initMessage.toString) + "_" + System.currentTimeMillis(), initMessage))).flatMap { res =>
                     logger.debug("starting message loop")
-                    messageLoop(
-                      queueOp,
-                      reader,
-                      writer,
-                      queueChecker.queueOps.toList.map{_._2},
-                      queueChecker
-                    )
+                    val messageLoopContext = MessageLoopContext[MetaManagerEnvironment, MetaManagerCommand, MetaManagerControlQueueContext, controlQueue.QueueQueueMessage](env, queueChecker.queueOps.toList.map{_._2}, queueChecker, controlQueue, queueOp, reader, writer)
+                    messageLoop(messageLoopContext)
                     Success(())
                   }
                 }

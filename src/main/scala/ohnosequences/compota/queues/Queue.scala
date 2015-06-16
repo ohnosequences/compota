@@ -145,6 +145,12 @@ object AnyQueue {
     type QueueElement = E
   }
 
+  type of1[E, Ctx, Msg <: AnyQueueMessage.of[E]] = AnyQueue {
+    type QueueContext = Ctx
+    type QueueElement = E
+    type QueueQueueMessage = Msg
+  }
+
   type of2m[E, Ctx] = MonoidQueue {
     type QueueContext = Ctx
     type QueueElement = E
@@ -283,6 +289,10 @@ object  AnyQueueOp {
     type QueueOpQueueMessage = M
     type QueueOpQueueReader = QR
     type QueueOpQueueWriter = QW
+  }
+  type of2[E, M <: AnyQueueMessage.of[E]] = AnyQueueOp {
+    type QueueOpElement = E
+    type QueueOpQueueMessage = M
   }
 }
 

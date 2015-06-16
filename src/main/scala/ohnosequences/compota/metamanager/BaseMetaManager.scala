@@ -25,11 +25,12 @@ trait BaseMetaManager extends AnyMetaManager {
   }
 
   override def process(command: BaseMetaManagerCommand,
-                       env: MetaManagerEnvironment,
-                       controlQueueOp: AnyQueueOp,
-                       queueOps: List[AnyQueueOp],
-                       queueChecker: QueueChecker[MetaManagerEnvironment]
+                       ctx: AnyMetaManagerContext.of[MetaManagerEnvironment]
                         ): Try[List[BaseMetaManagerCommand]] = {
+    val env = ctx.env
+    val queueChecker = ctx.queueChecker
+    val controlQueueOp = ctx.controlQueueOp
+    val queueOps = ctx.queueOps
     val logger = env.logger
     logger.info("processing tasks " + command)
     command match {

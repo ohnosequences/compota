@@ -29,10 +29,7 @@ class AwsMetaManager[U](val compota: AnyAwsCompota.of[U]) extends BaseMetaManage
   override val controlQueue = new DynamoDBQueue[BaseMetaManagerCommand](compota.configuration.controlQueue, BaseCommandSerializer)
 
   override def process(command: BaseMetaManagerCommand,
-                       env: AwsEnvironment,
-                       controlQueueOp: AnyQueueOp,
-                       queueOps: List[AnyQueueOp],
-                       queueChecker: QueueChecker[MetaManagerEnvironment]
+                       ctx: AnyMetaManagerContext.of[MetaManagerEnvironment]
                       ): Try[List[BaseMetaManagerCommand]] = {
     command match {
 //      case UnDeploy(reason, force) if reason.startsWith(AwsErrorTable.errorTableError) => {
@@ -47,7 +44,7 @@ class AwsMetaManager[U](val compota: AnyAwsCompota.of[U]) extends BaseMetaManage
 //          }
 //        }
 //      }
-      case c => super.process(c, env, controlQueueOp, queueOps, queueChecker)
+      case c => super.process(c, ctx)
     }
   }
 

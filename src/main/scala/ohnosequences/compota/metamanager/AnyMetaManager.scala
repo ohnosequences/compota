@@ -1,6 +1,6 @@
 package ohnosequences.compota.metamanager
 
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.{AtomicReference, AtomicInteger}
 import java.util.concurrent.{ConcurrentHashMap, Executors, ExecutorService}
 
 import ohnosequences.compota.environment.AnyEnvironment
@@ -14,15 +14,25 @@ import scala.util.{Failure, Success, Try}
 
 import scala.concurrent._
 
-trait AnyMessageLoopContext extends AnyProcessContext {
+trait AnyMessageLoopContext {
+  type Environment <: AnyEnvironment[Environment]
+  def env: Environment
   type Command <: AnyMetaManagerCommand
   type QueueContext
   type QueueMessage <: AnyQueueMessage.of[Command]
-  val controlQueue: AnyQueue.of3[Command, QueueContext, QueueMessage]
+  def controlQueue: AnyQueue.of3[Command, QueueContext, QueueMessage]
   def controlQueueOp: AnyQueueOp.of2[Command, QueueMessage]
-  val reader: AnyQueueReader.of[Command, QueueMessage]
-  val writer: AnyQueueWriter.of[Command]
+  def reader: AnyQueueReader.of[Command, QueueMessage]
+  def writer: AnyQueueWriter.of[Command]
+  def queueOps: List[AnyQueueOp]
+  def queueChecker: QueueChecker[Environment]
+
+  val processingCommands: ConcurrentHashMap[Command, Runnable] = new ConcurrentHashMap[Command, Runnable]()
+
+  def processContext[U] = ProcessContext[Environment, U](env, controlQueueOp, queueOps, queueChecker)
 }
+
+
 
 object AnyMessageLoopContext {
   type of4[E, Cmd, Ctx, M <: AnyQueueMessage.of[Cmd]] = AnyMessageLoopContext {
@@ -57,24 +67,28 @@ case class MessageLoopContext[
 
 trait AnyProcessContext {
   type Environment <: AnyEnvironment[Environment]
-  val env: Environment
+  type UnDeployActionsContext
+  def env: Environment
   def controlQueueOp: AnyQueueOp
-  val queueOps: List[AnyQueueOp]
-  val queueChecker: QueueChecker[Environment]
+  def queueOps: List[AnyQueueOp]
+  def queueChecker: QueueChecker[Environment]
+  val compotaUnDeployActionContext: AtomicReference[Option[UnDeployActionsContext]] = new AtomicReference(None)
 }
 
-object AnyMetaManagerContext {
-  type of[E <: AnyEnvironment[E]] = AnyProcessContext {
+object AnyProcessContext {
+  type of[E <: AnyEnvironment[E], U] = AnyProcessContext {
     type Environment = E
+    type UnDeployActionsContext = U
   }
 }
 
-case class ProcessContext[E <: AnyEnvironment[E]](env: E,
+case class ProcessContext[E <: AnyEnvironment[E], U](env: E,
                                                       controlQueueOp: AnyQueueOp,
                                                       queueOps: List[AnyQueueOp],
                                                       queueChecker: QueueChecker[E]
                                                        ) extends AnyProcessContext {
   override type Environment = E
+  override type UnDeployActionsContext = U
 }
 
 //abstract manager without command queue manipulations
@@ -101,7 +115,7 @@ trait AnyMetaManager {
 
   def controlQueueContext(env: MetaManagerEnvironment): MetaManagerControlQueueContext
 
-  def process(command: MetaManagerCommand, ctx: AnyMetaManagerContext.of[MetaManagerEnvironment]): Try[List[MetaManagerCommand]]
+  def process(command: MetaManagerCommand, ctx: AnyProcessContext.of[MetaManagerEnvironment, MetaManagerUnDeployingActionContext]): Try[List[MetaManagerCommand]]
 
   def printMessage(message: String): String = {
     message.split(System.lineSeparator()).toList match {
@@ -131,7 +145,8 @@ trait AnyMetaManager {
 
 
     @tailrec
-    def messageLoop(ctx: AnyMessageLoopContext.of4[MetaManagerEnvironment, MetaManagerCommand, MetaManagerControlQueueContext, controlQueue.QueueQueueMessage]): Unit = {
+    def messageLoop(ctx: AnyMessageLoopContext.of4[MetaManagerEnvironment, MetaManagerCommand, MetaManagerControlQueueContext, controlQueue.QueueQueueMessage],
+                    processContext: AnyProcessContext.of[MetaManagerEnvironment, MetaManagerUnDeployingActionContext]): Unit = {
 
       val executor = env.executor
 
@@ -162,38 +177,50 @@ trait AnyMetaManager {
                 }
               }
               case Some(body) =>
-                Try{env.executor.execute (  new Runnable {
+                Try{env.executor.execute (  new Runnable { runnable =>
                   override def toString: String = body.prefix + " executor"
                   override def run(): Unit = {
-
                     logger.debug("processing message " + printMessage(body.toString))
-
-                    process(body, ctx) match {
-                      case Failure(t) => {
-                        //command processing failure
-                        env.reportError(t, env.namespace / message.id)
-                      }
-                      case Success(commands) => {
-                        logger.debug("writing result: " + printMessage(commands.toString))
-                        ctx.writer.writeRaw(commands.map { c => (printMessage(c.prefix) + "_" + System.currentTimeMillis(), c)}).recoverWith { case t =>
-                          env.reportError(new Error("couldn't write message to control queue", t), env.namespace / Namespace.controlQueue)
-                          Failure(t)
-                        }.flatMap { written =>
-                          logger.debug("deleting message: " + printMessage(message.id))
-                          ctx.controlQueueOp.deleteMessage(message).recoverWith { case t =>
-                            env.reportError(new Error("couldn't delete message " + printMessage(message.id) + " from control queue", t), env.namespace / message.id)
+                    if (ctx.processingCommands.containsKey(body)) {
+                      logger.warn("command " + printMessage(body.toString) + " is processing")
+//                      logger.debug("deleting message: " + printMessage(message.id))
+//                      ctx.controlQueueOp.deleteMessage(message).recoverWith { case t =>
+//                        env.reportError(new Error("couldn't delete message " + printMessage(message.id) + " from control queue", t), env.namespace / message.id)
+//                        Failure(t)
+//                      }
+                    } else {
+                      ctx.processingCommands.put(body, runnable)
+                      process(body, processContext)  match {
+                        case Failure(t) => {
+                          ctx.processingCommands.remove(body)
+                          //command processing failure
+                          env.reportError(t, env.namespace / message.id)
+                        }
+                        case Success(commands) => {
+                          logger.info("command " + printMessage(body.toString) + " processed")
+                          ctx.processingCommands.remove(body)
+                          logger.debug("writing result: " + printMessage(commands.toString))
+                          ctx.writer.writeRaw(commands.map { c => (printMessage(c.prefix) + "_" + System.currentTimeMillis(), c) }).recoverWith { case t =>
+                            env.reportError(new Error("couldn't write message to control queue", t), env.namespace / Namespace.controlQueue)
                             Failure(t)
+                          }.flatMap { written =>
+                            logger.debug("deleting message: " + printMessage(message.id))
+                            ctx.controlQueueOp.deleteMessage(message).recoverWith { case t =>
+                              env.reportError(new Error("couldn't delete message " + printMessage(message.id) + " from control queue", t), env.namespace / message.id)
+                              Failure(t)
+                            }
                           }
                         }
                       }
+
                     }
                   }
                 })
-                }
+              }
             }
           }
         }
-        messageLoop(ctx)
+        messageLoop(ctx, processContext)
       } else {
         env.logger.info("environment stopped")
         Success(())
@@ -228,7 +255,7 @@ trait AnyMetaManager {
                   writer.writeRaw(List((printMessage(initMessage.toString) + "_" + System.currentTimeMillis(), initMessage))).flatMap { res =>
                     logger.debug("starting message loop")
                     val messageLoopContext = MessageLoopContext[MetaManagerEnvironment, MetaManagerCommand, MetaManagerControlQueueContext, controlQueue.QueueQueueMessage](env, queueChecker.queueOps.toList.map{_._2}, queueChecker, controlQueue, queueOp, reader, writer)
-                    messageLoop(messageLoopContext)
+                    messageLoop(messageLoopContext, messageLoopContext.processContext[MetaManagerUnDeployingActionContext])
                     Success(())
                   }
                 }

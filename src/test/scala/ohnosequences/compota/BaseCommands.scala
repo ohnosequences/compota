@@ -38,10 +38,11 @@ class BaseCommands {
 
     assertEquals(UnDeployMetaManger, BaseCommandSerializer.fromString(BaseCommandSerializer.toString(UnDeployMetaManger).get).get)
 
-    assertEquals(PrepareUnDeployActions, BaseCommandSerializer.fromString(BaseCommandSerializer.toString(PrepareUnDeployActions).get).get)
+    val prepareUnDeployActions = PrepareUnDeployActions(true)
+    assertEquals(prepareUnDeployActions, BaseCommandSerializer.fromString(BaseCommandSerializer.toString(prepareUnDeployActions).get).get)
 
     val commands = List(createNisperoWorkers, deleteNisperoWorkers, UnDeploy,
-      forceUnDeploy, reduceQueue, deleteQueue, finishCompota, AddTasks, UnDeployMetaManger, PrepareUnDeployActions, ExecuteUnDeployActions)
+      forceUnDeploy, reduceQueue, deleteQueue, finishCompota, AddTasks, UnDeployMetaManger, prepareUnDeployActions, ExecuteUnDeployActions)
 
     assertEquals(commands.size, commands.map { c => BaseCommandSerializer.toString(c).get}.toSet.size)
 

@@ -25,6 +25,7 @@ case class Command0(component: String, action: String, args: List[String]) { com
     //  val deleteErrorTable = DeleteErrorTable("reason", true)
     val reduceQueue = ReduceQueue(1)
     val deleteQueue = DeleteQueue(1)
+    val prepareUnDeployActions = PrepareUnDeployActions(true)
     val finishCompota = FinishCompota("reason", "message")
 
 
@@ -40,7 +41,7 @@ case class Command0(component: String, action: String, args: List[String]) { com
       case Command0(AddTasks.component, AddTasks.action, Nil) => Try{ AddTasks }
       case Command0(LaunchTerminationDaemon.component, LaunchTerminationDaemon.action, Nil) => Try{ LaunchTerminationDaemon }
       case Command0(LaunchConsole.component, LaunchConsole.action, Nil) => Try{ LaunchConsole }
-      case Command0(PrepareUnDeployActions.component, PrepareUnDeployActions.action, Nil) => Try{ PrepareUnDeployActions }
+      case Command0(prepareUnDeployActions.component, prepareUnDeployActions.action, execute :: Nil) => Try{ PrepareUnDeployActions(execute.toBoolean) }
       case Command0(ExecuteUnDeployActions.component, ExecuteUnDeployActions.action, Nil) => Try{ ExecuteUnDeployActions }
 
       case Command0(finishCompota.component, finishCompota.action, reason :: message :: Nil) => Try{ FinishCompota(reason, message) }
@@ -133,10 +134,10 @@ case class FinishCompota(reason: String, message: String) extends BaseMetaManage
   override val args: List[String] = List[String](reason, message)
 }
 
-case object PrepareUnDeployActions extends BaseMetaManagerCommand {
+case class PrepareUnDeployActions(executeUndeployActions: Boolean) extends BaseMetaManagerCommand {
   override val component: String = "undeploy_actions"
   override val action: String = "prepare"
-  override val args: List[String] = List[String]()
+  override val args: List[String] = List[String](executeUndeployActions.toString)
 }
 
 case object ExecuteUnDeployActions extends BaseMetaManagerCommand {

@@ -24,6 +24,7 @@ object AnyAwsCompota {
 }
 
 trait AnyAwsCompota extends AnyCompota { awsCompota =>
+
   override type CompotaEnvironment = AwsEnvironment
   override type CompotaNispero = AnyAwsNispero
   override type CompotaMetaManager = AwsMetaManager[CompotaUnDeployActionContext]
@@ -31,25 +32,12 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
   type CompotaConfiguration <: AwsCompotaConfiguration
 
 
-  lazy val awsCredentialsProvider: AWSCredentialsProvider = {
-    new InstanceProfileCredentialsProvider()
-  }
-
   override val metaManager: CompotaMetaManager = new AwsMetaManager[CompotaUnDeployActionContext](AnyAwsCompota.this)
 
   val executor = Executors.newCachedThreadPool()
 
-  val awsClients0: AtomicReference[Option[AWSClients]] = new AtomicReference(None)
-  def awsClients: AWSClients = {
-    awsClients0.get match {
-      case None => {
-        val aws = AWSClients.create(awsCredentialsProvider)
-        awsClients0.set(Some(aws))
-        aws
-      }
-      case Some(aws) => aws
-    }
-  }
+  lazy val awsCredentialsProvider: AWSCredentialsProvider = new InstanceProfileCredentialsProvider()
+  lazy val awsClients: AWSClients = AWSClients.create(awsCredentialsProvider)
 
   def launchLogUploader(): Unit = {
     initialEnvironment.map { env =>
@@ -89,43 +77,34 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
     }
   }
 
-  private val initialEnvironment_ = new AtomicReference[Option[AwsEnvironment]](None)
-  override def initialEnvironment: Try[AwsEnvironment] = {
-    initialEnvironment_.get match {
-      case Some(env) => Success(env)
-      case None => {
-        val ec2InstanceId = awsClients.ec2.getCurrentInstanceId.getOrElse("unknown_" + System.currentTimeMillis())
-        configuration.workingDirectory.mkdir()
-        S3Logger(
-          awsClients.s3,
-          ec2InstanceId,
-          configuration.loggingDirectory,
-          "log.txt",
-          configuration.loggingDestination(InstanceId(ec2InstanceId), Namespace.root),
-          debug = configuration.loggingDebug,
-          printToConsole = configuration.loggersPrintToConsole
-        ).flatMap { logger =>
-          AwsErrorTable.apply(logger, configuration.errorTable, awsClients).map { errorTable =>
-            new AwsEnvironment(
-              instanceId = InstanceId(ec2InstanceId),
-              namespace = Namespace.root,
-              configuration = configuration,
-              awsClients = awsClients,
-              logger = logger,
-              workingDirectory = configuration.workingDirectory,
-              executor = executor,
-              errorTable = errorTable,
-              sendForceUnDeployCommand0 = sendForceUnDeployCommand,
-              environments = new ConcurrentHashMap[(InstanceId, Namespace), AwsEnvironment](),
-              rootEnvironment0 = None,
-              origin = None,
-              localErrorCounts = new AtomicInteger(0)
-            )
-          }
-        }.map { env =>
-          initialEnvironment_.set(Some(env))
-          env
-        }
+  override lazy val initialEnvironment: Try[AwsEnvironment] = {
+    val ec2InstanceId = awsClients.ec2.getCurrentInstanceId.getOrElse("unknown_" + System.currentTimeMillis())
+    configuration.workingDirectory.mkdir()
+    S3Logger(
+      awsClients.s3,
+      ec2InstanceId,
+      configuration.loggingDirectory,
+      "log.txt",
+      configuration.loggingDestination(InstanceId(ec2InstanceId), Namespace.root),
+      debug = configuration.loggingDebug,
+      printToConsole = configuration.loggersPrintToConsole
+    ).flatMap { logger =>
+      AwsErrorTable.apply(logger, configuration.errorTable, awsClients).map { errorTable =>
+        new AwsEnvironment(
+          instanceId = InstanceId(ec2InstanceId),
+          namespace = Namespace.root,
+          configuration = configuration,
+          awsClients = awsClients,
+          logger = logger,
+          workingDirectory = configuration.workingDirectory,
+          executor = executor,
+          errorTable = errorTable,
+          sendForceUnDeployCommand0 = sendForceUnDeployCommand,
+          environments = new ConcurrentHashMap[(InstanceId, Namespace), AwsEnvironment](),
+          rootEnvironment0 = None,
+          origin = None,
+          localErrorCounts = new AtomicInteger(0)
+        )
       }
     }
   }
@@ -187,18 +166,16 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
       }
     }
   }
+
 }
 
 
 abstract class AwsCompota[U] (
    val nisperos: List[AnyAwsNispero],
-   val reducers: List[AnyQueueReducer.of[AwsEnvironment]],
    val configuration: AwsCompotaConfiguration)
   extends AnyAwsCompota {
 
   override type CompotaUnDeployActionContext = U
-
-//  override type CompotaNispero = AnyAwsNispero
 
   override type CompotaConfiguration = AwsCompotaConfiguration
 

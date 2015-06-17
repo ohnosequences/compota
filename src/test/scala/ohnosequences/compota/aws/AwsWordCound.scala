@@ -5,10 +5,10 @@ import ohnosequences.compota.aws.deployment.{AnyMetadata, Metadata}
 import ohnosequences.compota.aws.queues.DynamoDBQueue
 import ohnosequences.compota.environment.Env
 import ohnosequences.compota.local.LocalNispero
-import ohnosequences.compota.queues.InMemoryQueueReducer
+import ohnosequences.compota.queues.{InMemoryReducible, InMemoryQueueReducer}
 import ohnosequences.compota.serialization.{intSerializer, stringSerializer}
 import ohnosequences.compota.Instructions
-import ohnosequences.compota.monoid.{stringMonoid, intMonoid}
+import ohnosequences.compota.monoid.{Monoid, stringMonoid, intMonoid}
 import ohnosequences.logging.{ConsoleLogger, Logger}
 import org.junit.Test
 import org.junit.Assert._
@@ -53,10 +53,12 @@ class AwsWordCount {
     serializer = stringSerializer
   )
 
-  val countsQueue = new DynamoDBQueue[Int](
+  object countsQueue extends DynamoDBQueue[Int] (
     name = "counts",
     serializer = intSerializer
-  )
+  ) with InMemoryReducible {
+    override val monoid = intMonoid
+  }
 
   val rawMetadata = ohnosequences.compota.test.generated.metadata
 
@@ -113,9 +115,8 @@ class AwsWordCount {
   )
 
 
-  val reducer = InMemoryQueueReducer.create(countsQueue, intMonoid)
 
-  object wordCountCompota extends AwsCompota[Int](List(splitNispero, wordLengthNispero), List(reducer), wordCountCompotaConfiguration) {
+  object wordCountCompota extends AwsCompota[Int](List(splitNispero, wordLengthNispero), wordCountCompotaConfiguration) {
 
     val s = System.currentTimeMillis()
 

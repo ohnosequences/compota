@@ -73,6 +73,8 @@ class LocalQueue[T](name: String,
   override def create(ctx: LocalContext): Try[QueueQueueOp] = {
     Monkey.call(Success(new LocalQueueOp[T](queue, ctx)), monkeyAppearanceProbability.create)
   }
+
+
 }
 
 class LocalQueueOp[T](val queue: LocalQueue[T], val ctx: LocalContext) extends QueueOp[T, LocalMessage[T], LocalQueueReader[T], LocalQueueWriter[T]] { queueOp =>
@@ -104,6 +106,7 @@ class LocalQueueOp[T](val queue: LocalQueue[T], val ctx: LocalContext) extends Q
 
   //todo add limit support
   override def list(lastKey: Option[String], limit: Option[Int]): Try[(Option[String], List[String])] = {
+    //ctx.logger.debug("list lastKey:" )
     val idsList = queue.rawQueueP.keySet().toList
     Monkey.call(Success(Pagination.listPagination(idsList, limit, lastKey)), queue.monkeyAppearanceProbability.list)
   }
@@ -113,7 +116,7 @@ class LocalQueueOp[T](val queue: LocalQueue[T], val ctx: LocalContext) extends Q
   }
 
   override def get(key: String): Try[T] = {
-    ctx.logger.info("getting " + key)
+   // ctx.logger.info("getting " + key)
     Monkey.call(
       Option(queue.rawQueueP.get(key)) match {
         case None => Failure(new Error("key " + key + " doesn't exist in " + queue.name))

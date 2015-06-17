@@ -41,13 +41,13 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
   val environments = new ConcurrentHashMap[(InstanceId, Namespace), LocalEnvironment]()
 
   override lazy val initialEnvironment: Try[LocalEnvironment] = {
+    configuration.workingDirectory.mkdir()
     FileLogger(configuration.initialEnvironmentId.id,
       configuration.loggingDirectory,
       "log.txt",
       configuration.loggerDebug,
       printToConsole = configuration.loggersPrintToConsole
     ).map { logger =>
-      configuration.workingDirectory.mkdir()
       val env = new LocalEnvironment(
         instanceId = configuration.initialEnvironmentId,
         namespace = Namespace.root,
@@ -192,8 +192,12 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
   }
 
   override def launch(): Try[CompotaEnvironment] = {
-    //println("ge")
-    launchMetaManager()
+    println("launching metamanager")
+    launchMetaManager().recoverWith { case t =>
+      t.printStackTrace()
+      Failure(t)
+    }
+
   }
 
 
@@ -242,7 +246,6 @@ object AnyLocalCompota {
 }
 
 abstract class LocalCompota[U](val nisperos: List[AnyLocalNispero],
-                            val reducers: List[AnyQueueReducer.of[LocalEnvironment]],
                             val configuration: AnyLocalCompotaConfiguration
                             ) extends AnyLocalCompota {
 

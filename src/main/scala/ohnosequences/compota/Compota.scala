@@ -19,15 +19,11 @@ trait AnyCompota {
 
   type CompotaUnDeployActionContext
 
-  val compotaUnDeployActionContext: AtomicReference[Option[CompotaUnDeployActionContext]] = new AtomicReference(None)
-
   type CompotaMetaManager <: AnyMetaManager.of[CompotaEnvironment]
 
   def metaManager: CompotaMetaManager
 
   def nisperos: List[CompotaNispero]
-
-  def reducers: List[AnyQueueReducer.of[CompotaEnvironment]]
 
   type CompotaConfiguration <: AnyCompotaConfiguration
 
@@ -95,8 +91,6 @@ trait AnyCompota {
 
   def prepareUnDeployActions(env: CompotaEnvironment): Try[CompotaUnDeployActionContext]
 
-  ///def sendUnDeployCommand(env: CompotaEnvironment, reason: String, force: Boolean): Try[Unit]
-
   //undeploy right now
   def forceUnDeploy(env: CompotaEnvironment, reason: String, message: String): Try[Unit]
 
@@ -118,7 +112,6 @@ trait AnyCompota {
   def deleteManager(env: CompotaEnvironment): Try[Unit]
 
   def launchTerminationDaemon(queueChecker: QueueChecker[CompotaEnvironment], env: CompotaEnvironment): Try[TerminationDaemon[CompotaEnvironment]] = {
-    //env.logger.info("TERMINATION DAEMON IS HERE!")
     startedTime(env).flatMap { t =>
       val td = new TerminationDaemon[CompotaEnvironment](
         compota = anyCompota,
@@ -147,15 +140,3 @@ object AnyCompota {
 
 }
 
-//abstract class Compota[E <: AnyEnvironment[E], N <: AnyNispero.of[E], U, C <: AnyCompotaConfiguration](
-//                                                                    override val nisperos: List[N],
-//                                                                    override val reducers: List[AnyQueueReducer.of[E]],
-//                                                                    val configuration: C)
-//  extends AnyCompota {
-//
-//  type Nispero = N
-//  type CompotaEnvironment = E
-//  type CompotaUnDeployActionContext = U
-//  type CompotaConfiguration = C
-//
-//}

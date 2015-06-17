@@ -25,7 +25,7 @@ trait BaseMetaManager extends AnyMetaManager {
   }
 
   override def process(command: BaseMetaManagerCommand,
-                       ctx: AnyMetaManagerContext.of[MetaManagerEnvironment]
+                       ctx: AnyProcessContext.of[MetaManagerEnvironment, MetaManagerUnDeployingActionContext]
                         ): Try[List[BaseMetaManagerCommand]] = {
     val env = ctx.env
     val queueChecker = ctx.queueChecker
@@ -76,20 +76,30 @@ trait BaseMetaManager extends AnyMetaManager {
       }
 
       case CreateNisperoWorkers(index) => {
-        Success(List[BaseMetaManagerCommand](PrepareUnDeployActions))
+        Success(List[BaseMetaManagerCommand](PrepareUnDeployActions(false)))
       }
 
-      case PrepareUnDeployActions => {
-        compota.compotaUnDeployActionContext.get match {
-          case Some(ctx) => {
-            env.logger.info("already prepared")
-            Success(List[BaseMetaManagerCommand]())
+      case PrepareUnDeployActions(executeActions) => {
+        ctx.compotaUnDeployActionContext.get match {
+          case Some(uCtx) => {
+            env.logger.info("undeploy actions are already prepared")
+            if (executeActions) {
+              Success(List(ExecuteUnDeployActions))
+            } else {
+              Success(List[BaseMetaManagerCommand]())
+            }
           }
           case None => {
-            compota.prepareUnDeployActions(env).map { ctx =>
+            env.logger.info("preparing undeploy actions")
+            //started
+            compota.prepareUnDeployActions(env).map { uCtx =>
               env.logger.info("saving context")
-              compota.compotaUnDeployActionContext.set(Some(ctx))
-              List[BaseMetaManagerCommand]()
+              ctx.compotaUnDeployActionContext.set(Some(uCtx))
+              if (executeActions) {
+                List(ExecuteUnDeployActions)
+              } else {
+                List[BaseMetaManagerCommand]()
+              }
             }
           }
         }
@@ -123,12 +133,12 @@ trait BaseMetaManager extends AnyMetaManager {
         Success(List(ReduceQueue(0)))
       }
 
-      case ReduceQueue(index) if index < compota.reducers.size => {
-        val reducer = compota.reducers(index)
-        Try {
-          logger.info("reducing queue " + reducer.queue.name)
-          reducer.reduce(env)
-        }.flatMap { e => e }.map { res =>
+      case ReduceQueue(index) if index < queueOps.size  => {
+        val queueOp = queueOps(index)
+        Success(()).flatMap { u =>
+          logger.info("reducing queue " + queueOp)
+          queueOp.reduce(env)
+        }.map { res =>
           List(ReduceQueue(index + 1))
         }
       }
@@ -151,12 +161,13 @@ trait BaseMetaManager extends AnyMetaManager {
 
       case ExecuteUnDeployActions => {
         Success(()).flatMap { u =>
-          compota.compotaUnDeployActionContext.get match {
+          ctx.compotaUnDeployActionContext.get match {
             case None => {
-              Failure(new Error("compotaUnDeployActionContext is not set but ExecuteUnDeployActions started"))
+              //Failure(new Error("compotaUnDeployActionContext is not set but ExecuteUnDeployActions started"))
+              Success(List(PrepareUnDeployActions(true)))
             }
-            case Some(ctx) => {
-              compota.unDeployActions(env, ctx).map { message =>
+            case Some(uCtx) => {
+              compota.unDeployActions(env, uCtx).map { message =>
                 List(FinishCompota("solved", message))
               }
             }

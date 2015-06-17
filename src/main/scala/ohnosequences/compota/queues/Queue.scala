@@ -3,6 +3,7 @@ package ohnosequences.compota.queues
 import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 
+import ohnosequences.compota.environment.Env
 import ohnosequences.compota.monoid.Monoid
 import ohnosequences.logging.Logger
 
@@ -131,11 +132,28 @@ trait AnyQueue { queue =>
   }
 
   def subQueues: List[AnyQueue] = List(queue)
+
+  def reduce(env: Env, queueOp: AnyQueueOp.of1[QueueElement]): Try[Unit] = {
+    Success(())
+  }
+
+
 }
 
-trait MonoidQueue extends AnyQueue {
+trait AnyMonoidQueue extends AnyQueue { monoidQueue =>
   val monoid: Monoid[QueueElement]
+
+  def reducer: Option[AnyQueueReducer.of[QueueElement]]
+
+  override def reduce(env: Env, queueOp: AnyQueueOp.of1[QueueElement]): Try[Unit] = {
+    reducer match {
+      case None => Success(())
+      case Some(r) => r.reduce(env, monoidQueue, queueOp)
+    }
+  }
+
 }
+
 
 object AnyQueue {
   type of[Ctx] = AnyQueue {type QueueContext = Ctx}
@@ -151,11 +169,20 @@ object AnyQueue {
     type QueueQueueMessage = Msg
   }
 
-  type of2m[E, Ctx] = MonoidQueue {
+  type ofm[E] = AnyMonoidQueue {
+    type QueueElement = E
+  }
+
+  type of1[E] = AnyQueue {
+    type QueueElement = E
+  }
+
+  type of2m[E, Ctx] = AnyMonoidQueue {
     type QueueContext = Ctx
     type QueueElement = E
-
   }
+
+
 
 
   //  type of2[E, Ctx, M <: AnyQueueMessage.of[E], R <: AnyQueueReader.of[E, M], W <: AnyQueueWriter.of[E]] = AnyQueue {
@@ -182,7 +209,7 @@ abstract class Queue[E, Ctx](val name: String) extends AnyQueue {
 }
 
 
-trait AnyQueueOp {
+trait AnyQueueOp { anyQueueOp =>
 
   def subOps(): List[AnyQueueOp] = List(AnyQueueOp.this)
 
@@ -193,7 +220,11 @@ trait AnyQueueOp {
   // QueueReader[QElement, QMessage]
   type QueueOpQueueWriter <: AnyQueueWriter.of[QueueOpElement] //QueueWriter[QElement]
 
-  val queue: AnyQueue
+  val queue: AnyQueue.of1[QueueOpElement]
+
+  def reduce(env: Env): Try[Unit] = {
+    queue.reduce(env, anyQueueOp)
+  }
 
   def isEmpty: Try[Boolean]
 
@@ -215,32 +246,51 @@ trait AnyQueueOp {
 
   def delete(): Try[Unit]
 
-  def foldLeftId[T](z: T)(f: (T, String) => Try[T]): Try[T] = {
+  def foldLeftIdIndexed[T](z: T)(f: (T, String, Int) => Try[T]): Try[T] = {
     @tailrec
-    def foldLeftIdRec(c: T, lastKey: Option[String]): Try[T] = {
-      list(lastKey = None, limit = None) match {
+    def foldLeftIdRec(c: T, lastKey: Option[String], index: Int): Try[T] = {
+      //println("lastKey: " + lastKey + " index: " + index)
+      list(lastKey = lastKey, limit = None) match {
+        case Success((_, Nil)) => {
+          //the last chunk
+          Success(c)
+        }
         case Success((None, list)) => {
           //the last chunk
-          list.foldLeft[Try[T]](Success(c)) {
-            case (Failure(t), id) => Failure(t)
-            case (Success(t), id) => f(t, id)
+          list.zipWithIndex.foldLeft[Try[T]](Success(c)) {
+            case (Failure(t), (id, ind)) => Failure(t)
+            case (Success(t), (id, ind)) => f(t, id, ind)
           }
         }
         case Success((last, list)) => {
-          list.foldLeft[Try[T]](Success(c)) {
-            case (Failure(t), id) => Failure(t)
-            case (Success(t), id) => f(t, id)
+          list.zipWithIndex.foldLeft[Try[T]](Success(c)) {
+            case (Failure(t), (id, ind)) => Failure(t)
+            case (Success(t), (id, ind)) => f(t, id, ind)
           } match {
-            case Success(newC) => foldLeftIdRec(newC, last)
+            case Success(newC) => foldLeftIdRec(newC, last, index + list.size)
             case failure => failure
           }
         }
         case Failure(t) => Failure(t)
       }
     }
-    foldLeftIdRec(z, None)
+    foldLeftIdRec(z, None, 0)
   }
 
+  def foldLeftId[T](z: T)(f: (T, String) => Try[T]): Try[T] = {
+    foldLeftIdIndexed(z) { case (t, id, index) =>
+      f(t, id)
+    }
+
+  }
+
+  def foldLeftIndexed[T](z: T)(f: (T, QueueOpElement, Int) => Try[T]): Try[T] = {
+    foldLeftIdIndexed(z) { case (c, id, index) =>
+      get(id).flatMap { el =>
+        f(c, el, index)
+      }
+    }
+  }
 
   def foldLeft[T](z: T)(f: (T, QueueOpElement) => Try[T]): Try[T] = {
     foldLeftId(z) { case (c, id) =>
@@ -251,26 +301,9 @@ trait AnyQueueOp {
   }
 
   def forEachId(f: String => Unit): Try[Unit] = {
-
-//    @tailrec
-//    def forEachRec(f: String => T, lastKey: Option[String]): Try[Unit] = {
-//      list(lastKey = None, limit = None) match {
-//        case Success((None, list)) => {
-//          //the last chunk
-//          Success(list.foreach(f))
-//        }
-//        case Success((last, list)) => {
-//          list.foreach(f)
-//          forEachRec(f, last)
-//        }
-//        case Failure(t) => Failure(t)
-//      }
-//    }
-
     foldLeftId(()) { case (u, id) =>
       Try{f(id)}
     }
-
   }
 
   def forEach(f: (String, QueueOpElement) => Unit): Try[Unit] = {
@@ -293,6 +326,10 @@ object  AnyQueueOp {
   type of2[E, M <: AnyQueueMessage.of[E]] = AnyQueueOp {
     type QueueOpElement = E
     type QueueOpQueueMessage = M
+  }
+
+  type of1[E] = AnyQueueOp {
+    type QueueOpElement = E
   }
 }
 

@@ -4,8 +4,13 @@ name          := "compota"
 description   := "compota (ex nisperon)"
 organization  := "ohnosequences"
 
-resolvers += "Era7 maven releases" at "https://s3-eu-west-1.amazonaws.com/releases.era7.com"
-resolvers += "Era7 maven snapshots" at "https://s3-eu-west-1.amazonaws.com/snapshots.era7.com"
+resolvers := Seq[Resolver](
+  organization.value + " public maven releases"  at s3https(bucketRegion.value, "releases." + bucketSuffix.value),
+  organization.value + " public maven snapshots" at s3https(bucketRegion.value, "snapshots." + bucketSuffix.value),
+  Resolver.url(organization.value + " public ivy releases", url(s3https(bucketRegion.value, "releases." + bucketSuffix.value)))(ivy),
+  Resolver.url(organization.value + " public ivy snapshots", url(s3https(bucketRegion.value, "snapshots." + bucketSuffix.value)))(ivy)
+) ++ resolvers.value
+
 
 libraryDependencies ++= Seq(
   "commons-io"      %  "commons-io"               % "2.4",

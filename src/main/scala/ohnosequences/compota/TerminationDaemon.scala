@@ -36,11 +36,11 @@ class TerminationDaemon[E <: AnyEnvironment[E]](compota: AnyCompota.ofE[E], queu
             }
 
           } else {
-            compota.compotaUnDeployActionContext.get() match {
-              case None => {
-                env.logger.debug("undeploy context is not ready")
-              }
-              case Some(context) => {
+//            compota.compotaUnDeployActionContext.get() match {
+//              case None => {
+//                env.logger.debug("undeploy context is not ready")
+//              }
+//              case Some(context) => {
                 queueChecker.checkQueues() match {
                   case Failure(t) => {
                     env.reportError(new Error("couldn't check queues", t), env.namespace / "check_queues")
@@ -54,11 +54,13 @@ class TerminationDaemon[E <: AnyEnvironment[E]](compota: AnyCompota.ofE[E], queu
                     compota.sendUnDeployCommand(env).recoverWith { case t =>
                       env.reportError(new Error("couldn't send undeploy command", t), env.namespace / "send_undeploy")
                       Failure(t)
+                    }.map { success =>
+                      env.stop()
                     }
                   }
                 }
-              }
-            }
+             // }
+           // }
           }
           messageLoop()
         }

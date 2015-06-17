@@ -3,11 +3,9 @@ package ohnosequences.compota.local
 import java.util.concurrent.atomic.AtomicReference
 
 import ohnosequences.compota.environment.Env
-import ohnosequences.compota.graphs.QueueChecker
-import ohnosequences.compota.queues.InMemoryQueueReducerLocal
-import ohnosequences.compota.{TerminationDaemon, Instructions}
-import ohnosequences.compota.monoid.{stringMonoid, intMonoid}
-import ohnosequences.logging.{ConsoleLogger, Logger}
+import ohnosequences.compota.queues.{InMemoryReducible}
+import ohnosequences.compota.{Instructions}
+import ohnosequences.compota.monoid.{Monoid, intMonoid}
 import org.junit.Test
 import org.junit.Assert._
 import scala.concurrent.duration._
@@ -20,7 +18,7 @@ object wordLengthInstructions extends Instructions[String, Int] {
   override type Context = Unit
 
   override def solve(env: Env, context: Unit, input: String): Try[List[Int]] = {
-    Thread.sleep(200000)
+   //  Thread.sleep(200000)
 
     Success(List(input.length))
   }
@@ -43,7 +41,10 @@ object splitInstructions extends Instructions[String, String] {
 
 object textQueue extends LocalQueue[String]("text", visibilityTimeout = Duration(60, SECONDS))
 object wordsQueue extends LocalQueue[String]("words", visibilityTimeout = Duration(60, SECONDS))
-object countsQueue extends LocalQueue[Int]("counts")
+
+object countsQueue extends LocalQueue[Int]("counts") with InMemoryReducible {
+  override val monoid: Monoid[Int] = intMonoid
+}
 
 
 
@@ -52,7 +53,7 @@ object wordCountCompotaConfiguration extends AnyLocalCompotaConfiguration {
   override val loggerDebug: Boolean = true
   override val timeout= Duration(1000, SECONDS)
   override val terminationDaemonIdleTime =  Duration(10, SECONDS)
-  override val visibilityTimeout: Duration = Duration(15, SECONDS)
+  override val visibilityTimeout: Duration = Duration(60, SECONDS)
 
   override def errorThreshold: Int = 3
 }
@@ -75,16 +76,15 @@ object wordLengthNispero extends LocalNisperoLocal (
 
 class LocalCompotaTest {
 
-  val result = new AtomicReference[Int]()
+
 
   val inputS = "a a a b b cc cc"
   val longInputS = inputS + inputS + inputS
   val longLongInpitS = longInputS + longInputS + longInputS
   val input = List(longLongInpitS)
 
-  object reducer extends InMemoryQueueReducerLocal(countsQueue, intMonoid, result)
 
-  object wordLenghtCompota extends LocalCompota[Int](List(splitNispero, wordLengthNispero), List(reducer), wordCountCompotaConfiguration) {
+  object wordLenghtCompota extends LocalCompota[Int](List(splitNispero, wordLengthNispero), wordCountCompotaConfiguration) {
 
 
     val s = System.currentTimeMillis() + 1
@@ -92,6 +92,7 @@ class LocalCompotaTest {
     override def prepareUnDeployActions(env: wordLenghtCompota.CompotaEnvironment): Try[Int] = {
     //  Failure(new Error("intentional "))
 
+     // Thread.sleep(20000)
       Success(1000)
     }
 
@@ -129,7 +130,7 @@ class LocalCompotaTest {
       env.logger.info("waiting")
       env.logger.info(metaManager.controlQueue.rawQueue.toString)
       env.logger.info(metaManager.controlQueue.rawQueueP.toString)
-      Thread.sleep(5000)
+      //Thread.sleep(5000)
       Success("message context = " +context)
 
     }
@@ -144,7 +145,7 @@ class LocalCompotaTest {
     wordLenghtCompota.waitForFinished()
 
     val expectedResult = input.flatMap(_.split("\\s+").toList).map(_.length).sum
-    assertEquals(expectedResult, result.get())
+    assertEquals(expectedResult, countsQueue.result.get().get)
 
   //  wordCountCompota.main(Array("add", "tasks"))
    // wordCountCompota.launchWorker(splitNispero)

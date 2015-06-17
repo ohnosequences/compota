@@ -145,7 +145,7 @@ object AnyQueue {
     type QueueElement = E
   }
 
-  type of1[E, Ctx, Msg <: AnyQueueMessage.of[E]] = AnyQueue {
+  type of3[E, Ctx, Msg <: AnyQueueMessage.of[E]] = AnyQueue {
     type QueueContext = Ctx
     type QueueElement = E
     type QueueQueueMessage = Msg
@@ -166,7 +166,7 @@ object AnyQueue {
   //    type QueueQueueWriter = W
   //  }
 
-  type of3[E, Ctx, M <: AnyQueueMessage.of[E], R <: AnyQueueReader.of[E, M], W <: AnyQueueWriter.of[E], O <: AnyQueueOp.of[E, M, R, W]] = AnyQueue {
+  type of6[E, Ctx, M <: AnyQueueMessage.of[E], R <: AnyQueueReader.of[E, M], W <: AnyQueueWriter.of[E], O <: AnyQueueOp.of[E, M, R, W]] = AnyQueue {
     type QueueContext = Ctx
     type QueueElement = E
     type QueueQueueMessage = M

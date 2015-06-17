@@ -18,7 +18,7 @@ trait AnyMessageLoopContext extends AnyProcessContext {
   type Command <: AnyMetaManagerCommand
   type QueueContext
   type QueueMessage <: AnyQueueMessage.of[Command]
-  val controlQueue: AnyQueue.of1[Command, QueueContext, QueueMessage]
+  val controlQueue: AnyQueue.of3[Command, QueueContext, QueueMessage]
   def controlQueueOp: AnyQueueOp.of2[Command, QueueMessage]
   val reader: AnyQueueReader.of[Command, QueueMessage]
   val writer: AnyQueueWriter.of[Command]
@@ -43,7 +43,7 @@ case class MessageLoopContext[
   env: E,
   queueOps: List[AnyQueueOp],
   queueChecker: QueueChecker[E],
-  controlQueue: AnyQueue.of1[Cmd, Ctx, M],
+  controlQueue: AnyQueue.of3[Cmd, Ctx, M],
   controlQueueOp: AnyQueueOp.of2[Cmd, M],
   reader: AnyQueueReader.of[Cmd, M],
   writer: AnyQueueWriter.of[Cmd]

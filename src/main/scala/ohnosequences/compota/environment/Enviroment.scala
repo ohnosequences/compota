@@ -24,7 +24,7 @@ trait Env {
 
 abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironment =>
 
-  def rootEnvironment: E
+  def originEnvironment: Option[E]
 
   val environments: ConcurrentHashMap[(InstanceId, Namespace), E]
 
@@ -67,9 +67,8 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
 
   def sendForceUnDeployCommand(reason: String, message: String): Try[Unit]
 
-  def stop(): Unit
-
-  protected def terminate(): Unit
+  def stop(recursive: Boolean): Unit
+  def terminate(): Unit
 
   /**
    * all repeats are here, "5 errors - reboot,  10 errors - undeplot compota
@@ -96,7 +95,7 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
         case Failure(tt) => {
           logger.error("couldn't retrieve count from error table")
           errorTable.recover()
-          stop()
+          stop(true)
           terminate()
         }
         case Success(count) if count >= configuration.errorThreshold => {
@@ -107,7 +106,7 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
         }
         case Success(count) => {
           logger.error("reached local error threshold for " + namespace.toString + " [" + count + "]")
-          stop()
+          stop(true)
           terminate()
         }
       }

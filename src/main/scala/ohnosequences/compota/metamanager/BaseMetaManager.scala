@@ -1,5 +1,6 @@
 package ohnosequences.compota.metamanager
 
+import ohnosequences.compota.metamanager.UnDeployMetaManger
 import ohnosequences.compota.{Namespace, TerminationDaemon}
 import ohnosequences.compota.console.AnyConsole
 import ohnosequences.compota.graphs.QueueChecker
@@ -38,8 +39,16 @@ trait BaseMetaManager extends AnyMetaManager {
       case LaunchConsole => {
         env.subEnvironmentAsync(Left(Namespace.console)) { env =>
           compota.launchConsole(queueChecker, controlQueueOp, env)
-        }.map { tEnv =>
+         // SendNotification(compota.configuration.name + " started", message)
+        }.map { env =>
           List[BaseMetaManagerCommand](LaunchTerminationDaemon)
+        }
+      }
+
+      case SendNotification(subject, message) => {
+
+        compota.sendNotification(env, subject, message).map { res =>
+          List[BaseMetaManagerCommand]()
         }
       }
 
@@ -58,6 +67,12 @@ trait BaseMetaManager extends AnyMetaManager {
             Success(List(CreateNisperoWorkers(0)))
           } else {
             logger.info("adding tasks")
+            //todo give user access to writers
+//            val queueWriters: Map[String, AnyQueue ctx.queueOps.map { queueOp =>
+//              (queueOp.queue, queueOp.writer.get)
+//            }.toMap
+
+
             compota.addTasks(env).map { res =>
               List(CreateNisperoWorkers(0))
             }
@@ -177,16 +192,21 @@ trait BaseMetaManager extends AnyMetaManager {
 
       case FinishCompota(reason, message) => {
         compota.finishUnDeploy(env, reason, message).map { res =>
-          List(UnDeployMetaManger)
+          List(UnDeployMetaManger(reason, message))
         }
       }
 
-      case UnDeployMetaManger => {
+      case UnDeployMetaManger(reason, message) => {
         Success(()).flatMap { u =>
           logger.info("deleting control queue " + controlQueueOp.queue.name)
-          env.stop()
-          controlQueueOp.delete()
-          compota.deleteManager(env)
+          Try {
+            compota.sendNotification(env, compota.configuration.name + " finished", "reason: " + reason + System.lineSeparator() + message)
+            controlQueueOp.delete()
+            compota.deleteManager(env)
+            env.stop(recursive = true)
+            env.terminate()
+          }
+
         }.map { res =>
           List[BaseMetaManagerCommand]()
         }

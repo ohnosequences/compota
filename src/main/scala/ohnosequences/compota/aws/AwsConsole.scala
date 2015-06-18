@@ -1,13 +1,16 @@
 package ohnosequences.compota.aws
 
-
+import ohnosequences.awstools.autoscaling.AutoScalingGroup
+import ohnosequences.awstools.utils.AutoScalingUtils
 import ohnosequences.compota.Namespace
-import ohnosequences.compota.console.{AnyEnvironmentInfo, Console}
+import ohnosequences.compota.console.{AnyInstanceInfo, Console}
 import ohnosequences.compota.environment.InstanceId
 import ohnosequences.compota.graphs.QueueChecker
 import ohnosequences.compota.queues.AnyQueueOp
 
-import scala.util.Try
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 import scala.xml.NodeSeq
 
 import java.net.URL
@@ -19,35 +22,163 @@ class AwsConsole[N <: AnyAwsNispero](awsCompota: AnyAwsCompota.ofN[N],
                                          controlQueueOp: AnyQueueOp,
                                          queueChecker: QueueChecker[AwsEnvironment]) extends
 Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp, queueChecker) {
-  override def compotaInfoPageDetailsTable: NodeSeq = ???
 
-  override def nisperoInfoDetails(nispero: N): NodeSeq = ???
+  import ohnosequences.compota.console.GeneralComponents._
 
+  override def compotaInfoPageDetailsTable: NodeSeq = {
+    <table class="table table-striped topMargin20">
+      <tbody>
+        <tr>
+          <td class="col-md-6">metamanager auto scaling group</td>
+          <td class="col-md-6">
+            {awsCompota.configuration.managerAutoScalingGroup.name}
+          </td>
+        </tr>
+        <tr>
+          <td class="col-md-6">metamanager instance type</td>
+          <td class="col-md-6">
+            {awsCompota.configuration.timeout.toMinutes + " mins"}
+          </td>
+        </tr>
+        <tr>
+          <td class="col-md-6">timeout</td>
+          <td class="col-md-6">
+            {awsCompota.configuration.timeout.toMinutes + " mins"}
+          </td>
+        </tr>
+        <tr>
+          <td class="col-md-6">local error threshold</td>
+          <td class="col-md-6">
+            {awsCompota.configuration.errorThreshold}
+          </td>
+        </tr>
+        <tr>
+          <td class="col-md-6">global error threshold</td>
+          <td class="col-md-6">
+            {awsCompota.configuration.globalErrorThresholdPerNameSpace}
+          </td>
+        </tr>
+      </tbody>
+    </table>
 
-  class AwsWorkerInfo extends AnyEnvironmentInfo {
-    override def printState: NodeSeq = ???
+  }
 
-    override def namespace: Namespace = ???
-
-    override def instanceId: InstanceId = ???
+  def metamanagerInfo(): NodeSeq = {
+    <h3>Metamanager autoscaling group</h3>
+    <table class="table table-striped topMargin20">
+      <tbody>
+        {autoScalingGroupInfo(awsCompota.configuration.managerAutoScalingGroup)}
+      </tbody>
+    </table>
   }
 
 
-  override type EnvironmentInfo = AwsWorkerInfo
+  class AwsInstanceInfo(instanceInfo: com.amazonaws.services.autoscaling.model.Instance) extends AnyInstanceInfo {
 
-  override def printLog(instanceId: String, namespace: Seq[String]): NodeSeq = ???
+    override def printState: NodeSeq = {
+      <p>{instanceInfo.getLifecycleState}</p>    }
 
-  override def shutdown(): Unit = ???
+    override def namespace: Namespace = Namespace.root
 
-  override def getLogRaw(instanceId: String, namespace: Seq[String]): Try[Either[URL, String]] = ???
+    override def instanceId: InstanceId = {
+      InstanceId(instanceInfo.getInstanceId)
+    }
+  }
 
-  override def sidebar: NodeSeq = ???
 
-  override def stackTraceInstance(instanceId: String, namespace: Seq[String]): NodeSeq = ???
+  override type InstanceInfo = AwsInstanceInfo
 
-  override def listNisperoWorkers(nispero: String, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[EnvironmentInfo])] = ???
+  override def printLog(instanceId: String, namespaceRaw: Seq[String]): NodeSeq = {
+    val namespace = Namespace(namespaceRaw)
+    val logContent = awsCompota.configuration.loggingDestination(InstanceId(instanceId), namespace) match {
+      case Some(s3Object) => env.awsClients.s3.getObjectString(s3Object).recoverWith { case t =>
+        Failure(new Error("couldn't retrieve log for instance: " + instanceId + " namespace: " + namespace.getPath, t))
+      }
+      case None => {
+        Failure(new Error("couldn't retrieve log for instance: " + instanceId + " namespace: " + namespace.getPath))
+      }
+    }
+    preResult(logContent)
+  }
 
-  override def namespacePage: NodeSeq = ???
+  override def shutdown(): Unit = {}
+
+  override def getLogRaw(instanceId: String, namespaceRaw: Seq[String]): Try[Either[URL, String]] = {
+    val namespace = Namespace(namespaceRaw)
+    awsCompota.configuration.loggingDestination(InstanceId(instanceId), namespace) match {
+      case Some(s3object) => {
+        env.awsClients.s3.generateTemporaryLink(s3object, Duration(10, MINUTES)).map { url => Left(url) }.recoverWith { case t =>
+          Failure(new Error("couldn't retrieve log for instance: " + instanceId + " namespace: " + namespace.getPath, t))
+        }
+      }
+      case None => {
+        Failure(new Error("couldn't retrieve log for instance: " + instanceId + " namespace: " + namespace.getPath))
+      }
+    }
+  }
+
+  override def sidebar: NodeSeq = {
+    <ul class="nav nav-sidebar">
+      <li><a href="/"><strong>home</strong></a></li>
+    </ul>
+      <ul class="nav nav-sidebar">
+        {nisperosLinks}
+      </ul>
+      <ul class="nav nav-sidebar">
+        <li><a href="/errorsPage">errors</a></li>
+        <li><a href="#" class="undeploy">undeploy</a></li>
+      </ul>
+  }
+
+  override def stackTraceInstance(instanceId: String, namespace: Seq[String]): NodeSeq = {
+    preResult(Failure(new Error("stack traces are not supported in AWS compota console")))
+  }
+
+
+
+
+  override def listWorkers(nispero: N, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[AwsInstanceInfo])] = {
+    AutoScalingUtils.describeInstances(env.awsClients.as.as, nispero.configuration.workerAutoScalingGroup.name, lastToken, limit).map { case (lToken, instances) =>
+      (lToken, instances.map { i => new AwsInstanceInfo(i) })
+    }
+  }
+
+  override def listManagers(lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[AwsInstanceInfo])] = {
+    AutoScalingUtils.describeInstances(env.awsClients.as.as, awsCompota.configuration.managerAutoScalingGroup.name, lastToken, limit).map { case (lToken, instances) =>
+      (lToken, instances.map { i => new AwsInstanceInfo(i) })
+    }
+  }
+
+  override def nisperoInfoDetails(nispero: N): NodeSeq = {
+    <table class="table table-striped topMargin20">
+      <tbody>
+        {autoScalingGroupInfo(nispero.configuration.workerAutoScalingGroup)}
+      </tbody>
+    </table>
+  }
+
+  def autoScalingGroupInfo(group: AutoScalingGroup): NodeSeq = {
+    <tr>
+      <td class="col-md-6">auto scaling group name</td>
+      <td class="col-md-6">
+        {group.name}
+      </td>
+    </tr>
+      <tr>
+        <td class="col-md-6">desired capacity</td>
+        <td class="col-md-6">
+          {group.desiredCapacity}
+        </td>
+      </tr>
+      <tr>
+        <td class="col-md-6">instance type</td>
+        <td class="col-md-6">
+          {group.launchingConfiguration.instanceSpecs.instanceType.toString}
+        </td>
+      </tr>
+  }
+
+  override def namespacePage: NodeSeq = errorDiv(logger, "namespaces are not supported by AWS compota console")
 
   override def printNamespaces(lastToken: Option[String]): NodeSeq = ???
 

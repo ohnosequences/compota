@@ -15,6 +15,31 @@ import scala.sys.process._
 import scala.util.{Success, Failure, Try}
 import scala.xml.{Node, NodeSeq}
 
+object GeneralComponents {
+  def errorDiv(logger: Logger, message: String): NodeSeq = {
+    logger.error(message)
+    <div class="alert alert-danger">
+      {message}
+    </div>
+  }
+
+  def preResult(res: Try[String]): NodeSeq = {
+    res match {
+      case Failure(t) => {
+        <pre class="alert alert-danger pre-scrollable">{t.toString}</pre>
+      }
+      case Success(s) => {
+        <pre class="alert alert-success pre-scrollable">{s}</pre>
+      }
+    }
+  }
+
+  def errorTr(logger: Logger, message: String, cols: Int, lastToken: Option[String]): NodeSeq = {
+    logger.error(message)
+    <tr class="danger" data-lasttoken={lastToken.getOrElse("")}><td colspan={cols.toString}>{message}</td></tr>
+  }
+}
+
 abstract class AnyConsole {
 
   val logger: Logger
@@ -41,7 +66,9 @@ abstract class AnyConsole {
 
   def sendForceUnDeployCommand(reason: String, message: String): Unit
 
-  def printNisperoWorkers(nispero: String, lastToken: Option[String]): NodeSeq
+  def printWorkers(nispero: String, lastToken: Option[String]): NodeSeq
+
+  def printManagers(lastToken: Option[String]): NodeSeq
 
   def printNamespaces(lastToken: Option[String]): NodeSeq
 
@@ -69,13 +96,34 @@ abstract class AnyConsole {
 
 }
 
-trait AnyEnvironmentInfo {
+//todo split model from view
+trait AnyInstanceInfo {
 
   def instanceId: InstanceId
 
   def namespace: Namespace
 
   def printState: NodeSeq
+
+  def printInstanceInfoError(logger: Logger, t: Throwable, lastToken: Option[String]): NodeSeq = {
+    GeneralComponents.errorTr(logger, t.toString, 3, lastToken)
+  }
+
+  def printInstanceInfo(lastToken: Option[String]): Node = {
+    <tr data-lasttoken={lastToken.getOrElse("")}>
+      <td class="col-md-4">
+        {printInstance}
+      </td>
+      <td class="col-md-4">
+        {printState}
+      </td>
+      <td class="col-md-4">
+        {printConnectAction ++ printTerminateAction ++ printStackTrace ++ viewLog}
+      </td>
+    </tr>
+  }
+
+
 
   def printConnectAction: NodeSeq = {
     <a class="btn btn-info sshInstance" href="#" data-instance={instanceId.id} data-namespace={namespace.getPath}>
@@ -107,6 +155,11 @@ trait AnyEnvironmentInfo {
 
 }
 
+object AnyInstanceInfo {
+  def printInstanceInfoError(logger: Logger, t: Throwable, lastToken: Option[String]): NodeSeq = {
+    GeneralComponents.errorTr(logger, t.toString, 3, lastToken)
+  }
+}
 
 
 
@@ -117,6 +170,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
                                                                                                  nisperoGraph: QueueChecker[E]) extends AnyConsole {
 
 
+  import GeneralComponents._
 
   override val logger: Logger = env.logger
 
@@ -127,8 +181,6 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   def compotaInfoPage: NodeSeq = {
     compotaInfoPageHeader ++ compotaInfoPageDetailsTable ++ compotaControlQueueDetails
   }
-
-
 
   def compotaInfoPageHeader: NodeSeq = {
     <div class="page-header">
@@ -189,8 +241,6 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
 
-
-
   def compotaInfoPageDetailsTable: NodeSeq
 
   def compotaControlQueueDetails: NodeSeq = {
@@ -199,7 +249,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
 
-  def nisperosLinks(): NodeSeq = {
+  def nisperosLinks: NodeSeq = {
     val l = for {(name, nispero) <- compota.nisperosNames}
     yield <li>
         <a href={"/nispero/" + name}>
@@ -231,27 +281,14 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
       </a></p>
   }
 
-  def errorDiv(message: String): NodeSeq = {
-    <div class="alert alert-danger">
-      {message}
-    </div>
-  }
 
-  def preResult(res: Try[String]): NodeSeq = {
-    res match {
-      case Failure(t) => {
-        <pre class="alert alert-danger pre-scrollable">{t.toString}</pre>
-      }
-      case Success(s) => {
-        <pre class="alert alert-success pre-scrollable">{s}</pre>
-      }
-    }
-  }
+
+
 
   def nisperoInfoPage(nisperoName: String): NodeSeq = {
     compota.nisperosNames.get(nisperoName) match {
       case None => {
-        errorDiv(nisperoName + " doesn't exist")
+        errorDiv(logger, nisperoName + " doesn't exist")
       }
       case Some(nispero) =>
         <div class="page-header">
@@ -291,7 +328,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
           </div>
           <table class="table table-striped topMargin20">
             <tbody id="nisperoWorkersTableBody">
-              {printNisperoWorkers(nisperoName, None)}
+              {printWorkers(nisperoName, None)}
             </tbody>
           </table>
           <p><a class="btn btn-info loadMoreNisperoWorkers" href="#" data-nispero={nispero.configuration.name}>
@@ -319,7 +356,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
   def printErrorTableError(lastToken: Option[String], t: Throwable): NodeSeq = {
-    errorTr("error: " + t.toString, 3, lastToken)
+    errorTr(logger, "error: " + t.toString, 3, lastToken)
   }
 
   def printErrorTableItem(lastToken: Option[String], item: ErrorTableItem): Node = {
@@ -381,7 +418,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
   def printListMessagesError(t: Throwable, lastToken: Option[String]): NodeSeq = {
-    errorTr("error: " + t.toString, 3, lastToken)
+    errorTr(logger, "error: " + t.toString, 3, lastToken)
   }
 
   def printMessage(queueName: String, id: String, lastToken: Option[String]): Node = {
@@ -411,39 +448,32 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
 
-  type EnvironmentInfo <: AnyEnvironmentInfo
+  type InstanceInfo <: AnyInstanceInfo
 
-  def listNisperoWorkers(nispero: String, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[EnvironmentInfo])]
+  def printInstanceInfoPage(page: Try[(Option[String], List[InstanceInfo])], lastToken: Option[String]): NodeSeq = page match {
+    case Failure(t) => AnyInstanceInfo.printInstanceInfoError(logger, t, lastToken)
+    case Success((newLastToken, list)) =>  list.map(_.printInstanceInfo(newLastToken))
+  }
 
-  def printNisperoWorkers(nispero: String, lastToken: Option[String]): NodeSeq = {
-    listNisperoWorkers(nispero, lastToken, Some(3)) match {
-      case Failure(t) => printEnvironmentInfoError(t, lastToken)
-      case Success((newLastToken, list)) => list.map(printEnvironmentInfo(_, newLastToken))
+  def listWorkers(nispero: N, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[InstanceInfo])]
 
+  def listManagers(lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[InstanceInfo])]
+
+  def printWorkers(nisperoName: String, lastToken: Option[String]): NodeSeq = {
+    compota.nisperosNames.get(nisperoName) match {
+      case Some(nispero) => {
+        val page = listWorkers(nispero, lastToken, Some(compota.configuration.consoleInstancePageSize))
+        printInstanceInfoPage(page, lastToken)
+      }
+      case None => {
+        AnyInstanceInfo.printInstanceInfoError(logger, new Error("nispero " + nisperoName + " doesn't exist"), lastToken)
+      }
     }
   }
 
-  def errorTr(message: String, cols: Int, lastToken: Option[String]): NodeSeq = {
-    <tr class="danger" data-lasttoken={lastToken.getOrElse("")}><td colspan={cols.toString}>{message}</td></tr>
-  }
-
-
-  def printEnvironmentInfoError(t: Throwable, lastToken: Option[String]): NodeSeq = {
-    errorTr("error: " + t.toString, 3, lastToken)
-  }
-
-  def printEnvironmentInfo(environmentInfo: EnvironmentInfo, lastToken: Option[String]): Node = {
-    <tr data-lasttoken={lastToken.getOrElse("")}>
-      <td class="col-md-4">
-        {environmentInfo.printInstance}
-      </td>
-      <td class="col-md-4">
-        {environmentInfo.printState}
-      </td>
-      <td class="col-md-4">
-        {environmentInfo.printConnectAction ++ environmentInfo.printTerminateAction ++ environmentInfo.printStackTrace ++ environmentInfo.viewLog}
-      </td>
-    </tr>
+  def printManagers(lastToken: Option[String]): NodeSeq = {
+    val page = listManagers(lastToken, Some(compota.configuration.consoleInstancePageSize))
+    printInstanceInfoPage(page, lastToken)
   }
 
   def name: String = compota.configuration.name

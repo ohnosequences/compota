@@ -22,4 +22,8 @@ object Resources {
 
   def sqsQueue(metadata: AnyMetadata, name: String) = "compota_" + metadata.artifact + "_" + name
 
+  def notificationTopic(email: String): String = {
+    "compota_" + email.hashCode
+  }
+
 }

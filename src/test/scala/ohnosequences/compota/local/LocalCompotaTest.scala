@@ -140,12 +140,17 @@ class LocalCompotaTest {
   @Test
   def localCompotaTest(): Unit = {
     println("test")
-    wordLenghtCompota.launch()
+    wordLenghtCompota.launch().map { e =>
+      wordLenghtCompota.waitForFinished()
 
-    wordLenghtCompota.waitForFinished()
+      val expectedResult = input.flatMap(_.split("\\s+").toList).map(_.length).sum
+      assertEquals(expectedResult, countsQueue.result.get().get)
+    }.recoverWith { case t =>
+      org.junit.Assert.fail(t.toString)
+      Failure(t)
+    }
 
-    val expectedResult = input.flatMap(_.split("\\s+").toList).map(_.length).sum
-    assertEquals(expectedResult, countsQueue.result.get().get)
+
 
   //  wordCountCompota.main(Array("add", "tasks"))
    // wordCountCompota.launchWorker(splitNispero)

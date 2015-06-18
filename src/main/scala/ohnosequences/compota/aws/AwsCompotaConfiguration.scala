@@ -2,8 +2,10 @@ package ohnosequences.compota.aws
 
 import java.io.File
 
+import com.amazonaws.auth.AWSCredentialsProvider
 import ohnosequences.awstools.autoscaling._
 import ohnosequences.awstools.ec2.{InstanceType, InstanceSpecs}
+import ohnosequences.awstools.regions.Region
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.compota.environment.InstanceId
 import ohnosequences.compota.{Namespace, AnyNisperoConfiguration, AnyCompotaConfiguration}
@@ -13,6 +15,18 @@ import scala.concurrent.duration.Duration
 
 
 trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
+
+  def awsRegion: Region = Region.Ireland
+
+  def localAwsCredentialsProvider: AWSCredentialsProvider
+
+  def instanceAwsCredentialsProvider: AWSCredentialsProvider
+
+  def notificationTopic: String = {
+    Resources.notificationTopic(notificationEmail)
+  }
+
+  def notificationEmail: String
 
   def metadata: AnyMetadata
 

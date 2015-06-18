@@ -155,11 +155,11 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
     }
 
     case GET(Path(Seg("nispero" :: nispero :: "workers" ::  Nil))) => {
-      ResponseString(console.printNisperoWorkers(nispero, None).toString())
+      ResponseString(console.printWorkers(nispero, None).toString())
     }
 
     case GET(Path(Seg("nispero" :: nispero :: "workers" ::  lastToken :: Nil))) => {
-      ResponseString(console.printNisperoWorkers(nispero, Some(lastToken)).toString())
+      ResponseString(console.printWorkers(nispero, Some(lastToken)).toString())
     }
 
     case GET(Path(Seg("namespaces" :: Nil))) => {
@@ -205,16 +205,39 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
 }
 
 
-class UnfilteredConsoleServer(console: AnyConsole) {
+class UnfilteredConsoleServer(console: AnyConsole, currentAddress: String) {
 
 
   object users extends Users {
-    override def auth(u: String, p: String): Boolean = u.equals("nispero") && p.equals(console.password)
+    val userName = "nispero"
+    override def auth(u: String, p: String): Boolean = userName.equals(u) && p.equals(console.password)
   }
 
 
   def shutdown() {
     Runtime.getRuntime().halt(0)
+  }
+
+//  def currentAddress: String = {
+//    aws.ec2.getCurrentInstance.flatMap {_.getPublicDNS()}.getOrElse("<undefined>")
+//  }
+
+  def printURL(domain: String): String = console.isHTTPS match {
+    case true => "https://" + domain
+    case false => "http://" + domain
+  }
+
+  def startedMessage(customInfo: String): String = {
+    val message = new StringBuilder()
+    message.append("console address: " + printURL(currentAddress) + System.lineSeparator())
+    message.append("user: " + users.userName)
+    message.append("password: " + console.password + System.lineSeparator())
+    if(!customInfo.isEmpty) {
+      message.append(System.lineSeparator())
+      message.append(System.lineSeparator())
+      message.append(customInfo)
+    }
+    message.toString()
   }
 
 

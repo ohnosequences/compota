@@ -11,7 +11,7 @@ import ohnosequences.compota.local.metamanager.{LocalMetaManager}
 import ohnosequences.compota.metamanager.{ForceUnDeploy, UnDeploy}
 import ohnosequences.compota.queues.{AnyQueueOp, AnyQueueReducer}
 import ohnosequences.compota.{Namespace, AnyCompota}
-import ohnosequences.logging.{FileLogger, Logger}
+import ohnosequences.logging.{ConsoleLogger, FileLogger, Logger}
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ListBuffer
 
@@ -27,10 +27,6 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
 
   val isFinished = new java.util.concurrent.atomic.AtomicBoolean(false)
 
-  val executor = Executors.newCachedThreadPool()
-
-  val errorTable = new LocalErrorTable
-
   def waitForFinished(): Unit = {
     while(!isFinished.get()) {
       Thread.sleep(5000)
@@ -38,9 +34,9 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
     }
   }
 
-  val environments = new ConcurrentHashMap[(InstanceId, Namespace), LocalEnvironment]()
 
-  override lazy val initialEnvironment: Try[LocalEnvironment] = {
+  override def initialEnvironment: Try[LocalEnvironment] = {
+    val environments = new ConcurrentHashMap[(InstanceId, Namespace), LocalEnvironment]()
     configuration.workingDirectory.mkdir()
     FileLogger(configuration.initialEnvironmentId.id,
       configuration.loggingDirectory,
@@ -53,13 +49,12 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
         namespace = Namespace.root,
         workingDirectory = configuration.workingDirectory,
         logger = logger,
-        executor = executor,
-        errorTable = errorTable,
+        executor = Executors.newCachedThreadPool(),
+        errorTable = new LocalErrorTable(),
         configuration = configuration,
         sendForceUnDeployCommand0 = sendForceUnDeployCommand,
         environments = environments,
-        rootEnvironment0 = None,
-        origin = None,
+        originEnvironment = None,
         localErrorCounts = new AtomicInteger(0)
       )
       environments.put((env.instanceId, env.namespace), env)
@@ -70,23 +65,34 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
     }
   }
 
-  def terminateInstance(instance: InstanceId, namespace: Namespace): Try[Unit] = {
-    Option(environments.get((instance, namespace))) match {
+
+  override def sendNotification(env: LocalEnvironment, subject: String, message: String): Try[Unit] = {
+    env.logger.info("sending notification")
+    env.logger.info("sending notification. subject: " + subject)
+    env.logger.info("sending notification. message: " + message.take(200))
+    Success(())
+  }
+
+  //to start compota
+  override def localEnvironment(cliLogger: ConsoleLogger, args: List[String]): Try[LocalEnvironment] = initialEnvironment
+
+  def terminateInstance(env: CompotaEnvironment, instance: InstanceId, namespace: Namespace): Try[Unit] = {
+    Option(env.environments.get((instance, namespace))) match {
       case None => Success(()) //so idempotent
-      case Some(env) => Try(env.stop())
+      case Some(e) => Try(e.stop(false))
     }
   }
 
   override val metaManager = new LocalMetaManager[CompotaUnDeployActionContext](anyLocalCompota)
 
-  def getLog(logger: Logger, instanceId: InstanceId, namespace: Namespace): Try[String] = {
-    logger.info("looking for namespace " + namespace.toString)
+  def getLog(env: CompotaEnvironment, instanceId: InstanceId, namespace: Namespace): Try[String] = {
+    env.logger.info("looking for namespace " + namespace.toString)
    // logger.info("known instances: " + environments.keys().toList)
-    Option(environments.get((instanceId, namespace))) match {
+    Option(env.environments.get((instanceId, namespace))) match {
       case None => Failure(new Error("instance :" + instanceId.id + " with namespace: " + namespace.toString + " not found"))
-      case Some(env) => {
+      case Some(e) => {
         Try {
-          val log = scala.io.Source.fromFile(env.logger.logFile).getLines().mkString(System.lineSeparator())
+          val log = scala.io.Source.fromFile(e.logger.logFile).getLines().mkString(System.lineSeparator())
           log
         }
       }
@@ -98,24 +104,18 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
     "worker_" + nispero.configuration.name + "_" + id
   }
 
-//  private def workerNamespace(nispero: AnyLocalNispero, id: Int): Namespace = {
-//    Namespace.root / workerSubspace(nispero, id)
-//  }
 
   private def workerInstanceNamespace(nispero: AnyLocalNispero, id: Int): (InstanceId, Namespace) = {
     val s = workerSubspace(nispero, id)
     (InstanceId(s), Namespace.root)
   }
 
-  def launchWorker(nispero: AnyLocalNispero, id: Int): Try[LocalEnvironment] = {
+  def launchWorker(env: CompotaEnvironment, nispero: AnyLocalNispero, id: Int): Try[LocalEnvironment] = {
     val subId = workerSubspace(nispero, id)
-    initialEnvironment.flatMap { iEnv =>
-      iEnv.subEnvironmentAsync(Right(InstanceId(subId))) { env =>
-        nispero.worker.start(env)
-      }
+    env.subEnvironmentAsync(Right(InstanceId(subId))) { env =>
+      nispero.worker.start(env)
     }
   }
-
 
   override def startedTime(env: CompotaEnvironment): Try[Long] = Success(System.currentTimeMillis())
 
@@ -128,7 +128,7 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
   override def createNisperoWorkers(env: CompotaEnvironment, nispero: CompotaNispero): Try[Unit] = {
     Try {
       for (i <- 1 to nispero.configuration.workers) {
-        launchWorker(nispero, i).get
+        launchWorker(env, nispero, i).get
       }
     }
   }
@@ -138,18 +138,18 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
     //logger.debug("envs: " + )
     Try {
       for (i <- 1 to nispero.configuration.workers) {
-        terminateInstance(workerInstanceNamespace(nispero, i)._1, workerInstanceNamespace(nispero, i)._2).get
+        terminateInstance(env, workerInstanceNamespace(nispero, i)._1, workerInstanceNamespace(nispero, i)._2).get
       }
     }
   }
 
-  def listNisperoWorkers(logger: Logger, nispero: CompotaNispero): Try[List[CompotaEnvironment]] = {
+  def listNisperoWorkers(env: CompotaEnvironment, nispero: CompotaNispero): Try[List[CompotaEnvironment]] = {
     Try {
       val res = new ListBuffer[CompotaEnvironment]()
       for (i <- 1 to nispero.configuration.workers) {
-        logger.info("looking for " + workerInstanceNamespace(nispero, i))
+        env.logger.info("looking for " + workerInstanceNamespace(nispero, i))
         //logger.info("in " + environments)
-        Option(environments.get(workerInstanceNamespace(nispero, i))).foreach { e =>
+        Option(env.environments.get(workerInstanceNamespace(nispero, i))).foreach { e =>
           res += e
         }
       }
@@ -157,17 +157,8 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
     }
   }
 
-  def printThreads(): Unit = {
-    Thread.getAllStackTraces.foreach { case (thread, sts) =>
-      println(thread.toString + ":" + thread.getState)
-      sts.foreach { st =>
-        println("      " + st.toString)
-      }
-    }
-  }
-
-  def getStackTrace(instance: InstanceId, namespace: Namespace): Try[String] = {
-    Option(environments.get((instance, namespace))) match {
+  def getStackTrace(env: CompotaEnvironment, instance: InstanceId, namespace: Namespace): Try[String] = {
+    Option(env.environments.get((instance, namespace))) match {
       case None => Failure(new Error("instance " + instance.id + " with namespace " + namespace.toString + " does not exist"))
       case Some(e) => {
         e.getThreadInfo match {
@@ -184,28 +175,23 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
     }
   }
 
-
-
   override def deleteManager(env: CompotaEnvironment): Try[Unit] = {
     env.executor.awaitTermination(10, TimeUnit.SECONDS)
     Success(())
   }
 
-  override def launch(): Try[CompotaEnvironment] = {
+  override def launch(env: CompotaEnvironment): Try[CompotaEnvironment] = {
     println("launching metamanager")
-    launchMetaManager().recoverWith { case t =>
+    Try {metaManager.launchMetaManager(env)}.recoverWith { case t =>
       t.printStackTrace()
       Failure(t)
-    }
-
+    }.map { u => env}
   }
 
 
   def finishUnDeploy(env: LocalEnvironment, reason: String, message: String): Try[Unit] = {
     Success(isFinished.set(true))
   }
-
-
 
 
   //send command to metamanager that reduce queues etc
@@ -219,20 +205,43 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
 
   //undeploy right now
   override def forceUnDeploy(env: CompotaEnvironment, reason: String, message: String): Try[Unit] = {
-    Success(()).flatMap { u =>
-      env.logger.warn("force undeploy")
-      env.logger.info("forcedUnDeployActions")
-      forcedUnDeployActions(env).flatMap { message =>
-        env.logger.info("forcedUnDeployActions result: " + message)
-        finishUnDeploy(env, reason, message)
+    nisperos.foreach { nispero =>
+      Try {
+        deleteNisperoWorkers(env, nispero)
+      }
+      Try {
+        env.logger.warn("deleting queue: " + nispero.inputQueue.name)
+        nispero.inputQueue.delete(nispero.inputContext(env))
+      }
+      Try {
+        env.logger.warn("deleting queue: " + nispero.outputQueue.name)
+        nispero.outputQueue.delete(nispero.outputContext(env))
       }
     }
+    env.logger.warn("force undeploy")
+    env.logger.info("forcedUnDeployActions")
+    val m2 = Success(()).flatMap { u => forcedUnDeployActions(env) } match {
+      case Success(m) => env.logger.info("forcedUnDeployActions result: " + m); m
+      case Failure(t) => env.logger.warn(t); ""
+    }
+    Try {
+      sendNotification(env, configuration.name + " terminated", "reason: " + reason + System.lineSeparator() + message + System.lineSeparator() + m2)
+    }
+    Try {
+      deleteManager(env)
+    }
+    env.stop(recursive = true)
+    Success(isFinished.set(true))
+
   }
 
   override def launchConsole(nisperoGraph: QueueChecker[CompotaEnvironment], controlQueueOp: AnyQueueOp, env: CompotaEnvironment): Try[AnyConsole] = {
     Try{
       val console = new LocalConsole[CompotaNispero](AnyLocalCompota.this, env, controlQueueOp, nisperoGraph)
-      new UnfilteredConsoleServer(console).start()
+      val server = new UnfilteredConsoleServer(console, "localhost")
+      val message = server.startedMessage(customMessage)
+      sendNotification(env, configuration.name + " started", message)
+      server.start()
       console
     }
   }

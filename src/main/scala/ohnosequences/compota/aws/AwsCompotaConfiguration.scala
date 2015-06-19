@@ -2,15 +2,16 @@ package ohnosequences.compota.aws
 
 import java.io.File
 
-import com.amazonaws.auth.AWSCredentialsProvider
+import com.amazonaws.auth.{InstanceProfileCredentialsProvider, AWSCredentialsProvider}
 import ohnosequences.awstools.autoscaling._
 import ohnosequences.awstools.ec2.{InstanceType, InstanceSpecs}
 import ohnosequences.awstools.regions.Region
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.compota.environment.InstanceId
+import ohnosequences.compota.queues.AnyQueue
 import ohnosequences.compota.{Namespace, AnyNisperoConfiguration, AnyCompotaConfiguration}
 import ohnosequences.compota.aws.deployment.{AnyMetadata, Metadata, userScriptGenerator}
-
+import scala.concurrent.duration._
 import scala.concurrent.duration.Duration
 
 
@@ -20,11 +21,13 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   def localAwsCredentialsProvider: AWSCredentialsProvider
 
-  def instanceAwsCredentialsProvider: AWSCredentialsProvider
+  def instanceAwsCredentialsProvider: AWSCredentialsProvider = new InstanceProfileCredentialsProvider()
 
   def notificationTopic: String = {
     Resources.notificationTopic(notificationEmail)
   }
+
+
 
   def notificationEmail: String
 
@@ -56,9 +59,12 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   def errorTable: String = Resources.errorTable(metadata)
 
-  def loggerBucket: String = Resources.loggerBucket(metadata)
+  def resultsBucket: String = Resources.compotaBucket(metadata)
 
-  def logUploaderTimeout: Duration
+  def loggerBucket: String = Resources.compotaBucket(metadata)
+
+
+  def logUploaderTimeout: Duration = Duration(1, MINUTES)
 
   def controlQueue: String = Resources.controlQueue(metadata)
 
@@ -106,6 +112,10 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
       Some(ObjectAddress(loggerBucket, taskId) / id.id)
     }
     case _ => None
+  }
+
+  def resultsDestination[Q <: AnyQueue](queue: Q): Option[ObjectAddress] = {
+    Some(ObjectAddress(resultsBucket, "results") / queue.name)
   }
 }
 

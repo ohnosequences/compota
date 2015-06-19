@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import ohnosequences.compota.environment.Env
 import ohnosequences.compota.monoid.Monoid
+import ohnosequences.compota.serialization.Serializer
 import ohnosequences.logging.Logger
 
 import scala.annotation.tailrec
@@ -133,25 +134,29 @@ trait AnyQueue { queue =>
 
   def subQueues: List[AnyQueue] = List(queue)
 
-  def reduce(env: Env, queueOp: AnyQueueOp.of1[QueueElement]): Try[Unit] = {
-    Success(())
-  }
+//  def reduce(env: Env, queueOp: AnyQueueOp.of1[QueueElement]): Try[Unit] = {
+//    Success(())
+//  }
 
+  val reducer: AnyQueueReducer.of2[QueueElement, QueueContext] = new UnitQueueReducer(queue)
 
+}
+
+trait AnySerializableQueue extends AnyQueue {
+  val serializer: Serializer[QueueElement]
 }
 
 trait AnyMonoidQueue extends AnyQueue { monoidQueue =>
   val monoid: Monoid[QueueElement]
 
-  def reducer: Option[AnyQueueReducer.of[QueueElement]]
-
-  override def reduce(env: Env, queueOp: AnyQueueOp.of1[QueueElement]): Try[Unit] = {
-    reducer match {
-      case None => Success(())
-      case Some(r) => r.reduce(env, monoidQueue, queueOp)
-    }
-  }
-
+//  def reducer: Option[AnyQueueReducer.of[QueueElement]]
+//
+//  override def reduce(env: Env, queueOp: AnyQueueOp.of1[QueueElement]): Try[Unit] = {
+//    reducer match {
+//      case None => Success(())
+//      case Some(r) => r.reduce(env, monoidQueue, queueOp)
+//    }
+//  }
 }
 
 
@@ -183,16 +188,6 @@ object AnyQueue {
   }
 
 
-
-
-  //  type of2[E, Ctx, M <: AnyQueueMessage.of[E], R <: AnyQueueReader.of[E, M], W <: AnyQueueWriter.of[E]] = AnyQueue {
-  //    type QueueContext = Ctx
-  //    type QueueElement = E
-  //    type QueueQueueMessage = M
-  //    type QueueQueueReader = R
-  //    type QueueQueueWriter = W
-  //  }
-
   type of6[E, Ctx, M <: AnyQueueMessage.of[E], R <: AnyQueueReader.of[E, M], W <: AnyQueueWriter.of[E], O <: AnyQueueOp.of[E, M, R, W]] = AnyQueue {
     type QueueContext = Ctx
     type QueueElement = E
@@ -211,19 +206,21 @@ abstract class Queue[E, Ctx](val name: String) extends AnyQueue {
 
 trait AnyQueueOp { anyQueueOp =>
 
+
   def subOps(): List[AnyQueueOp] = List(AnyQueueOp.this)
 
   type QueueOpElement
   type QueueOpQueueMessage <: AnyQueueMessage.of[QueueOpElement]
-  // QueueMessage[QueueOpElement]
   type QueueOpQueueReader <: AnyQueueReader.of[QueueOpElement, QueueOpQueueMessage]
-  // QueueReader[QElement, QMessage]
-  type QueueOpQueueWriter <: AnyQueueWriter.of[QueueOpElement] //QueueWriter[QElement]
+  type QueueOpQueueWriter <: AnyQueueWriter.of[QueueOpElement]
+  type QueueOpQueueContext
 
-  val queue: AnyQueue.of1[QueueOpElement]
+  val context: QueueOpQueueContext
+
+  val queue: AnyQueue.of2[QueueOpElement, QueueOpQueueContext]
 
   def reduce(env: Env): Try[Unit] = {
-    queue.reduce(env, anyQueueOp)
+    queue.reducer.reduce(env, anyQueueOp)
   }
 
   def isEmpty: Try[Boolean]
@@ -328,39 +325,24 @@ object  AnyQueueOp {
     type QueueOpQueueMessage = M
   }
 
+
+
   type of1[E] = AnyQueueOp {
     type QueueOpElement = E
+  }
+
+  type of2c[E, C] = AnyQueueOp {
+    type QueueOpElement = E
+    type QueueOpQueueContext = C
   }
 }
 
 
-abstract class QueueOp[E, M <: AnyQueueMessage.of[E], QR <: AnyQueueReader.of[E, M], QW <: AnyQueueWriter.of[E]] extends AnyQueueOp {
+abstract class QueueOp[E, M <: AnyQueueMessage.of[E], QR <: AnyQueueReader.of[E, M], QW <: AnyQueueWriter.of[E], Ctx] extends AnyQueueOp {
 
   override type QueueOpElement = E
   override type QueueOpQueueMessage = M
   override type QueueOpQueueReader = QR
   override type QueueOpQueueWriter = QW
-
+  override type QueueOpQueueContext = Ctx
 }
-
-//abstract class Queue[E, Ctx](val name: String) extends AnyQueue {
-//  type Elmnt = E
-//  type Context = Ctx
-//}
-
-//object Queue {
-//  type of[E, Ctx, M <: QueueMessage[E], R <: QueueReader[E, M], W <: QueueWriter[E]] = Queue[E, Ctx] {
-//    type Msg = M
-//    type Reader = R
-//    type Writer = W
-//  }
-//}
-
-//trait AnyReducibleQueue extends AnyQueue {
-//  val monoid: Monoid[Elmnt]
-//
-//  def reduce(environment: Environment[Context]): Try[Unit] = {
-//    Success(())
-//  }
-//}
-

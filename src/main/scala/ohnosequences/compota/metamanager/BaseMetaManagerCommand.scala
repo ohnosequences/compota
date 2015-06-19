@@ -27,7 +27,7 @@ case class Command0(component: String, action: String, args: List[String]) { com
     val deleteQueue = DeleteQueue(1)
     val prepareUnDeployActions = PrepareUnDeployActions(true)
     val finishCompota = FinishCompota("reason", "message")
-    val sendNotification = FinishCompota("subject", "message")
+    val sendNotification = SendNotification("subject", "message")
     val unDeployMetaManger = UnDeployMetaManger("reason", "message")
 
 

@@ -43,8 +43,12 @@ trait AnyCompota {
     NisperoGraph(nisperosNames)
   }
 
-  def configurationChecks(env: CompotaEnvironment): Try[Boolean] = {
-    Success(true)
+  def configurationChecks(env: CompotaEnvironment): Try[Unit] = {
+    env.logger.info("checking nispero graph")
+    nisperoGraph.graph.sort().map { c =>
+      env.logger.info("checking nispero graph - OK")
+      ()
+    }
   }
 
   def launch(env: CompotaEnvironment): Try[CompotaEnvironment]
@@ -70,12 +74,12 @@ trait AnyCompota {
       }
       case "checks" :: Nil => {
         localEnvironment(logger, List[String]()).flatMap { env =>
-          configurationChecks(env).map {
-            case false => env.logger.info("configuration checks failed")
-            case true => env.logger.info("configuration checked")
+          configurationChecks(env).map { r =>
+            env.logger.info("configuration checked")
           }
         }.recoverWith { case t =>
-          t.printStackTrace()
+          logger.info("configuration checks failed")
+          logger.error(t)
           Failure(t)
         }
       }
@@ -89,14 +93,12 @@ trait AnyCompota {
       }
       case "start" :: Nil => {
         localEnvironment(logger, List[String]()).flatMap { env =>
-          configurationChecks(env).flatMap {
-            case false => Failure(new Error("configuration checks failed"))
-            case true => {
-              env.logger.info("configuration checked")
-              launch(env)
-            }
+          configurationChecks(env).flatMap { r =>
+            env.logger.info("configuration checked")
+            launch(env)
           }
         }.recoverWith { case t =>
+          logger.error(new Error("configuration checks failed", t))
           t.printStackTrace()
           Failure(t)
         }

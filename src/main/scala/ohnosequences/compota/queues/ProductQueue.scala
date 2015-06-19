@@ -109,7 +109,7 @@ trait AnyProductQueueOp extends AnyQueueOp { productQueueOp =>
   type XMessage <: AnyQueueMessage.of[XElement]
   type YMessage <: AnyQueueMessage.of[YElement]
 
-  val queue: AnyProductQueue.of4[XElement, YElement, XMessage, YMessage]
+  val queue: AnyProductQueue.of4[XElement, YElement, XMessage, YMessage, QueueOpQueueContext]
 
   val xQueueOp: AnyQueueOp.of2[XElement, XMessage]
   val yQueueOp: AnyQueueOp.of2[YElement, YMessage]
@@ -197,14 +197,16 @@ object AnyProductQueueOp {
   }
 }
 
-case class ProductQueueOp[X, Y, XM <: AnyQueueMessage.of[X], YM <: AnyQueueMessage.of[Y]](
-                                                                                           queue: AnyProductQueue.of4[X, Y, XM, YM],
+case class ProductQueueOp[X, Y, XM <: AnyQueueMessage.of[X], YM <: AnyQueueMessage.of[Y], C](
+                                                                                           context: C,
+                                                                                           queue: AnyProductQueue.of4[X, Y, XM, YM, C],
                                                                                            xQueueOp: AnyQueueOp.of2[X, XM],
                                                                                            yQueueOp: AnyQueueOp.of2[Y, YM]) extends AnyProductQueueOp {
   override type XElement = X
   override type YElement = Y
   override type XMessage = XM
   override type YMessage = YM
+  override type QueueOpQueueContext = C
 }
 
 
@@ -227,7 +229,7 @@ trait AnyProductQueue extends AnyQueue { anyProductQueue =>
 
   override type QueueQueueReader = ProductQueueReader[XElement, YElement, XMessage, YMessage]
   override type QueueQueueWriter = ProductQueueWriter[XElement, YElement]
-  override type QueueQueueOp = ProductQueueOp[XElement, YElement, XMessage, YMessage]
+  override type QueueQueueOp = ProductQueueOp[XElement, YElement, XMessage, YMessage, QueueContext]
 
   override def subQueues: List[AnyQueue] = xQueue.subQueues ++ yQueue.subQueues
 
@@ -235,18 +237,19 @@ trait AnyProductQueue extends AnyQueue { anyProductQueue =>
 
     xQueue.create(ctx).flatMap { xQueueOp =>
       yQueue.create(ctx).map { yQueueOp =>
-        ProductQueueOp(anyProductQueue, xQueueOp, yQueueOp)
+        ProductQueueOp(ctx, anyProductQueue, xQueueOp, yQueueOp)
       }
     }
   }
 }
 
 object AnyProductQueue {
-  type of4[X, Y, XM <: AnyQueueMessage.of[X], YM <: AnyQueueMessage.of[Y]] = AnyProductQueue {
+  type of4[X, Y, XM <: AnyQueueMessage.of[X], YM <: AnyQueueMessage.of[Y], C] = AnyProductQueue {
     type XElement = X
     type YElement = Y
     type XMessage = XM
     type YMessage = YM
+    type QueueContext = C
   }
 }
 

@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.{AtomicInteger}
 
 import com.amazonaws.auth.{PropertiesFileCredentialsProvider}
 import ohnosequences.awstools.AWSClients
+import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.compota.aws.metamanager.AwsMetaManager
 import ohnosequences.compota.console.{UnfilteredConsoleServer, AnyConsole}
 import ohnosequences.compota.environment.InstanceId
@@ -71,16 +72,17 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
 
   override def launchConsole(nisperoGraph: QueueChecker[CompotaEnvironment], controlQueue: AnyQueueOp, env: CompotaEnvironment): Try[AnyConsole] = {
     Try {
+      //todo move to separated command
+
+      env.awsClients.s3.createBucket(configuration.resultsBucket)
+      env.awsClients.s3.createBucket(configuration.loggerBucket)
+
       val console = new AwsConsole[CompotaNispero](awsCompota, env, controlQueue, nisperoGraph)
       val currentAddress = env.awsClients.ec2.getCurrentInstance.flatMap {_.getPublicDNS()}.getOrElse("<undefined>")
-
       val server = new UnfilteredConsoleServer(console, currentAddress)
-
-      //todo change this order
+      server.start()
       val message = server.startedMessage(customMessage)
       sendNotification(env, configuration.name + " started", message)
-      server.start()
-
       console
     }
   }
@@ -145,6 +147,26 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
         originEnvironment = None,
         localErrorCounts = new AtomicInteger(0)
       )
+    }
+  }
+
+
+  override def configurationChecks(env: AwsEnvironment): Try[Unit] = {
+    super.configurationChecks(env).flatMap { u =>
+      env.logger.info("checking jar object " + configuration.metadata.jarUrl)
+      ObjectAddress(configuration.metadata.jarUrl).flatMap { jarObject =>
+        env.awsClients.s3.objectExists(jarObject).map {
+          case true => {
+            env.logger.info("jar object " + jarObject.url + " OK")
+            if(configuration.notificationEmail.isEmpty) {
+              Failure(new Error("notification email is empty"))
+            } else {
+              Success(())
+            }
+          };
+          case false => Failure(new Error("jar object " + jarObject.url + " does not exists"))
+        }
+      }
     }
   }
 

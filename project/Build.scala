@@ -7,11 +7,20 @@ import AssemblyKeys._
 
 object CompotaBuild extends Build {
 
-  val testCredentialsProvider = SettingKey[Option[AWSCredentialsProvider]]("credentials provider for test environment")
+  val testCredentialsProvider = SettingKey[AWSCredentialsProvider]("aws credentials provider for test environment")
 
- // val testMainClass = SettingKey[Option[String]]("compota main class")
+  val testNotificationEmail = SettingKey[String]("e-mail address for test notifications")
 
-  override lazy val settings = super.settings ++ Seq(testCredentialsProvider := None)
+  override lazy val settings = super.settings ++ Seq(testCredentialsProvider := new InstanceProfileCredentialsProvider(), testNotificationEmail := "")
+
+  def stringOptionPrinter(option: Option[String]): String = option match {
+    case None => "None"
+    case Some(s) => "Some(\"" + s + "\")"
+  }
+
+  def artifactPrepare(s: String): String = {
+    s.split("\\W").reduce(_ + "_" + _)
+  }
 
   def providerConstructorPrinter(provider: AWSCredentialsProvider) = provider match {
     case ip: InstanceProfileCredentialsProvider => {
@@ -26,17 +35,8 @@ object CompotaBuild extends Build {
       val path = field.get(pp).toString
       "new com.amazonaws.auth.PropertiesFileCredentialsProvider(\"\"\"$path$\"\"\")".replace("$path$", path)
     }
-
-    //todo fix!
-    case p => ""
+    case p => "new com.amazonaws.auth.InstanceProfileCredentialsProvider()"
   }
-
-  def optionStringPrinter(o: Option[String]): String = o match {
-    case None => "None"
-    case Some(s) => "Some(\"" + s + "\")"
-  }
-
-
 
   lazy val root = Project(id = "compota",
     base = file("."),
@@ -45,12 +45,25 @@ object CompotaBuild extends Build {
         val text = """
                      |package ohnosequences.compota.test.generated
                      |
-                     |object credentials {
-                     |  val credentialsProvider: Option[com.amazonaws.auth.AWSCredentialsProvider] = $cred$
+                     |object awsCredentials {
+                     |  val credentialsProvider: com.amazonaws.auth.AWSCredentialsProvider = $cred$
                      |}
                      |""".stripMargin
-          .replace("$cred$", testCredentialsProvider.value.map(providerConstructorPrinter).toString)
-        val file = (sourceManaged in Compile).value / "testCredentials.scala"
+          .replace("$cred$", providerConstructorPrinter(testCredentialsProvider.value))
+        val file = (sourceManaged in Compile).value / "awsCredentials.scala"
+        IO.write(file, text)
+        Seq(file)
+      },
+      sourceGenerators in Test += task[Seq[File]] {
+        val text = """
+                     |package ohnosequences.compota.test.generated
+                     |
+                     |object email {
+                     |  val email: String = $email$
+                     |}
+                     |""".stripMargin
+          .replace("$email$", "\"" + testNotificationEmail.value + "\"")
+        val file = (sourceManaged in Compile).value / "email.scala"
         IO.write(file, text)
         Seq(file)
       },
@@ -89,19 +102,22 @@ object CompotaBuild extends Build {
         }
       val text = """
                    |package ohnosequences.compota.test.generated
+                   |import ohnosequences.compota.aws.deployment.Metadata
                    |
-                   |object metadata extends ohnosequences.compota.aws.deployment.AnyMetadata {
-                   |  override val artifact = "$artifact$"
-                   |  override val jarUrl = "$jarUrl$"
-                   |  override val testJarUrl = Some("$testJarUrl$")
-                   |  override val mainClass = $mainClass$
+                   |object metadata {
+                   |  val metadata: Metadata = Metadata(
+                   |    artifact = "$artifact$",
+                   |    jarUrl = "$jarUrl$",
+                   |    testJarUrl = Some("$testJarUrl$"),
+                   |    mainClass = $mainClass$
+                   |  )
                    |}
                    |""".stripMargin
-        .replace("$artifact$", (name.value + version.value).toLowerCase)
+        .replace("$artifact$", artifactPrepare(name.value + version.value))
         .replace("$jarUrl$", fatJarUrl)
         .replace("$testJarUrl$", testJarUrl)
-        .replace("$mainClass$", optionStringPrinter(None))
-      val file = (sourceManaged in Compile).value / "testMetadata.scala"
+        .replace("$mainClass$", stringOptionPrinter(None))
+      val file = (sourceManaged in Compile).value / "metadata.scala"
       IO.write(file, text)
       Seq(file)
     }

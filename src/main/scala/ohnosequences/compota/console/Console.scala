@@ -483,12 +483,12 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
   def mainCSS: String = {
-    val css = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/console/main.css")).mkString
+    val css = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/ohnosequences/compota/console/main.css")).mkString
     css
   }
 
   def mainHTML: String = {
-    val main = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/console/main.html")).mkString
+    val main = scala.io.Source.fromInputStream(getClass.getResourceAsStream("ohnosequences/compota/console/main.html")).mkString
     main
   }
 

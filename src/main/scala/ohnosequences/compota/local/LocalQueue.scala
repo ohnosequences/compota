@@ -71,13 +71,13 @@ class LocalQueue[T](name: String,
 
 
   override def create(ctx: LocalContext): Try[QueueQueueOp] = {
-    Monkey.call(Success(new LocalQueueOp[T](queue, ctx)), monkeyAppearanceProbability.create)
+    Monkey.call(Success(new LocalQueueOp[T](ctx, queue)), monkeyAppearanceProbability.create)
   }
 
 
 }
 
-class LocalQueueOp[T](val queue: LocalQueue[T], val ctx: LocalContext) extends QueueOp[T, LocalMessage[T], LocalQueueReader[T], LocalQueueWriter[T]] { queueOp =>
+class LocalQueueOp[T](val context: LocalContext, val queue: LocalQueue[T]) extends QueueOp[T, LocalMessage[T], LocalQueueReader[T], LocalQueueWriter[T], LocalContext] { queueOp =>
 
   override def deleteMessage(message: LocalMessage[T]): Try[Unit] = {
 
@@ -134,7 +134,7 @@ class LocalQueueReader[T](val queueOp: LocalQueueOp[T]) extends QueueReader[T, L
       case None => Success(None)
       case Some(entry) => {
         val  res = new LocalMessage(entry.getKey, entry.getValue, queueOp.queue.monkeyAppearanceProbability)
-        queueOp.ctx.executor.execute { new Runnable {
+        queueOp.context.executor.execute { new Runnable {
           override def toString: String = queueOp.queue.name + " message extender for " + entry.getKey
 
           override def run(): Unit = {

@@ -239,9 +239,9 @@ trait AnyLocalCompota extends AnyCompota { anyLocalCompota =>
     Try{
       val console = new LocalConsole[CompotaNispero](AnyLocalCompota.this, env, controlQueueOp, nisperoGraph)
       val server = new UnfilteredConsoleServer(console, "localhost")
+      server.start()
       val message = server.startedMessage(customMessage)
       sendNotification(env, configuration.name + " started", message)
-      server.start()
       console
     }
   }

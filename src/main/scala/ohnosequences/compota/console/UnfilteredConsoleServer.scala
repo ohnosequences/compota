@@ -251,6 +251,7 @@ class UnfilteredConsoleServer(console: AnyConsole, currentAddress: String) {
       } else {
         unfiltered.netty.Server.http(port = 80).handler(new ConsolePlan(users, console))
       }
+      //Starts server in the background
       server.start()
       console.logger.info("console server started on port " + server.ports.head)
 
@@ -261,6 +262,7 @@ class UnfilteredConsoleServer(console: AnyConsole, currentAddress: String) {
         } else {
           unfiltered.netty.Server.http(80, "localhost").handler(new ConsolePlan(users, console))
         }
+        //Starts server in the background
         server.start()
         console.logger.info("console server started on port " + server.ports.head)
 

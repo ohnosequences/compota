@@ -6,6 +6,7 @@ import ohnosequences.compota.environment.Env
 import ohnosequences.compota.queues.{InMemoryReducible}
 import ohnosequences.compota.{Instructions}
 import ohnosequences.compota.monoid.{Monoid, intMonoid}
+import ohnosequences.logging.ConsoleLogger
 import org.junit.Test
 import org.junit.Assert._
 import scala.concurrent.duration._
@@ -137,14 +138,16 @@ class LocalCompotaTest {
   }
 
 
-  @Test
+ // @Test
   def localCompotaTest(): Unit = {
-    println("test")
-    wordLenghtCompota.launch().map { e =>
-      wordLenghtCompota.waitForFinished()
+    val cliLogger = new ConsoleLogger("localCompotaTest")
+    wordLenghtCompota.localEnvironment(cliLogger, List[String]()).flatMap { env =>
+      wordLenghtCompota.launch(env).map { e =>
+        wordLenghtCompota.waitForFinished()
 
-      val expectedResult = input.flatMap(_.split("\\s+").toList).map(_.length).sum
-      assertEquals(expectedResult, countsQueue.result.get().get)
+        val expectedResult = input.flatMap(_.split("\\s+").toList).map(_.length).sum
+        assertEquals(expectedResult, countsQueue.result.get().get)
+      }
     }.recoverWith { case t =>
       org.junit.Assert.fail(t.toString)
       Failure(t)

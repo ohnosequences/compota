@@ -1,160 +1,158 @@
-package ohnosequences.compota.aws
+package ohnosequences.compota.test.aws
 
+import com.amazonaws.auth.AWSCredentialsProvider
 import ohnosequences.awstools.s3.ObjectAddress
+import ohnosequences.compota.aws._
 import ohnosequences.compota.aws.deployment.{AnyMetadata, Metadata}
-import ohnosequences.compota.aws.queues.DynamoDBQueue
+import ohnosequences.compota.aws.queues.{S3InMemoryReducible, DynamoDBQueue}
 import ohnosequences.compota.environment.Env
-import ohnosequences.compota.local.LocalNispero
-import ohnosequences.compota.queues.{InMemoryReducible, InMemoryQueueReducer}
 import ohnosequences.compota.serialization.{intSerializer, stringSerializer}
 import ohnosequences.compota.Instructions
 import ohnosequences.compota.monoid.{Monoid, stringMonoid, intMonoid}
-import ohnosequences.logging.{ConsoleLogger, Logger}
-import org.junit.Test
+import ohnosequences.logging.ConsoleLogger
 import org.junit.Assert._
+import org.junit.Test
 import scala.concurrent.duration._
 
 import scala.concurrent.duration.Duration
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
-class AwsWordCount {
+object wordLengthInstructions extends Instructions[String, Int] {
+  override type Context = Unit
 
-  object wordLengthInstructions extends Instructions[String, Int] {
-
-    override type Context = Unit
-
-    override def solve(env: Env, context: Unit, input: String): Try[List[Int]] = {
-      throw new Error("uuu!")
-      Success(List(input.length))
-    }
-
-    override def prepare(env: Env) = Success(())
-
+  override def solve(env: Env, context: Unit, input: String): Try[List[Int]] = {
+    // throw new Error("uuu!")
+    Success(List(input.length))
   }
 
-  object splitInstructions extends Instructions[String, String] {
+  override def prepare(env: Env) = Success(())
+}
 
-    override type Context = Unit
+object splitInstructions extends Instructions[String, String] {
+  override type Context = Unit
 
-    override def solve(env: Env, context: Unit, input: String): Try[List[String]] = {
-      Success(input.split("\\s+").toList)
-    }
-
-    override def prepare(env: Env) = Success(())
-
+  override def solve(env: Env, context: Unit, input: String): Try[List[String]] = {
+    Success(input.split("\\s+").toList)
   }
 
-  val textQueue = new DynamoDBQueue[String](
-    name = "text",
-    serializer = stringSerializer
-  )
-  val wordsQueue = new DynamoDBQueue[String](
-    name = "words",
-    serializer = stringSerializer
-  )
+  override def prepare(env: Env) = Success(())
+}
 
-  object countsQueue extends DynamoDBQueue[Int] (
-    name = "counts",
-    serializer = intSerializer
-  ) with InMemoryReducible {
-    override val monoid = intMonoid
-  }
+object textQueue extends DynamoDBQueue[String](
+  name = "text",
+  serializer = stringSerializer
+)
 
-  val rawMetadata = ohnosequences.compota.test.generated.metadata
+object wordsQueue extends DynamoDBQueue[String](
+  name = "words",
+  serializer = stringSerializer
+)
 
-  val compotaMetadata = new Metadata(
-    rawMetadata.artifact,
-    rawMetadata.jarUrl,
-    rawMetadata.testJarUrl,
-    Some(this.getClass.toString)
-  )
+object countsQueue extends DynamoDBQueue[Int](
+  name = "counts",
+  serializer = intSerializer
+) with S3InMemoryReducible {
 
-  object wordCountCompotaConfiguration extends AwsCompotaConfiguration {
+  override val destination: Option[ObjectAddress] = wordCountCompotaConfiguration.resultsDestination(countsQueue)
+  override val monoid = intMonoid
 
+}
 
-    override def metadata: AnyMetadata = compotaMetadata
+object wordCountCompotaConfiguration extends AwsCompotaConfiguration {
+  override def metadata: AnyMetadata = AwsCompotaTest.testMetadata.copy(mainClass = Some("ohnosequences.compota.test.aws.AwsWordCount$"))
 
+  override def localAwsCredentialsProvider: AWSCredentialsProvider = AwsCompotaTest.testCredentialsProvider
 
-    override def logUploaderTimeout: Duration = Duration(1, MINUTES)
+  override def notificationEmail: String = AwsCompotaTest.testNotificationEmail
 
-    override val loggerDebug: Boolean = true
-    override val deleteErrorQueue: Boolean = false
-    override val timeout: Duration = Duration(1, HOURS)
+  override val loggerDebug: Boolean = true
+  override val deleteErrorQueue: Boolean = false
+  override val timeout: Duration = Duration(1, HOURS)
+}
 
-  }
+object splitNisperoConfiguration extends AwsNisperoConfiguration {
+  override def name: String = "split"
 
+  override def compotaConfiguration: AwsCompotaConfiguration = wordCountCompotaConfiguration
 
+  override def workerDesiredSize: Int = 1
+}
 
-  object splitNisperoConfiguration extends  AwsNisperoConfiguration {
+object splitNispero extends AwsNispero(
+  textQueue,
+  wordsQueue,
+  splitInstructions,
+  splitNisperoConfiguration
+)
 
-    override def name: String = "split"
+object wordLengthNisperoConfiguration extends AwsNisperoConfiguration {
+  override def name: String = "wordLenght"
 
-    override def compotaConfiguration: AwsCompotaConfiguration = wordCountCompotaConfiguration
+  override def compotaConfiguration: AwsCompotaConfiguration = wordCountCompotaConfiguration
 
-    override def workerDesiredSize: Int = 1
-  }
+  override def workerDesiredSize: Int = 1
+}
 
-  val splitNispero = AwsNispero(
-    textQueue,
-    wordsQueue,
-    splitInstructions,
-    splitNisperoConfiguration)
+object wordLengthNispero extends AwsNispero(
+  wordsQueue,
+  countsQueue,
+  wordLengthInstructions,
+  splitNisperoConfiguration
+)
 
-  object wordLengthNisperoConfiguration extends AwsNisperoConfiguration {
-    override def name: String = "wordLenght"
+object wordCountCompota extends AwsCompota[Int](List(splitNispero, wordLengthNispero), wordCountCompotaConfiguration) {
 
-    override def compotaConfiguration: AwsCompotaConfiguration = wordCountCompotaConfiguration
-    override def workerDesiredSize: Int = 1
-  }
+  override def prepareUnDeployActions(env: AwsEnvironment): Try[Int] = Success(1000)
 
-  val wordLengthNispero = AwsNispero(
-    wordsQueue,
-    countsQueue,
-    wordLengthInstructions,
-    splitNisperoConfiguration
-  )
-
-
-
-  object wordCountCompota extends AwsCompota[Int](List(splitNispero, wordLengthNispero), wordCountCompotaConfiguration) {
-
-    val s = System.currentTimeMillis()
-
-    override def prepareUnDeployActions(env: AwsEnvironment): Try[Int] = Success(1000)
-
-    override def configurationChecks(env: AwsEnvironment): Try[Boolean] = {
+  override def configurationChecks(env: AwsEnvironment): Try[Unit] = {
+    super.configurationChecks(env).flatMap { u =>
       configuration.metadata.testJarUrl match {
-        case None => Success(false)
-        case Some(jarLocation) => ObjectAddress(jarLocation).flatMap(env.awsClients.s3.objectExists)
+        case None => Failure(new Error("test jar URL is not specified"))
+        case Some(jarLocation) => {
+          ObjectAddress(jarLocation).flatMap { jarObject =>
+            env.awsClients.s3.objectExists(jarObject).map {
+              case true => env.logger.info("test jar " + jarObject.url + " OK"); Success(())
+              case false => Failure(new Error("test jar " + jarObject.url + " does not exists"))
+            }
+          }
+        }
       }
     }
-
-    override def addTasks(environment: AwsEnvironment): Try[Unit] = {
-      environment.logger.debug("test")
-      // environment.logger.error(new Error("exception"))
-      val op = textQueue.create(environment.createDynamoDBContext).get
-      val writer = op.writer.get
-      writer.writeRaw(List(("1", "a a a b b")))
-    }
-
-    override def unDeployActions(env: AwsEnvironment, context: Int): Try[String] = {
-      Success("message context = " +context)
-    }
   }
 
+  override def addTasks(environment: AwsEnvironment): Try[Unit] = {
+    environment.logger.debug("test")
+    // environment.logger.error(new Error("exception"))
+    val op = textQueue.create(environment.createDynamoDBContext).get
+    val writer = op.writer.get
+    writer.writeRaw(List(("1", "a a a b b")))
+  }
+
+  override def unDeployActions(env: AwsEnvironment, context: Int): Try[String] = {
+    Success("message context = " + context)
+  }
+}
+
+class AwsWordCountTest {
   @Test
-  def localCompotaTest(): Unit = {
-
-    //wordCountCompota()
-
-
-
-   // wordCountCompota.launch()
-   // wordCountCompota.waitForFinished()
-
-
-    //  wordCountCompota.main(Array("add", "tasks"))
-    // wordCountCompota.launchWorker(splitNispero)
+  def awsWordCoundTest(): Unit = {
+    val cliLogger = new ConsoleLogger("awsWordCountTest")
+    cliLogger.info("started")
+    wordCountCompota.localEnvironment(cliLogger, List[String]()).flatMap { env =>
+      cliLogger.info("local environment loaded")
+      cliLogger.info("checking configuration for " + wordCountCompota)
+      wordCountCompota.configurationChecks(env).flatMap { r =>
+        cliLogger.info("checks passed. launching compota")
+//        wordCountCompota.launch(env).map { e =>
+//          cliLogger.info("started")
+//        }
+        Success(())
+      }
+    }.recoverWith { case t =>
+      cliLogger.error(t)
+      org.junit.Assert.fail(t.toString)
+      Failure(t)
+    }
 
   }
 

@@ -37,6 +37,7 @@ trait BaseMetaManager extends AnyMetaManager {
     command match {
 
       case LaunchConsole => {
+
         env.subEnvironmentAsync(Left(Namespace.console)) { env =>
           compota.launchConsole(queueChecker, controlQueueOp, env)
          // SendNotification(compota.configuration.name + " started", message)

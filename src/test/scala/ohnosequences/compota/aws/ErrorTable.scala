@@ -1,6 +1,7 @@
-package ohnosequences.compota.aws
+package ohnosequences.compota.test.aws
 
 import ohnosequences.compota.Namespace
+import ohnosequences.compota.aws.AwsErrorTable
 import ohnosequences.compota.environment.InstanceId
 import ohnosequences.logging.ConsoleLogger
 import org.junit.Test
@@ -12,7 +13,7 @@ class ErrorTableTest {
  // @Test
   def testCount() {
     val tableName = "errorTable.testCount"
-    TestCredentials.aws match {
+    AwsCompotaTest.aws match {
       case None => println("this test requires test credentials")
       case Some(aws) => {
         val logger = new ConsoleLogger(prefix = "errorTableTest()", debug = true)

@@ -180,9 +180,24 @@ Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp
 
   override def namespacePage: NodeSeq = errorDiv(logger, "namespaces are not supported by AWS compota console")
 
-  override def printNamespaces(lastToken: Option[String]): NodeSeq = ???
+  override def printNamespaces(lastToken: Option[String]): NodeSeq = errorDiv(logger, "namespaces are not supported by AWS compota console")
 
-  override def terminateInstance(instanceId: String, namespace: Seq[String]): NodeSeq = ???
+  override def terminateInstance(instanceId: String, namespace: Seq[String]): NodeSeq = {
+    preResult(Try {
+      env.awsClients.ec2.terminateInstance(instanceId)
+      "instance " + instanceId + " terminated"
+    })
+  }
 
-  override def sshInstance(instanceId: String, namespace: Seq[String]): NodeSeq = ???
+  override def sshInstance(instanceId: String, namespace: Seq[String]): NodeSeq = {
+    val tryS: Try[String] = Success(()).flatMap { u =>
+      env.awsClients.ec2.getInstanceById(instanceId).flatMap { instance =>
+        instance.getSSHCommand()
+      } match {
+        case Some(s) => Success(s)
+        case None => Failure(new Error("couldn't retrive ssh command for instance: " + instanceId))
+      }
+    }
+    preResult(tryS)
+  }
 }

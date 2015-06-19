@@ -55,7 +55,7 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   def loggingDirectory =  new File(workingDirectory, "logs")
 
-  def managerInstanceType = InstanceType.c1_medium
+  def managerInstanceType = InstanceType.c3_large
 
   def errorTable: String = Resources.errorTable(metadata)
 
@@ -96,7 +96,7 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
     launchingConfiguration = managerLaunchConfiguration
   )
 
-  def workerInstanceType: InstanceType = InstanceType.m1_medium
+  def workerInstanceType: InstanceType = InstanceType.m3_medium
 
   def workerPurchaseModel: PurchaseModel = SpotAuto
 

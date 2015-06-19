@@ -29,18 +29,21 @@ class TerminationDaemon[E <: AnyEnvironment[E]](compota: AnyCompota.ofE[E], queu
             env.logger.info(message)
             env.logger.info("force undeploy")
             compota.sendForceUnDeployCommand(env, "timeout", message).recoverWith { case t =>
-              env.reportError(terminationDaemon / "send_force_undeploy", new Error("couldn't send force undeploy command", t))
+              env.reportError( new Error("couldn't send force undeploy command", t), env.namespace / "send_force_undeploy")
                 Failure(t)
+            }.map { sent =>
+              env.stop(recursive = false)
             }
+
           } else {
-            compota.compotaUnDeployActionContext.get() match {
-              case None => {
-                env.logger.debug("undeploy context is not ready")
-              }
-              case Some(context) => {
+//            compota.compotaUnDeployActionContext.get() match {
+//              case None => {
+//                env.logger.debug("undeploy context is not ready")
+//              }
+//              case Some(context) => {
                 queueChecker.checkQueues() match {
                   case Failure(t) => {
-                    env.reportError(terminationDaemon / "check_queues", new Error("couldn't check queues", t))
+                    env.reportError(new Error("couldn't check queues", t), env.namespace / "check_queues")
                   }
                   case Success(Left(queueOp)) => {
                     env.logger.info("queue " + queueOp.queue.name + " isn't empty")
@@ -49,13 +52,15 @@ class TerminationDaemon[E <: AnyEnvironment[E]](compota: AnyCompota.ofE[E], queu
                     env.logger.info("all queues are empty")
                     env.logger.info("sending undeploy command")
                     compota.sendUnDeployCommand(env).recoverWith { case t =>
-                      env.reportError(terminationDaemon / "send_undeploy_command", new Error("couldn't send undeploy command", t))
+                      env.reportError(new Error("couldn't send undeploy command", t), env.namespace / "send_undeploy")
                       Failure(t)
+                    }.map { success =>
+                      env.stop(recursive = false)
                     }
                   }
                 }
-              }
-            }
+             // }
+           // }
           }
           messageLoop()
         }

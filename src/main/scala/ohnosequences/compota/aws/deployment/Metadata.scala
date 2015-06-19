@@ -7,7 +7,7 @@ trait  AnyMetadata {
   val mainClass: Option[String]
 }
 
-class Metadata(val artifact: String,
-               val jarUrl: String,
-               val testJarUrl: Option[String],
-               val mainClass: Option[String]) extends AnyMetadata
+case class Metadata(artifact: String,
+               jarUrl: String,
+               testJarUrl: Option[String],
+               mainClass: Option[String]) extends AnyMetadata

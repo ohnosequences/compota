@@ -1,18 +1,21 @@
 package ohnosequences.compota.aws
 
+import java.io.File
 import java.util.concurrent.{ConcurrentHashMap, Executors}
-import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
+import java.util.concurrent.atomic.{AtomicInteger}
 
-import com.amazonaws.auth.{InstanceProfileCredentialsProvider, AWSCredentialsProvider}
+import com.amazonaws.auth.{PropertiesFileCredentialsProvider}
 import ohnosequences.awstools.AWSClients
+import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.compota.aws.metamanager.AwsMetaManager
 import ohnosequences.compota.console.{UnfilteredConsoleServer, AnyConsole}
 import ohnosequences.compota.environment.InstanceId
 import ohnosequences.compota.graphs.{QueueChecker}
+import ohnosequences.compota.local.LocalErrorTable
 import ohnosequences.compota.metamanager.{ForceUnDeploy, UnDeploy}
 import ohnosequences.compota.queues._
 import ohnosequences.compota.{Namespace, AnyCompota}
-import ohnosequences.logging.{S3Logger}
+import ohnosequences.logging.{ConsoleLogger, S3Logger}
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
@@ -24,57 +27,44 @@ object AnyAwsCompota {
 }
 
 trait AnyAwsCompota extends AnyCompota { awsCompota =>
+
   override type CompotaEnvironment = AwsEnvironment
   override type CompotaNispero = AnyAwsNispero
   override type CompotaMetaManager = AwsMetaManager[CompotaUnDeployActionContext]
 
   type CompotaConfiguration <: AwsCompotaConfiguration
 
-
-  lazy val awsCredentialsProvider: AWSCredentialsProvider = {
-    new InstanceProfileCredentialsProvider()
-  }
-
   override val metaManager: CompotaMetaManager = new AwsMetaManager[CompotaUnDeployActionContext](AnyAwsCompota.this)
 
-  val executor = Executors.newCachedThreadPool()
-
-  val awsClients0: AtomicReference[Option[AWSClients]] = new AtomicReference(None)
-  def awsClients: AWSClients = {
-    awsClients0.get match {
-      case None => {
-        val aws = AWSClients.create(awsCredentialsProvider)
-        awsClients0.set(Some(aws))
-        aws
-      }
-      case Some(aws) => aws
-    }
-  }
-
-  def launchLogUploader(): Unit = {
-    initialEnvironment.map { env =>
-      env.logger.info("starting log uploader")
-      configuration.loggingLocation(env.instanceId) match {
-        case None => env.logger.info("log uploader is disabled")
-        case Some(loggerDestination) => {
-          env.subEnvironmentAsync("logUploader") { logEnv =>
-            @tailrec
-            def launchLogUploaderRec(timeout: Duration = configuration.logUploaderTimeout): Unit = {
-              if(env.isStopped) {
-                env.logger.info("log uploader stopped")
-                Success(())
-              } else {
-                Thread.sleep(timeout.toMillis)
-                env.logger.info("uploading log " + logEnv.logger.logFile.getAbsolutePath + " to " + loggerDestination)
-                logEnv.logger.uploadLog() match {
-                  case Failure(t) => logEnv.reportError(Namespace.logUploader, t)
-                  case Success(uploaded) => launchLogUploaderRec(timeout)
+  def launchLogUploader(env: CompotaEnvironment): Unit = {
+    env.logger.info("starting log uploader")
+    env.logger match {
+      case s3Logger: S3Logger => {
+        s3Logger.loggingDestination match {
+          case None => env.logger.info("log uploader is disabled")
+          case Some(loggerDestination) => {
+            env.subEnvironmentAsync(Left(Namespace.logUploader)) { logEnv =>
+              @tailrec
+              def launchLogUploaderRec(timeout: Duration = configuration.logUploaderTimeout): Unit = {
+                if (env.isStopped) {
+                  env.logger.info("log uploader stopped")
+                  Success(())
+                } else {
+                  Thread.sleep(timeout.toMillis)
+                  env.logger.info("uploading log " + s3Logger.logFile.getAbsolutePath + " to " + loggerDestination)
+                  s3Logger.uploadLog() match {
+                    case Failure(t) => logEnv.reportError(t)
+                    case Success(uploaded) => launchLogUploaderRec(timeout)
+                  }
                 }
               }
+              launchLogUploaderRec()
             }
-            launchLogUploaderRec()
           }
         }
+      }
+      case _ => {
+        env.logger.info("starting log uploader: unsupported logger")
       }
     }
 
@@ -82,47 +72,99 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
 
   override def launchConsole(nisperoGraph: QueueChecker[CompotaEnvironment], controlQueue: AnyQueueOp, env: CompotaEnvironment): Try[AnyConsole] = {
     Try {
+      //todo move to separated command
+
+      env.awsClients.s3.createBucket(configuration.resultsBucket)
+      env.awsClients.s3.createBucket(configuration.loggerBucket)
+
       val console = new AwsConsole[CompotaNispero](awsCompota, env, controlQueue, nisperoGraph)
-      new UnfilteredConsoleServer(console).start()
+      val currentAddress = env.awsClients.ec2.getCurrentInstance.flatMap {_.getPublicDNS()}.getOrElse("<undefined>")
+      val server = new UnfilteredConsoleServer(console, currentAddress)
+      server.start()
+      val message = server.startedMessage(customMessage)
+      sendNotification(env, configuration.name + " started", message)
       console
     }
   }
 
-  private val initialEnvironment_ = new AtomicReference[Option[AwsEnvironment]](None)
   override def initialEnvironment: Try[AwsEnvironment] = {
-    initialEnvironment_.get match {
-      case Some(env) => Success(env)
-      case None => {
-        val ec2InstanceId = awsClients.ec2.getCurrentInstanceId.getOrElse("unknown_" + System.currentTimeMillis())
-        configuration.workingDirectory.mkdir()
-        S3Logger(
-          awsClients.s3,
-          ec2InstanceId,
-          configuration.loggingDirectory,
-          "log.txt",
-          configuration.loggingLocation(ec2InstanceId),
-          debug = configuration.loggingDebug,
-          printToConsole = configuration.loggersPrintToConsole
-        ).flatMap { logger =>
-          AwsErrorTable.apply(logger, configuration.errorTable, awsClients).map { errorTable =>
-            new AwsEnvironment(
-              instanceId = InstanceId(ec2InstanceId),
-              configuration = configuration,
-              awsClients = awsClients,
-              logger = logger,
-              workingDirectory = configuration.workingDirectory,
-              executor = executor,
-              errorTable = errorTable,
-              sendForceUnDeployCommand0 = sendForceUnDeployCommand,
-              environments = new ConcurrentHashMap[InstanceId, AwsEnvironment],
-              rootEnvironment0 = None,
-              origin = None,
-              localErrorCounts = new AtomicInteger(0)
-            )
-          }
-        }.map { env =>
-          initialEnvironment_.set(Some(env))
-          env
+
+    val awsClients = AWSClients.create(configuration.localAwsCredentialsProvider, configuration.awsRegion)
+
+    val ec2InstanceId = awsClients.ec2.getCurrentInstanceId.getOrElse("unknown_" + System.currentTimeMillis())
+    configuration.workingDirectory.mkdir()
+    S3Logger(
+      awsClients.s3,
+      ec2InstanceId,
+      configuration.loggingDirectory,
+      "log.txt",
+      configuration.loggingDestination(InstanceId(ec2InstanceId), Namespace.root),
+      debug = configuration.loggingDebug,
+      printToConsole = configuration.loggersPrintToConsole
+    ).flatMap { logger =>
+      AwsErrorTable.apply(logger, configuration.errorTable, awsClients).map { errorTable =>
+        new AwsEnvironment(
+          instanceId = InstanceId(ec2InstanceId),
+          namespace = Namespace.root,
+          configuration = configuration,
+          awsClients = awsClients,
+          logger = logger,
+          workingDirectory = configuration.workingDirectory,
+          executor = Executors.newCachedThreadPool(),
+          errorTable = errorTable,
+          sendForceUnDeployCommand0 = sendForceUnDeployCommand,
+          environments = new ConcurrentHashMap[(InstanceId, Namespace), AwsEnvironment](),
+          originEnvironment = None,
+          localErrorCounts = new AtomicInteger(0)
+        )
+      }
+    }
+  }
+
+  //to start compota
+  override def localEnvironment(cliLogger: ConsoleLogger, args: List[String]): Try[AwsEnvironment] = {
+    Try {
+      val awsClients = args match {
+        case file :: Nil => {
+          AWSClients.create(new PropertiesFileCredentialsProvider(file), configuration.awsRegion)
+        }
+        case _ => {
+          AWSClients.create(configuration.localAwsCredentialsProvider, configuration.awsRegion)
+        }
+      }
+      val localInstanceId = configuration.initialEnvironmentId
+      new AwsEnvironment(
+        instanceId = localInstanceId,
+        namespace = Namespace.root,
+        configuration = configuration,
+        awsClients = awsClients,
+        logger = cliLogger,
+        workingDirectory = new File("."),
+        executor = Executors.newCachedThreadPool(),
+        errorTable = new LocalErrorTable,
+        sendForceUnDeployCommand0 = sendForceUnDeployCommand,
+        environments = new ConcurrentHashMap[(InstanceId, Namespace), AwsEnvironment](),
+        originEnvironment = None,
+        localErrorCounts = new AtomicInteger(0)
+      )
+    }
+  }
+
+
+  override def configurationChecks(env: AwsEnvironment): Try[Unit] = {
+    super.configurationChecks(env).flatMap { u =>
+      env.logger.info("checking jar object " + configuration.metadata.jarUrl)
+      ObjectAddress(configuration.metadata.jarUrl).flatMap { jarObject =>
+        env.awsClients.s3.objectExists(jarObject).map {
+          case true => {
+            env.logger.info("jar object " + jarObject.url + " OK")
+            if(configuration.notificationEmail.isEmpty) {
+              Failure(new Error("notification email is empty"))
+            } else {
+              Success(())
+            }
+          };
+          case false => Failure(new Error("jar object " + jarObject.url + " does not exists"))
         }
       }
     }
@@ -132,6 +174,14 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
     Try {
       env.logger.info("creating working auto scaling group " + nispero.configuration.workerAutoScalingGroup.name)
       env.awsClients.as.createAutoScalingGroup(nispero.configuration.workerAutoScalingGroup)
+      ()
+    }
+  }
+
+  def createMetaManagerGroup(env: CompotaEnvironment): Try[Unit] = {
+    Try {
+      env.logger.info("creating metamanager auto scaling group " + configuration.managerAutoScalingGroup.name)
+      env.awsClients.as.createAutoScalingGroup(configuration.managerAutoScalingGroup)
       ()
     }
   }
@@ -154,14 +204,60 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
     }
   }
 
-  override def launch(): Try[CompotaEnvironment] = ???
+  override def launch(env: CompotaEnvironment): Try[CompotaEnvironment] = {
+    createMetaManagerGroup(env).map { r =>
+      env
+    }
+  }
 
-  override def finishUnDeploy(env: CompotaEnvironment, reason: String, message: String): Try[Unit] = ???
+  override def finishUnDeploy(env: CompotaEnvironment, reason: String, message: String): Try[Unit] = {
+    Success(())
+  }
 
-  override def prepareUnDeployActions(env: CompotaEnvironment): Try[CompotaUnDeployActionContext] = ???
+
+  override def sendNotification(env: AwsEnvironment, subject: String, message: String): Try[Unit] = {
+    Try {
+      val topic = env.awsClients.sns.createTopic(configuration.notificationTopic)
+      topic.publish(message, subject)
+    }
+  }
 
   //undeploy right now
-  override def forceUnDeploy(env: CompotaEnvironment, reason: String, message: String): Try[Unit] = ???
+  override def forceUnDeploy(env: CompotaEnvironment, reason: String, message: String): Try[Unit] = {
+    val logger = env.logger
+    nisperos.foreach { nispero =>
+      Try {
+        deleteNisperoWorkers(env, nispero)
+      }
+      Try {
+        logger.warn("deleting queue: " + nispero.inputQueue.name)
+        nispero.inputQueue.delete(nispero.inputContext(env))
+      }
+      Try {
+        logger.warn("deleting queue: " + nispero.outputQueue.name)
+        nispero.outputQueue.delete(nispero.outputContext(env))
+      }
+    }
+    Try {
+      logger.warn("deleting control queue: " + metaManager.controlQueue.name)
+      metaManager.controlQueue.delete(metaManager.controlQueueContext(env))
+    }
+
+    Success(()).flatMap { u =>
+      forcedUnDeployActions(env)
+    } match {
+      case Success(m) => {
+        sendNotification(env, configuration.name + " terminated", "reason: " + reason + System.lineSeparator() + message + System.lineSeparator() + m)
+      }
+      case Failure(t) => sendNotification(env, configuration.name + " terminated", "reason: " + reason + System.lineSeparator() + message)
+    }
+    Try {
+      deleteManager(env)
+    }
+    env.stop(true)
+    env.terminate()
+    Success(())
+  }
 
   override def sendUnDeployCommand(env: CompotaEnvironment): Try[Unit] = {
     metaManager.sendMessageToControlQueue(env, UnDeploy)
@@ -190,13 +286,10 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
 
 abstract class AwsCompota[U] (
    val nisperos: List[AnyAwsNispero],
-   val reducers: List[AnyQueueReducer.of[AwsEnvironment]],
    val configuration: AwsCompotaConfiguration)
   extends AnyAwsCompota {
 
   override type CompotaUnDeployActionContext = U
-
-//  override type CompotaNispero = AnyAwsNispero
 
   override type CompotaConfiguration = AwsCompotaConfiguration
 

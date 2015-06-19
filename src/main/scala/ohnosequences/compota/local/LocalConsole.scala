@@ -4,14 +4,13 @@ import java.io.File
 import java.net.URL
 
 import ohnosequences.compota.Namespace
-import ohnosequences.compota.console.{AnyWorkerInfo, Console}
+import ohnosequences.compota.console.{AnyInstanceInfo, Pagination, Console}
 import ohnosequences.compota.environment.InstanceId
-import ohnosequences.compota.graphs.{QueueChecker, NisperoGraph}
+import ohnosequences.compota.graphs.{QueueChecker}
 import ohnosequences.compota.queues.AnyQueueOp
-import ohnosequences.logging.Logger
 
 import scala.util.{Failure, Success, Try}
-import scala.xml.{Node, NodeSeq}
+import scala.xml.{NodeSeq}
 
 import scala.collection.JavaConversions._
 
@@ -22,11 +21,17 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
                                          nisperoGraph: QueueChecker[LocalEnvironment]) extends
   Console[LocalEnvironment, N, AnyLocalCompota.of2[N]](localCompota, env, controlQueueOp, nisperoGraph) {
 
-  override def getNamespaceLog(id: String): Try[Either[URL, String]] = {
-    Try {
-      val log = scala.io.Source.fromFile(localCompota.configuration.taskLogFile(new Namespace(id))).getLines().mkString
-      Right(log)
+
+  import ohnosequences.compota.console.GeneralComponents._
+
+  override def getLogRaw(instanceId: String, namespace: Seq[String]): Try[Either[URL, String]] = {
+    localCompota.getLog(env, InstanceId(instanceId), Namespace(namespace)).map { s =>
+      Right(s)
     }
+  }
+
+  override def printLog(instanceId: String, namespace: Seq[String]): NodeSeq = {
+    preResult(localCompota.getLog(env, InstanceId(instanceId), Namespace(namespace)))
   }
 
   override def sidebar: NodeSeq = {
@@ -34,10 +39,11 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
       <li><a href="/"><strong>home</strong></a></li>
     </ul>
     <ul class="nav nav-sidebar">
-      {nisperosLinks()}
+      {nisperosLinks}
     </ul>
       <ul class="nav nav-sidebar">
         <li><a href="/errorsPage">errors</a></li>
+        <li><a href="/namespacePage">namespaces</a></li>
         <li><a href="/threads">threads</a></li>
         <li><a href="#" class="undeploy">undeploy</a></li>
       </ul>
@@ -47,65 +53,35 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
     logger.info("shutdown")
   }
 
-  override def getTerminateInstance(id: InstanceId): Try[String] = {
-    localCompota.terminateInstance(id).map(_ => "instance " + id.id  + " terminated")
+
+  override def terminateInstance(instanceId: String, namespace: Seq[String]): NodeSeq = {
+    preResult(localCompota.terminateInstance(env, InstanceId(instanceId), Namespace(namespace)).map(_ => "instance " + instanceId  + " terminated"))
   }
 
-  override def getInstanceLogRaw(instanceId: String): Try[Either[URL, String]] = {
-    localCompota.getInstanceLog(logger, InstanceId(instanceId)).map(Right(_))
-  }
-
-
-  override def getInstanceLog(instanceId: InstanceId): Try[String] = {
-    localCompota.getInstanceLog(logger, instanceId)
-  }
-
-  case class ListWorkerInfoLocal(env: LocalEnvironment) extends AnyWorkerInfo {
+  case class LocalEnvironmentInfo(env: LocalEnvironment) extends AnyInstanceInfo {
 
     override def instanceId: InstanceId = env.instanceId
 
-    override def printState: String = {
+    override def namespace: Namespace = env.namespace
+
+    override def printState: NodeSeq = {
       env.getThreadInfo match {
-        case Some((t, st)) => t.getState.toString
-        case None => "n/a"
+        case Some((t, st)) => <p>{t.getState.toString}</p>
+        case None => <p>n/a</p>
       }
     }
     override def printConnectAction: NodeSeq = xml.NodeSeq.Empty
   }
 
+  override type InstanceInfo = LocalEnvironmentInfo
 
-  override type ListWorkerInfo = ListWorkerInfoLocal
-
-  override def listWorkers(nisperoName: String, lastWorkerToken: Option[String], limit: Option[Int]): Try[(Option[String], List[ListWorkerInfo])] = {
-    localCompota.nisperosNames.get(nisperoName) match {
-      case Some(nispero) => {
-        localCompota.listNisperoWorkers(nispero).flatMap { list =>
-          val workerInfo: List[ListWorkerInfoLocal] = list.map(ListWorkerInfoLocal)
-          lastWorkerToken match {
-            case None => listWorkers(workerInfo, limit)
-            case Some(l) => listWorkers(workerInfo.drop(l.toInt + 1), limit)
-          }
-        }
-      }
-      case None => Failure(new Error("couldn't find nispero " + nisperoName))
+  override def listWorkers(nispero: N, lastWorkerToken: Option[String], limit: Option[Int]): Try[(Option[String], List[LocalEnvironmentInfo])] = {
+    localCompota.listNisperoWorkers(env, nispero).map { list =>
+      // env.logger.info("get workers info: " + list)
+      val workerInfo: List[LocalEnvironmentInfo] = list.map(LocalEnvironmentInfo)
+      Pagination.listPagination(workerInfo, limit, lastWorkerToken)
     }
   }
-
-  def listWorkers(workerInfo: List[ListWorkerInfo], limit: Option[Int]): Try[(Option[String], List[ListWorkerInfo])] = {
-    val (lastWorker, workerInfoList) = limit match {
-      case None => {
-        (None, workerInfo)
-      }
-      case Some(l) if l < workerInfo.size - 1 => {
-        (Some(l.toString), workerInfo.take(l))
-      }
-      case Some(l) => {
-        (Some(l.toString), workerInfo)
-      }
-    }
-    Success((lastWorker, workerInfoList))
-  }
-
 
   override def nisperoInfoDetails(nispero: N): NodeSeq = {
     <table class="table table-striped topMargin20">
@@ -124,11 +100,6 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
         </tr>
       </tbody>
     </table>
-  }
-
-
-  override def getSSHInstance(id: InstanceId): Try[String] = {
-    Failure(new Error("ssh is not supported by local nispero"))
   }
 
   override def compotaInfoPageDetailsTable: NodeSeq = {
@@ -151,12 +122,61 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
 
   }
 
-
-  override def getInstanceStackTrace(id: InstanceId): Try[String] = {
-    localCompota.getInstanceStackTrace(id)
+  override def namespacePage: NodeSeq = {
+    <h2>Instances and namespaces</h2>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th class="col-md-3">instance/namespace</th>
+            <th class="col-md-3">status</th>
+            <th class="col-md-3">actions</th>
+          </tr>
+        </thead>
+        <table class="table table-striped topMargin20">
+          <tbody id="namespacesTableBody">
+            {printNamespaces(None)}
+          </tbody>
+        </table>
+      </table>
+      <p><a class="btn btn-info loadMoreNamespaces" href="#">
+        <i class="icon-refresh icon-white"></i>
+        Show more
+      </a></p>
   }
 
-  override def mainHTML: String = {
-    scala.io.Source.fromFile(new File("E:\\reps\\compota\\src\\main\\resources\\console\\main.html")).getLines().mkString(System.lineSeparator())
+  def listNamespaces(lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[LocalEnvironmentInfo])] = {
+    Try {
+      val namespaces: List[LocalEnvironmentInfo] = env.environments.map { case ((instance, namespace), e) =>
+        new LocalEnvironmentInfo(e)
+      }.toList
+      Pagination.listPagination(namespaces, limit, lastToken)
+    }
   }
+
+
+  override def listManagers(lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[LocalEnvironmentInfo])] = {
+    Try {
+      val managers: List[LocalEnvironmentInfo] = env.environments.filter { case ((instance, namespace), e) =>
+        namespace.getPath.toLowerCase.contains("manager")
+      }.map { case ((instance, namespace), e) =>
+        new LocalEnvironmentInfo(e)
+      }.toList
+      Pagination.listPagination(managers, limit, lastToken)
+    }
+  }
+
+  def printNamespaces(lastToken: Option[String]): NodeSeq = {
+    val page = listNamespaces(lastToken, Some(localCompota.configuration.consoleNamespacesPageSize))
+    printInstanceInfoPage(page, lastToken)
+  }
+
+  override def stackTraceInstance(instanceId: String, namespace: Seq[String]): NodeSeq = {
+    preResult(localCompota.getStackTrace(env, InstanceId(instanceId), Namespace(namespace)))
+  }
+
+  override def sshInstance(instanceId: String, namespace: Seq[String]): NodeSeq = xml.NodeSeq.Empty
+
+//  override def mainHTML: String = {
+//    scala.io.Source.fromFile(new File("E:\\reps\\compota\\src\\main\\resources\\console\\main.html")).getLines().mkString(System.lineSeparator())
+//  }
 }

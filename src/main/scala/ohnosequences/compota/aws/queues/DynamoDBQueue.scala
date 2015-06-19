@@ -115,8 +115,8 @@ case class DynamoDBContext (
 
 
 
-class DynamoDBQueueOP[T](val queue: DynamoDBQueue[T], val tableName: String, val sqsUrl: String, val aws: AWSClients, val serializer: Serializer[T], val bench: Option[Bench])
-  extends QueueOp[T, DynamoDBMessage[T], DynamoDBQueueReader[T], DynamoDBQueueWriter[T]] {
+class DynamoDBQueueOP[T](val context: DynamoDBContext, val queue: DynamoDBQueue[T], val tableName: String, val sqsUrl: String, val aws: AWSClients, val serializer: Serializer[T], val bench: Option[Bench])
+  extends QueueOp[T, DynamoDBMessage[T], DynamoDBQueueReader[T], DynamoDBQueueWriter[T], DynamoDBContext] {
 
   val logger = new ConsoleLogger("DynamoDB OP")
 
@@ -196,6 +196,10 @@ object DynamoDBQueue {
   val hash = new AttributeDefinition(idAttr, ScalarAttributeType.S)
 }
 
+trait DynamoDBContextQueue extends AnyQueue {
+  override type QueueContext = DynamoDBContext
+}
+
 class DynamoDBQueue[T](name: String,
                        val serializer: Serializer[T],
                        bench: Option[Bench] = None,
@@ -203,7 +207,7 @@ class DynamoDBQueue[T](name: String,
                        val visibilityTimeout: Duration = Duration(10, MINUTES),
                        readThroughput: Long = 1,
                        writeThroughput: Long = 1
-                       ) extends Queue[T, DynamoDBContext](name) { queue =>
+                       ) extends Queue[T, DynamoDBContext](name) with DynamoDBContextQueue with AnySerializableQueue { queue =>
 
   override type QueueQueueMessage = DynamoDBMessage[T]
   override type QueueQueueWriter = DynamoDBQueueWriter[T]
@@ -233,7 +237,7 @@ class DynamoDBQueue[T](name: String,
         ) //max
       ).getQueueUrl
 
-      new DynamoDBQueueOP[T](queue, Resources.dynamodbTable(ctx.metadata, name), queueUrl, ctx.aws, serializer, bench)
+      new DynamoDBQueueOP[T](ctx, queue, Resources.dynamodbTable(ctx.metadata, name), queueUrl, ctx.aws, serializer, bench)
     }
   }
 

@@ -5,8 +5,9 @@ import scala.util.{Failure, Success, Try}
 import scala.util.parsing.json.JSONObject
 
 trait Serializer[T] {
- // def fromString(s: String, errorMessage: String)
+  // def fromString(s: String, errorMessage: String)
   def fromString(s: String): Try[T]
+
   def toString(t: T): Try[String]
 }
 
@@ -25,16 +26,16 @@ class JsonSerializer[T](implicit mf: scala.reflect.Manifest[T]) extends Serializ
 
 object unitSerializer extends Serializer[Unit] {
   def fromString(s: String) = Success(())
+
   def toString(t: Unit) = Success("")
 }
 
 object intSerializer extends Serializer[Int] {
 
   def fromString(s: String): Try[Int] = try {
-    if(s == null) {
-      Failure(new Error("can't convert null to Int"))
-    } else {
-      Success(s.toInt)
+    Option(s) match {
+      case None => Failure(new Error("can't convert null to Int"))
+      case Some(ss) => Success(s.toInt)
     }
   } catch {
     case b: NumberFormatException => Failure(b)
@@ -61,14 +62,15 @@ class MapSerializer[K, V](kSerializer: Serializer[K], vSerializer: Serializer[V]
   }
 
 
-  override def fromString(s: String) = Try {
+  override def fromString(s: String) = Success(()).flatMap { u =>
     scala.util.parsing.json.JSON.parseFull(s) match {
       case Some(map: Map[String, String]) => {
-        map.map {
+        Success(map.map {
           case (key, value) =>
             (kSerializer.fromString(key).get, vSerializer.fromString(value).get)
-        }
+        })
       }
+      case _ => Failure(new Error("couldn't parse map"))
     }
   }
 }

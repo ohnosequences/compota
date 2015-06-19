@@ -9,7 +9,9 @@ import ohnosequences.logging.Logger
 import java.io.File
 import scala.util.{Success, Failure, Try}
 
-case class InstanceId(id: String)
+case class InstanceId(id: String) {
+  override def toString: String = id
+}
 //{
 //  def subInstance(subId: String) = InstanceId(id + "_" + subId)
 //}
@@ -22,26 +24,30 @@ trait Env {
 
 abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironment =>
 
-  def rootEnvironment: E
+  def originEnvironment: Option[E]
 
-  val environments: ConcurrentHashMap[Namespace, E]
+  val environments: ConcurrentHashMap[(InstanceId, Namespace), E]
 
-  def subEnvironmentSync[R](subSpace: String)(statement: E => R): Try[(E, R)]
+  def subEnvironmentSync[R](subspaceOrInstance: Either[String, InstanceId], async: Boolean)(statement: E => R): Try[(E, R)]
 
-  def subEnvironmentAsync(subSpace: String)(statement: E => Unit): Try[E] = {
-    subEnvironmentSync(subSpace) { env =>
+  def threadName: String = instanceId.id + "." + namespace.toString
+
+  def subEnvironmentAsync(subspaceOrInstance: Either[String, InstanceId])(statement: E => Unit): Try[E] = {
+    subEnvironmentSync(subspaceOrInstance, async = true) { env =>
       executor.execute(new Runnable {
         override def run(): Unit = {
           val oldName = Thread.currentThread().getName
-          Thread.currentThread().setName(env.namespace.toString)
-          env.logger.debug("changing thread name to " + instanceId.id)
-          env.environments.put(env.namespace, env)
+          env.logger.debug("changing thread name from " + Thread.currentThread().getName + " to " + env.threadName)
+          Thread.currentThread().setName(env.threadName)
+          env.logger.debug("new name: " + Thread.currentThread().getName)
           Try {
             statement(env)
           }
           //env.reportError()
+          env.logger.debug("finishing " + env.threadName)
+          env.logger.debug("changing thread name to " + oldName)
           Thread.currentThread().setName(oldName)
-          env.environments.remove(env.namespace)
+          env.environments.remove((env.instanceId, env.namespace))
         }
       })
     }.map(_._1)
@@ -61,20 +67,19 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
 
   def sendForceUnDeployCommand(reason: String, message: String): Try[Unit]
 
-  def stop(): Unit
-
-  protected def terminate(): Unit
+  def stop(recursive: Boolean): Unit
+  def terminate(): Unit
 
   /**
    * all repeats are here, "5 errors - reboot,  10 errors - undeplot compota
    * shouldn't do nothing if env is terminated
    */
-  def reportError(t: Throwable, subSpace: Option[String]): Unit = {
+  def reportError(t: Throwable, namespace: Namespace = namespace): Unit = {
 
-    val namespace = subSpace match {
-      case None => anyEnvironment.namespace
-      case Some(sub) => anyEnvironment.namespace / sub
-    }
+//    val namespace = subSpace match {
+//      case None => anyEnvironment.namespace
+//      case Some(sub) => anyEnvironment.namespace / sub
+//    }
 
     val sb = new StringBuilder
     logger.printThrowable(t, { e =>
@@ -90,7 +95,7 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
         case Failure(tt) => {
           logger.error("couldn't retrieve count from error table")
           errorTable.recover()
-          stop()
+          stop(true)
           terminate()
         }
         case Success(count) if count >= configuration.errorThreshold => {
@@ -101,7 +106,7 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
         }
         case Success(count) => {
           logger.error("reached local error threshold for " + namespace.toString + " [" + count + "]")
-          stop()
+          stop(true)
           terminate()
         }
       }

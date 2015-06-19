@@ -40,7 +40,7 @@ body {
     margin-bottom: 40px;
 }
 
-.marginLeft, .sshInstance, .terminateInstance, .instanceStackTrace, .viewInstanceLog  {
+.marginLeft, .sshInstance, .terminateInstance, .instanceStackTrace, .viewLog  {
     margin-left: 10px;
 }
 

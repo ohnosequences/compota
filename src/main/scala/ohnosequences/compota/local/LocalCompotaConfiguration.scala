@@ -10,7 +10,7 @@ import scala.concurrent.duration.MINUTES
 
 trait AnyLocalCompotaConfiguration extends AnyCompotaConfiguration {
 
-  val initialEnvironmentId = InstanceId("local")
+
 
   def workingDirectory: File = new File("compota")
   def loggingDirectory: File = new File(workingDirectory, "logs")
@@ -26,6 +26,7 @@ trait AnyLocalCompotaConfiguration extends AnyCompotaConfiguration {
 
   def errorThreshold = 5
 
+  val consoleNamespacesPageSize = 10
 
   override def localErrorThreshold: Int = 15
 

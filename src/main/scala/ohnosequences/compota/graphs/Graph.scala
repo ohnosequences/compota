@@ -1,6 +1,7 @@
 package ohnosequences.compota.graphs
 
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable
+import scala.util.{Failure, Success, Try}
 
 case class Node[N](label: N)
 
@@ -31,32 +32,39 @@ class Graph[N, E](val edges: List[Edge[E, N]]) {
     edges.filter(_.target.equals(node)).toSet
   }
 
-  def sort: List[Node[N]] =  {
-    var arcFree = new Graph(edges.filterNot { edge =>
+  def arcFree: Graph[N, E] = new Graph(edges.filterNot { edge =>
+    edge.source.equals(edge.target)
+  })
+
+  def sort(): Try[List[Node[N]]] = {
+    val arcFree = new Graph(edges.filterNot { edge =>
       edge.source.equals(edge.target)
     })
 
-    val result = ListBuffer[Node[N]]()
-    var s: List[Node[N]] = nodes.toList.filter(arcFree.in(_).isEmpty)
-    //println(s)
-    while(!s.isEmpty) {
-      val n = s.head
-      s = s.tail
-      result += n
+    val visitedEdges = new mutable.HashSet[Edge[E, N]]()
 
-      // println("analyzing node: " + n + " in: " + arcFree.out(n))
+    val result = new mutable.ListBuffer[Node[N]]()
+
+    val sources = new mutable.ArrayBuffer[Node[N]]()
+    sources ++= nodes.filter(arcFree.in(_).isEmpty)
+
+    while (sources.nonEmpty) {
+      val n = sources.remove(sources.size - 1)
+      result += n
       arcFree.out(n).foreach { e =>
-        arcFree = arcFree.remove(e)
-        if(!arcFree.nodes.contains(e.target) || arcFree.in(e.target).isEmpty) {
-          s = e.target :: s
+        if (!visitedEdges.contains(e)) {
+          visitedEdges.add(e)
+          if (arcFree.in(e.target).forall(visitedEdges.contains)) {
+            sources += e.target
+          }
         }
       }
     }
-
-    if(!arcFree.edges.isEmpty) {
-      // println("oioioi")
+    if (arcFree.edges.forall(visitedEdges.contains)) {
+      Success(result.toList)
+    } else {
+      Failure(new Error("unable to sort graph unvisited edges: " + edges.filterNot(visitedEdges.contains) + " edges: " + arcFree.edges))
     }
-    result.toList
   }
 
 }

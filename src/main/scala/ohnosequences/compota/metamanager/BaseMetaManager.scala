@@ -1,6 +1,7 @@
 package ohnosequences.compota.metamanager
 
-import ohnosequences.compota.TerminationDaemon
+import ohnosequences.compota.metamanager.UnDeployMetaManger
+import ohnosequences.compota.{Namespace, TerminationDaemon}
 import ohnosequences.compota.console.AnyConsole
 import ohnosequences.compota.graphs.QueueChecker
 import ohnosequences.compota.queues.AnyQueueOp
@@ -12,7 +13,7 @@ trait BaseMetaManager extends AnyMetaManager {
 
   override type MetaManagerCommand = BaseMetaManagerCommand
 
-  override def initMessage(): BaseMetaManagerCommand = LaunchConsole
+  override def initMessage: BaseMetaManagerCommand = LaunchConsole
 
   def sendMessageToControlQueue(env: MetaManagerEnvironment, command: BaseMetaManagerCommand): Try[Unit] = {
     Success(()).flatMap { u =>
@@ -25,25 +26,35 @@ trait BaseMetaManager extends AnyMetaManager {
   }
 
   override def process(command: BaseMetaManagerCommand,
-                       env: MetaManagerEnvironment,
-                       controlQueueOp: AnyQueueOp,
-                       queueOps: List[AnyQueueOp],
-                       queueChecker: QueueChecker[MetaManagerEnvironment]
+                       ctx: AnyProcessContext.of[MetaManagerEnvironment, MetaManagerUnDeployingActionContext]
                         ): Try[List[BaseMetaManagerCommand]] = {
+    val env = ctx.env
+    val queueChecker = ctx.queueChecker
+    val controlQueueOp = ctx.controlQueueOp
+    val queueOps = ctx.queueOps
     val logger = env.logger
     logger.info("processing tasks " + command)
     command match {
 
       case LaunchConsole => {
-        env.subEnvironmentAsync("console") { env =>
+
+        env.subEnvironmentAsync(Left(Namespace.console)) { env =>
           compota.launchConsole(queueChecker, controlQueueOp, env)
-        }.map { tEnv =>
+         // SendNotification(compota.configuration.name + " started", message)
+        }.map { env =>
           List[BaseMetaManagerCommand](LaunchTerminationDaemon)
         }
       }
 
+      case SendNotification(subject, message) => {
+
+        compota.sendNotification(env, subject, message).map { res =>
+          List[BaseMetaManagerCommand]()
+        }
+      }
+
       case LaunchTerminationDaemon => {
-        env.subEnvironmentAsync("terminationDaemon") { env =>
+        env.subEnvironmentAsync(Left(Namespace.terminationDaemon)) { env =>
           compota.launchTerminationDaemon(queueChecker, env)
         }.map { tEnv =>
           List[BaseMetaManagerCommand](AddTasks)
@@ -57,6 +68,12 @@ trait BaseMetaManager extends AnyMetaManager {
             Success(List(CreateNisperoWorkers(0)))
           } else {
             logger.info("adding tasks")
+            //todo give user access to writers
+//            val queueWriters: Map[String, AnyQueue ctx.queueOps.map { queueOp =>
+//              (queueOp.queue, queueOp.writer.get)
+//            }.toMap
+
+
             compota.addTasks(env).map { res =>
               List(CreateNisperoWorkers(0))
             }
@@ -75,20 +92,30 @@ trait BaseMetaManager extends AnyMetaManager {
       }
 
       case CreateNisperoWorkers(index) => {
-        Success(List[BaseMetaManagerCommand](PrepareUnDeployActions))
+        Success(List[BaseMetaManagerCommand](PrepareUnDeployActions(false)))
       }
 
-      case PrepareUnDeployActions => {
-        compota.compotaUnDeployActionContext.get match {
-          case Some(ctx) => {
-            env.logger.info("already prepared")
-            Success(List[BaseMetaManagerCommand]())
+      case PrepareUnDeployActions(executeActions) => {
+        ctx.compotaUnDeployActionContext.get match {
+          case Some(uCtx) => {
+            env.logger.info("undeploy actions are already prepared")
+            if (executeActions) {
+              Success(List(ExecuteUnDeployActions))
+            } else {
+              Success(List[BaseMetaManagerCommand]())
+            }
           }
           case None => {
-            compota.prepareUnDeployActions(env).map { ctx =>
+            env.logger.info("preparing undeploy actions")
+            //started
+            compota.prepareUnDeployActions(env).map { uCtx =>
               env.logger.info("saving context")
-              compota.compotaUnDeployActionContext.set(Some(ctx))
-              List[BaseMetaManagerCommand]()
+              ctx.compotaUnDeployActionContext.set(Some(uCtx))
+              if (executeActions) {
+                List(ExecuteUnDeployActions)
+              } else {
+                List[BaseMetaManagerCommand]()
+              }
             }
           }
         }
@@ -122,12 +149,12 @@ trait BaseMetaManager extends AnyMetaManager {
         Success(List(ReduceQueue(0)))
       }
 
-      case ReduceQueue(index) if index < compota.reducers.size => {
-        val reducer = compota.reducers(index)
-        Try {
-          logger.info("reducing queue " + reducer.queue.name)
-          reducer.reduce(env)
-        }.flatMap { e => e }.map { res =>
+      case ReduceQueue(index) if index < queueOps.size  => {
+        val queueOp = queueOps(index)
+        Success(()).flatMap { u =>
+          logger.info("reducing queue " + queueOp)
+          queueOp.reduce(env)
+        }.map { res =>
           List(ReduceQueue(index + 1))
         }
       }
@@ -150,12 +177,13 @@ trait BaseMetaManager extends AnyMetaManager {
 
       case ExecuteUnDeployActions => {
         Success(()).flatMap { u =>
-          compota.compotaUnDeployActionContext.get match {
+          ctx.compotaUnDeployActionContext.get match {
             case None => {
-              Failure(new Error("compotaUnDeployActionContext is not set but ExecuteUnDeployActions started"))
+              //Failure(new Error("compotaUnDeployActionContext is not set but ExecuteUnDeployActions started"))
+              Success(List(PrepareUnDeployActions(true)))
             }
-            case Some(ctx) => {
-              compota.unDeployActions(env, ctx).map { message =>
+            case Some(uCtx) => {
+              compota.unDeployActions(env, uCtx).map { message =>
                 List(FinishCompota("solved", message))
               }
             }
@@ -165,16 +193,21 @@ trait BaseMetaManager extends AnyMetaManager {
 
       case FinishCompota(reason, message) => {
         compota.finishUnDeploy(env, reason, message).map { res =>
-          List(UnDeployMetaManger)
+          List(UnDeployMetaManger(reason, message))
         }
       }
 
-      case UnDeployMetaManger => {
+      case UnDeployMetaManger(reason, message) => {
         Success(()).flatMap { u =>
           logger.info("deleting control queue " + controlQueueOp.queue.name)
-          env.stop()
-          controlQueueOp.delete()
-          compota.deleteManager(env)
+          Try {
+            compota.sendNotification(env, compota.configuration.name + " finished", "reason: " + reason + System.lineSeparator() + message)
+            controlQueueOp.delete()
+            compota.deleteManager(env)
+            env.stop(recursive = true)
+            env.terminate()
+          }
+
         }.map { res =>
           List[BaseMetaManagerCommand]()
         }

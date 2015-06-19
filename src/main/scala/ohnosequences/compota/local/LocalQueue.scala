@@ -3,6 +3,8 @@ package ohnosequences.compota.local
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{ConcurrentSkipListMap}
 
+import ohnosequences.compota.console.Pagination
+
 import scala.concurrent.{ExecutionContext, Future}
 
 
@@ -69,11 +71,13 @@ class LocalQueue[T](name: String,
 
 
   override def create(ctx: LocalContext): Try[QueueQueueOp] = {
-    Monkey.call(Success(new LocalQueueOp[T](queue, ctx)), monkeyAppearanceProbability.create)
+    Monkey.call(Success(new LocalQueueOp[T](ctx, queue)), monkeyAppearanceProbability.create)
   }
+
+
 }
 
-class LocalQueueOp[T](val queue: LocalQueue[T], val ctx: LocalContext) extends QueueOp[T, LocalMessage[T], LocalQueueReader[T], LocalQueueWriter[T]] { queueOp =>
+class LocalQueueOp[T](val context: LocalContext, val queue: LocalQueue[T]) extends QueueOp[T, LocalMessage[T], LocalQueueReader[T], LocalQueueWriter[T], LocalContext] { queueOp =>
 
   override def deleteMessage(message: LocalMessage[T]): Try[Unit] = {
 
@@ -102,7 +106,9 @@ class LocalQueueOp[T](val queue: LocalQueue[T], val ctx: LocalContext) extends Q
 
   //todo add limit support
   override def list(lastKey: Option[String], limit: Option[Int]): Try[(Option[String], List[String])] = {
-    Monkey.call(Success((None, queue.rawQueueP.keySet().toList)), queue.monkeyAppearanceProbability.list)
+    //ctx.logger.debug("list lastKey:" )
+    val idsList = queue.rawQueueP.keySet().toList
+    Monkey.call(Success(Pagination.listPagination(idsList, limit, lastKey)), queue.monkeyAppearanceProbability.list)
   }
 
   override def size: Try[Int] = {
@@ -110,7 +116,7 @@ class LocalQueueOp[T](val queue: LocalQueue[T], val ctx: LocalContext) extends Q
   }
 
   override def get(key: String): Try[T] = {
-    ctx.logger.info("getting " + key)
+   // ctx.logger.info("getting " + key)
     Monkey.call(
       Option(queue.rawQueueP.get(key)) match {
         case None => Failure(new Error("key " + key + " doesn't exist in " + queue.name))
@@ -128,7 +134,7 @@ class LocalQueueReader[T](val queueOp: LocalQueueOp[T]) extends QueueReader[T, L
       case None => Success(None)
       case Some(entry) => {
         val  res = new LocalMessage(entry.getKey, entry.getValue, queueOp.queue.monkeyAppearanceProbability)
-        queueOp.ctx.executor.execute { new Runnable {
+        queueOp.context.executor.execute { new Runnable {
           override def toString: String = queueOp.queue.name + " message extender for " + entry.getKey
 
           override def run(): Unit = {

@@ -2,17 +2,34 @@ package ohnosequences.compota.aws
 
 import java.io.File
 
+import com.amazonaws.auth.{InstanceProfileCredentialsProvider, AWSCredentialsProvider}
 import ohnosequences.awstools.autoscaling._
 import ohnosequences.awstools.ec2.{InstanceType, InstanceSpecs}
+import ohnosequences.awstools.regions.Region
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.compota.environment.InstanceId
+import ohnosequences.compota.queues.AnyQueue
 import ohnosequences.compota.{Namespace, AnyNisperoConfiguration, AnyCompotaConfiguration}
 import ohnosequences.compota.aws.deployment.{AnyMetadata, Metadata, userScriptGenerator}
-
+import scala.concurrent.duration._
 import scala.concurrent.duration.Duration
 
 
 trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
+
+  def awsRegion: Region = Region.Ireland
+
+  def localAwsCredentialsProvider: AWSCredentialsProvider
+
+  def instanceAwsCredentialsProvider: AWSCredentialsProvider = new InstanceProfileCredentialsProvider()
+
+  def notificationTopic: String = {
+    Resources.notificationTopic(notificationEmail)
+  }
+
+
+
+  def notificationEmail: String
 
   def metadata: AnyMetadata
 
@@ -38,13 +55,16 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   def loggingDirectory =  new File(workingDirectory, "logs")
 
-  def managerInstanceType = InstanceType.c1_medium
+  def managerInstanceType = InstanceType.c3_large
 
   def errorTable: String = Resources.errorTable(metadata)
 
-  def loggerBucket: String = Resources.loggerBucket(metadata)
+  def resultsBucket: String = Resources.compotaBucket(metadata)
 
-  def logUploaderTimeout: Duration
+  def loggerBucket: String = Resources.compotaBucket(metadata)
+
+
+  def logUploaderTimeout: Duration = Duration(1, MINUTES)
 
   def controlQueue: String = Resources.controlQueue(metadata)
 
@@ -76,7 +96,7 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
     launchingConfiguration = managerLaunchConfiguration
   )
 
-  def workerInstanceType: InstanceType = InstanceType.m1_medium
+  def workerInstanceType: InstanceType = InstanceType.m3_medium
 
   def workerPurchaseModel: PurchaseModel = SpotAuto
 
@@ -93,10 +113,11 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
     }
     case _ => None
   }
+
+  def resultsDestination[Q <: AnyQueue](queue: Q): Option[ObjectAddress] = {
+    Some(ObjectAddress(resultsBucket, "results") / queue.name)
+  }
 }
-
-//class CompotaConfiguration(val name: String) extends CompotaConfigurationAux
-
 
 abstract class AwsNisperoConfiguration extends AnyNisperoConfiguration {
 

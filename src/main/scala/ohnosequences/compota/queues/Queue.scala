@@ -3,7 +3,9 @@ package ohnosequences.compota.queues
 import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 
+import ohnosequences.compota.environment.Env
 import ohnosequences.compota.monoid.Monoid
+import ohnosequences.compota.serialization.Serializer
 import ohnosequences.logging.Logger
 
 import scala.annotation.tailrec
@@ -131,11 +133,32 @@ trait AnyQueue { queue =>
   }
 
   def subQueues: List[AnyQueue] = List(queue)
+
+//  def reduce(env: Env, queueOp: AnyQueueOp.of1[QueueElement]): Try[Unit] = {
+//    Success(())
+//  }
+
+  val reducer: AnyQueueReducer.of2[QueueElement, QueueContext] = new UnitQueueReducer(queue)
+
 }
 
-trait MonoidQueue extends AnyQueue {
-  val monoid: Monoid[QueueElement]
+trait AnySerializableQueue extends AnyQueue {
+  val serializer: Serializer[QueueElement]
 }
+
+trait AnyMonoidQueue extends AnyQueue { monoidQueue =>
+  val monoid: Monoid[QueueElement]
+
+//  def reducer: Option[AnyQueueReducer.of[QueueElement]]
+//
+//  override def reduce(env: Env, queueOp: AnyQueueOp.of1[QueueElement]): Try[Unit] = {
+//    reducer match {
+//      case None => Success(())
+//      case Some(r) => r.reduce(env, monoidQueue, queueOp)
+//    }
+//  }
+}
+
 
 object AnyQueue {
   type of[Ctx] = AnyQueue {type QueueContext = Ctx}
@@ -145,22 +168,27 @@ object AnyQueue {
     type QueueElement = E
   }
 
-  type of2m[E, Ctx] = MonoidQueue {
+  type of3[E, Ctx, Msg <: AnyQueueMessage.of[E]] = AnyQueue {
     type QueueContext = Ctx
     type QueueElement = E
+    type QueueQueueMessage = Msg
+  }
 
+  type ofm[E] = AnyMonoidQueue {
+    type QueueElement = E
+  }
+
+  type of1[E] = AnyQueue {
+    type QueueElement = E
+  }
+
+  type of2m[E, Ctx] = AnyMonoidQueue {
+    type QueueContext = Ctx
+    type QueueElement = E
   }
 
 
-  //  type of2[E, Ctx, M <: AnyQueueMessage.of[E], R <: AnyQueueReader.of[E, M], W <: AnyQueueWriter.of[E]] = AnyQueue {
-  //    type QueueContext = Ctx
-  //    type QueueElement = E
-  //    type QueueQueueMessage = M
-  //    type QueueQueueReader = R
-  //    type QueueQueueWriter = W
-  //  }
-
-  type of3[E, Ctx, M <: AnyQueueMessage.of[E], R <: AnyQueueReader.of[E, M], W <: AnyQueueWriter.of[E], O <: AnyQueueOp.of[E, M, R, W]] = AnyQueue {
+  type of6[E, Ctx, M <: AnyQueueMessage.of[E], R <: AnyQueueReader.of[E, M], W <: AnyQueueWriter.of[E], O <: AnyQueueOp.of[E, M, R, W]] = AnyQueue {
     type QueueContext = Ctx
     type QueueElement = E
     type QueueQueueMessage = M
@@ -176,18 +204,24 @@ abstract class Queue[E, Ctx](val name: String) extends AnyQueue {
 }
 
 
-trait AnyQueueOp {
+trait AnyQueueOp { anyQueueOp =>
+
 
   def subOps(): List[AnyQueueOp] = List(AnyQueueOp.this)
 
   type QueueOpElement
   type QueueOpQueueMessage <: AnyQueueMessage.of[QueueOpElement]
-  // QueueMessage[QueueOpElement]
   type QueueOpQueueReader <: AnyQueueReader.of[QueueOpElement, QueueOpQueueMessage]
-  // QueueReader[QElement, QMessage]
-  type QueueOpQueueWriter <: AnyQueueWriter.of[QueueOpElement] //QueueWriter[QElement]
+  type QueueOpQueueWriter <: AnyQueueWriter.of[QueueOpElement]
+  type QueueOpQueueContext
 
-  val queue: AnyQueue
+  val context: QueueOpQueueContext
+
+  val queue: AnyQueue.of2[QueueOpElement, QueueOpQueueContext]
+
+  def reduce(env: Env): Try[Unit] = {
+    queue.reducer.reduce(env, anyQueueOp)
+  }
 
   def isEmpty: Try[Boolean]
 
@@ -209,32 +243,69 @@ trait AnyQueueOp {
 
   def delete(): Try[Unit]
 
-  def forEachId[T](f: String => T): Try[Unit] = {
-
+  def foldLeftIdIndexed[T](z: T)(f: (T, String, Int) => Try[T]): Try[T] = {
     @tailrec
-    def forEachRec(f: String => T, lastKey: Option[String]): Try[Unit] = {
-      list(lastKey = None, limit = None) match {
+    def foldLeftIdRec(c: T, lastKey: Option[String], index: Int): Try[T] = {
+      //println("lastKey: " + lastKey + " index: " + index)
+      list(lastKey = lastKey, limit = None) match {
+        case Success((_, Nil)) => {
+          //the last chunk
+          Success(c)
+        }
         case Success((None, list)) => {
           //the last chunk
-          Success(list.foreach(f))
+          list.zipWithIndex.foldLeft[Try[T]](Success(c)) {
+            case (Failure(t), (id, ind)) => Failure(t)
+            case (Success(t), (id, ind)) => f(t, id, ind)
+          }
         }
         case Success((last, list)) => {
-          list.foreach(f)
-          forEachRec(f, last)
+          list.zipWithIndex.foldLeft[Try[T]](Success(c)) {
+            case (Failure(t), (id, ind)) => Failure(t)
+            case (Success(t), (id, ind)) => f(t, id, ind)
+          } match {
+            case Success(newC) => foldLeftIdRec(newC, last, index + list.size)
+            case failure => failure
+          }
         }
         case Failure(t) => Failure(t)
       }
     }
+    foldLeftIdRec(z, None, 0)
+  }
 
-    forEachRec(f, None)
+  def foldLeftId[T](z: T)(f: (T, String) => Try[T]): Try[T] = {
+    foldLeftIdIndexed(z) { case (t, id, index) =>
+      f(t, id)
+    }
 
   }
 
-  def forEach[T](f: (String, QueueOpElement) => T): Try[Unit] = {
-    Try {
-      forEachId { id =>
-        f(id, get(id).get)
+  def foldLeftIndexed[T](z: T)(f: (T, QueueOpElement, Int) => Try[T]): Try[T] = {
+    foldLeftIdIndexed(z) { case (c, id, index) =>
+      get(id).flatMap { el =>
+        f(c, el, index)
       }
+    }
+  }
+
+  def foldLeft[T](z: T)(f: (T, QueueOpElement) => Try[T]): Try[T] = {
+    foldLeftId(z) { case (c, id) =>
+      get(id).flatMap { el =>
+        f(c, el)
+      }
+    }
+  }
+
+  def forEachId(f: String => Unit): Try[Unit] = {
+    foldLeftId(()) { case (u, id) =>
+      Try{f(id)}
+    }
+  }
+
+  def forEach(f: (String, QueueOpElement) => Unit): Try[Unit] = {
+    forEachId { id =>
+      f(id, get(id).get)
     }
   }
 
@@ -242,43 +313,36 @@ trait AnyQueueOp {
 
 }
 
-object AnyQueueOp {
+object  AnyQueueOp {
   type of[E, M <: AnyQueueMessage.of[E], QR <: AnyQueueReader.of[E, M], QW <: AnyQueueWriter.of[E]] = AnyQueueOp {
     type QueueOpElement = E
     type QueueOpQueueMessage = M
     type QueueOpQueueReader = QR
     type QueueOpQueueWriter = QW
   }
+  type of2[E, M <: AnyQueueMessage.of[E]] = AnyQueueOp {
+    type QueueOpElement = E
+    type QueueOpQueueMessage = M
+  }
+
+
+
+  type of1[E] = AnyQueueOp {
+    type QueueOpElement = E
+  }
+
+  type of2c[E, C] = AnyQueueOp {
+    type QueueOpElement = E
+    type QueueOpQueueContext = C
+  }
 }
 
 
-abstract class QueueOp[E, M <: AnyQueueMessage.of[E], QR <: AnyQueueReader.of[E, M], QW <: AnyQueueWriter.of[E]] extends AnyQueueOp {
+abstract class QueueOp[E, M <: AnyQueueMessage.of[E], QR <: AnyQueueReader.of[E, M], QW <: AnyQueueWriter.of[E], Ctx] extends AnyQueueOp {
 
   override type QueueOpElement = E
   override type QueueOpQueueMessage = M
   override type QueueOpQueueReader = QR
   override type QueueOpQueueWriter = QW
-
+  override type QueueOpQueueContext = Ctx
 }
-
-//abstract class Queue[E, Ctx](val name: String) extends AnyQueue {
-//  type Elmnt = E
-//  type Context = Ctx
-//}
-
-//object Queue {
-//  type of[E, Ctx, M <: QueueMessage[E], R <: QueueReader[E, M], W <: QueueWriter[E]] = Queue[E, Ctx] {
-//    type Msg = M
-//    type Reader = R
-//    type Writer = W
-//  }
-//}
-
-//trait AnyReducibleQueue extends AnyQueue {
-//  val monoid: Monoid[Elmnt]
-//
-//  def reduce(environment: Environment[Context]): Try[Unit] = {
-//    Success(())
-//  }
-//}
-

@@ -1,4 +1,4 @@
-package ohnosequences.compota.aws
+package ohnosequences.compota.test.aws
 
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -32,7 +32,7 @@ class QueueTests {
   //@Test
   def writeAndRead() {
     val bench = new Bench()
-    TestCredentials.aws match {
+    AwsCompotaTest.aws match {
       case None => println("this test requires test credentials")
       case Some(aws) => {
         val queue = new DynamoDBQueue("test", intSerializer, Some(bench))

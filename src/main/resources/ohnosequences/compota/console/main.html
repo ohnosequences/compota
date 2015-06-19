@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>$name$ console</title>
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/main.css">
+    <!-- Latest compiled and minified JavaScript -->
+
+</head>
+<body>
+
+<div class="container-liquid white">
+    <div class="row-fluid">
+        <div class="col-md-2 sidebar">
+           @sidebar
+        </div>
+        <div class="col-md-10 col-md-offset-2 main">
+          @main
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="undeployModal" tabindex="-1" role="dialog" aria-labelledby="undeployModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title" id="undeployModalLabel">Undeploy</h4>
+            </div>
+
+            <div class="modal-body undeployBody">
+
+            </div>
+
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary undeployFinal" id="">Undeploy</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="terminateInstanceModal" tabindex="-1" role="dialog" aria-labelledby="terminateInstanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title" id="terminateInstanceModalLabel">Terminate instance</h4>
+            </div>
+
+            <div class="modal-body terminateInstanceBody">
+
+            </div>
+
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary terminateFinal" data-id="">Terminate</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="instanceStackTraceModal" tabindex="-1" role="dialog" aria-labelledby="instanceStackTraceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title" id="instanceStackTraceModalLabel">Stack trace</h4>
+            </div>
+
+            <div class="modal-body instanceStackTraceBody">
+            </div>
+
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="viewLogModal" tabindex="-1" role="dialog" aria-labelledby="viewLogModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title" id="viewLogModalLabel">Log</h4>
+            </div>
+
+            <div class="modal-body viewLogBody">
+            </div>
+
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="sshInstanceModal" tabindex="-1" role="dialog" aria-labelledby="sshInstanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title" id="sshInstanceModalLabel">Connect to instance</h4>
+            </div>
+
+            <div class="modal-body sshInstanceBody">
+
+            </div>
+
+
+            <div class="modal-footer">
+                <!--<button type="button" class="btn btn-primary sshCopy">Copy</button>-->
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="showMessagesModal" tabindex="-1" role="dialog" aria-labelledby="showMessagesModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title" id="showMessagesModalLabel"></h4>
+            </div>
+
+            <div class="modal-body">
+
+                <div class="smallBody">
+                <table class="table table-striped">
+                    <tbody id="showMessagesTable">
+
+                    </tbody>
+                </table>
+                </div>
+                <div class="vspace20"></div>
+                <p><a class="btn btn-info loadMoreMessages" href="#" data-queue="" data-lasttoken="">
+                    <i class="icon-refresh icon-white"></i>
+                    Show more
+                </a></p>
+                </div>
+
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default btn-primary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+<script src="https://netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+<!-- Include all compiled plugins (below), or include individual files as needed -->
+<script>
+    $(document).ready(function () {
+
+        if (!window.console) console = {};
+
+        console.log = console.log || function () {};
+        console.warn = console.warn || function () {};
+        console.error = console.error || function () {};
+        console.info = console.info || function () {};
+
+        console.info("Compota console loaded");
+
+        function bindSSHCommand() {
+            $('.sshInstance').click(function (event) {
+                var instance = $(event.target).data('instance');
+                var namespace = $(event.target).data('namespace');
+                sshInstance(instance, namespace)
+            });
+        }
+        bindSSHCommand();
+        function sshInstance(instance, namespace) {
+            console.info('sshInstance(' + instance + ', ' + namespace + ')');
+            $('.sshInstanceBody').load('/instance/ssh' + instance + '/' + namespace);
+            $('#sshInstanceModal').modal('show')
+        }
+
+        function bindTerminateInstance() {
+            $('.terminateInstance').click(function (event) {
+                var instance = $(event.target).data('instance');
+                var namespace = $(event.target).data('namespace');
+                terminateInstance(instance, namespace);
+            })
+        }
+        bindTerminateInstance();
+        function terminateInstance(instance, namespace) {
+            console.info('terminateInstance(' + instance + ', ' + namespace + ')');
+            $('.terminateFinal').data('instance', instance);
+            $('.terminateFinal').data('namespace', namespace);
+            $('.terminateInstanceBody').html('<p>Do you want to terminate instance ' + instance + '?</p>');
+            $('#terminateInstanceModal').modal('show')
+        }
+
+        function bindInstanceStackTrace() {
+            $('.instanceStackTrace').click(function (event) {
+                var instance = $(event.target).data('instance');
+                var namespace = $(event.target).data('namespace');
+                instanceStackTrace(instance, namespace);
+            })
+        }
+        bindInstanceStackTrace();
+        function instanceStackTrace(instance, namespace) {
+            console.info('instanceStackTrace(' + instance + ', ' + namespace + ')');
+            $('.instanceStackTraceBody').load('/instance/stackTrace/' + instance + '/' + namespace);
+            $('#instanceStackTraceModalLabel').text('Stack trace for instance ' + instance);
+            $('#instanceStackTraceModal').modal('show')
+        }
+
+        function bindViewLog() {
+            $('.viewLog').click(function (event) {
+                var instance = $(event.target).data('instance');
+                var namespace = $(event.target).data('namespace');
+                viewLog(instance, namespace);
+            })
+        }
+        bindViewLog();
+        function viewLog(instance, namespace) {
+            console.info('viewLog(' + instance + ', ' + namespace + ')');
+            $('.viewLogBody').load('/logging/' + instance + '/' + namespace);
+            $('#viewLogModalLabel').text('Log for ' + instance);
+            $('#viewLogModal').modal('show')
+        }
+
+        $('.undeploy').click(function (event) {
+            console.info('undeploy:');
+            $('.undeployBody').html('<p>Do you want to undeploy $name$?</p>');
+            $('#undeployModal').modal('show')
+        });
+
+        $('.undeployFinal').click(function (event) {
+            console.info('final undeploy:');
+            $('.undeployBody').load('/undeploy')
+        });
+
+        $('.terminateFinal').click(function (event) {
+            var instance = $(event.target).data('instance');
+            var namespace = $(event.target).data('namespace');
+            console.info('final terminate: ' + instance );
+            $('.terminateInstanceBody').load('/instance/terminate/' + instance + '/' + namespace)
+        });
+
+        $('.loadMoreMessages').click(function () {
+            var queue = $(event.target).data('queue');
+            var lastToken = $('#showMessagesTable').find('tr:last-child').data('lasttoken');
+            var query = '/queue/' + queue + '/messages';
+
+            if (lastToken) {
+                query += "/" + lastToken
+            }
+
+            console.info('loadMoreMessage: ' + query);
+            $.get(query, function (data) {
+                $('#showMessagesTable').append(data);
+                //deleteMessages();
+            })
+        });
+
+        $('.loadMoreNisperoWorkers').click(function () {
+            var lastToken = $('#nisperoWorkersTableBody').find('tr:last-child').data('lasttoken');
+            var nispero = $(event.target).data('nispero');
+            var query = '/nispero/' + nispero + '/workers';
+            if (lastToken) {
+                query += "/" + lastToken
+            }
+
+            console.info("loadMoreNisperoWorkers : " + query);
+            $.get(query, function (data) {
+                $('#nisperoWorkersTableBody').append(data)
+            })
+
+        });
+
+        $('.loadMoreNamespaces').click(function () {
+            var lastToken = $('#namespacesTableBody').find('tr:last-child').data('lasttoken');
+            var query = '/namespaces';
+            if (lastToken) {
+                query += "/" + lastToken
+            }
+
+            console.info("loadMoreNamespaces : " + query);
+            $.get(query, function (data) {
+                $('#namespacesTableBody').append(data)
+            })
+
+        });
+
+        $('.loadMoreErrors').click(function () {
+            var lastToken = $('#errorsTableBody').find('tr:last-child').data('lasttoken');
+
+            var query = '/errors';
+            if (lastToken) {
+                query += "/" + lastToken
+            }
+
+            console.info("loadMoreErrors : " + query);
+            $.get(query, function (data) {
+                $('#errorsTableBody').append(data)
+            })
+
+        });
+
+        $('.showQueueMessages').click(function (event) {
+            var queue = $(event.target).data('queue')
+            console.info('show messages: queue:' + queue);
+            $('#showMessagesModalLabel').text(queue + ' messages');
+            $('#showMessagesTable').load('/queue/' + queue + '/messages')
+
+            $('.loadMoreMessages').data('queue', queue)
+            $('#showMessagesModal').modal('show')
+        });
+
+
+    });
+</script>
+</body>
+</html>

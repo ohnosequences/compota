@@ -8,7 +8,7 @@ import ohnosequences.compota.environment.AnyEnvironment
 import ohnosequences.compota.graphs.{QueueChecker, NisperoGraph}
 import ohnosequences.compota.metamanager.AnyMetaManager
 import ohnosequences.compota.queues._
-import ohnosequences.logging.ConsoleLogger
+import ohnosequences.logging.{Logger, ConsoleLogger}
 import scala.util.{Failure, Success, Try}
 
 trait AnyCompota {
@@ -19,21 +19,21 @@ trait AnyCompota {
 
   type CompotaUnDeployActionContext
 
-  val compotaUnDeployActionContext: AtomicReference[Option[CompotaUnDeployActionContext]] = new AtomicReference(None)
-
   type CompotaMetaManager <: AnyMetaManager.of[CompotaEnvironment]
 
   def metaManager: CompotaMetaManager
 
   def nisperos: List[CompotaNispero]
 
-  def reducers: List[AnyQueueReducer.of[CompotaEnvironment]]
-
   type CompotaConfiguration <: AnyCompotaConfiguration
 
   def configuration: CompotaConfiguration
 
+  //for metamanager and workers
   def initialEnvironment: Try[CompotaEnvironment]
+
+  //to start compota
+  def localEnvironment(cliLogger: ConsoleLogger, args: List[String]): Try[CompotaEnvironment]
 
   def nisperosNames: Map[String, CompotaNispero] = nisperos.map { nispero =>
     (nispero.configuration.name, nispero)
@@ -43,44 +43,82 @@ trait AnyCompota {
     NisperoGraph(nisperosNames)
   }
 
-  def launchMetaManager(): Try[CompotaEnvironment] = {
-    initialEnvironment.flatMap { iEnv =>
-      iEnv.subEnvironmentAsync("metamanager") { env =>
-        metaManager.launchMetaManager(env)
-      }
+  def configurationChecks(env: CompotaEnvironment): Try[Unit] = {
+    env.logger.info("checking nispero graph")
+    nisperoGraph.graph.sort().map { c =>
+      env.logger.info("checking nispero graph - OK")
+      ()
     }
   }
 
-  def configurationChecks(env: CompotaEnvironment): Try[Boolean] = {
-    Success(true)
-  }
-
-
-  def launchWorker(nispero: CompotaNispero): Try[CompotaEnvironment] = {
-    initialEnvironment.flatMap { iEnv =>
-      iEnv.subEnvironmentAsync("worker") { env =>
-        nispero.worker.start(env)
-      }
-    }
-  }
-
-  def launchWorker(name: String): Try[CompotaEnvironment] = {
-    nisperosNames.get(name) match {
-      case None => {
-        //report error
-        Failure(new Error("nispero " + name + " doesn't exist"))
-      }
-      case Some(nispero) => launchWorker(nispero)
-    }
-  }
-
-  def launch(): Try[CompotaEnvironment]
+  def launch(env: CompotaEnvironment): Try[CompotaEnvironment]
 
   def main(args: Array[String]): Unit = {
-    val logger = new ConsoleLogger("compotaCLI", false, None)
+    val logger = new ConsoleLogger("compotaCLI", false)
     args.toList match {
-      case "run" :: "worker" :: name :: Nil => launchWorker(name)
-      case "run" :: "metamanager" :: Nil => launchMetaManager()
+      case "run" :: "worker" :: name :: Nil => {
+        initialEnvironment.map { env =>
+          env.logger.info("starting worker for nispero: " + name)
+          nisperosNames.get(name) match {
+            case None => {
+              env.logger.error(new Error("nispero " + name + " doesn't exist"))
+            }
+            case Some(nispero) => {
+              nispero.worker.start(env)
+            }
+          }
+        }.recoverWith { case t =>
+          println("couldn't initializate initial environment")
+          Failure(t)
+        }
+      }
+      case "checks" :: Nil => {
+        localEnvironment(logger, List[String]()).flatMap { env =>
+          configurationChecks(env).map { r =>
+            env.logger.info("configuration checked")
+          }
+        }.recoverWith { case t =>
+          logger.info("configuration checks failed")
+          logger.error(t)
+          Failure(t)
+        }
+      }
+      case "run" :: "metamanager" :: Nil => {
+        initialEnvironment.map { env =>
+          metaManager.launchMetaManager(env)
+        }.recoverWith { case t =>
+          println("couldn't initializate initial environment")
+          Failure(t)
+        }
+      }
+      case "start" :: Nil => {
+        localEnvironment(logger, List[String]()).flatMap { env =>
+          configurationChecks(env).flatMap { r =>
+            env.logger.info("configuration checked")
+            launch(env)
+          }
+        }.recoverWith { case t =>
+          logger.error(new Error("configuration checks failed", t))
+          t.printStackTrace()
+          Failure(t)
+        }
+      }
+      case "undeploy" :: Nil => {
+        localEnvironment(logger, List[String]()).flatMap { env =>
+          sendForceUnDeployCommand(env, "manual termination from CLI", "manual termination from CLI")
+        }.recoverWith { case t =>
+          t.printStackTrace()
+          Failure(t)
+        }
+      }
+      case "undeploy" :: "force" :: Nil => {
+        localEnvironment(logger, List[String]()).flatMap { env =>
+          forceUnDeploy(env, "manual termination from CLI", "manual termination from CLI")
+        }.recoverWith { case t =>
+          t.printStackTrace()
+          Failure(t)
+        }
+      }
       case _ => logger.error("wrong command")
     }
   }
@@ -91,11 +129,11 @@ trait AnyCompota {
     Success("")
   }
 
+  def sendNotification(env: CompotaEnvironment, subject: String, message: String): Try[Unit]
+
   def finishUnDeploy(env: CompotaEnvironment, reason: String, message: String): Try[Unit]
 
   def prepareUnDeployActions(env: CompotaEnvironment): Try[CompotaUnDeployActionContext]
-
-  ///def sendUnDeployCommand(env: CompotaEnvironment, reason: String, force: Boolean): Try[Unit]
 
   //undeploy right now
   def forceUnDeploy(env: CompotaEnvironment, reason: String, message: String): Try[Unit]
@@ -118,7 +156,6 @@ trait AnyCompota {
   def deleteManager(env: CompotaEnvironment): Try[Unit]
 
   def launchTerminationDaemon(queueChecker: QueueChecker[CompotaEnvironment], env: CompotaEnvironment): Try[TerminationDaemon[CompotaEnvironment]] = {
-    env.logger.info("TERMINATION DAEMON IS HERE!")
     startedTime(env).flatMap { t =>
       val td = new TerminationDaemon[CompotaEnvironment](
         compota = anyCompota,
@@ -131,31 +168,21 @@ trait AnyCompota {
 
   def launchConsole(nisperoGraph: QueueChecker[CompotaEnvironment], controlQueue: AnyQueueOp, env: CompotaEnvironment): Try[AnyConsole]
 
+  def customMessage: String = ""
+
 }
 
 object AnyCompota {
-  type of2[E <: AnyEnvironment[E], U] = AnyCompota { type CompotaEnvironment = E ; type CompotaUnDeployActionContext = U  }
+  type of2[E <: AnyEnvironment[E], U] = AnyCompota {type CompotaEnvironment = E; type CompotaUnDeployActionContext = U}
   type of[E <: AnyEnvironment[E], N <: AnyNispero.of[E]] = AnyCompota {
-    type CompotaEnvironment = E ;
-    type CompotaNispero = N  }
+    type CompotaEnvironment = E
+    type CompotaNispero = N}
   type of3[E <: AnyEnvironment[E], U, N <: AnyNispero.of[E]] = AnyCompota {
     type CompotaEnvironment = E
     type CompotaUnDeployActionContext = U
     type CompotaNispero = N
   }
-  type ofE[E <: AnyEnvironment[E]] = AnyCompota { type CompotaEnvironment = E}
+  type ofE[E <: AnyEnvironment[E]] = AnyCompota {type CompotaEnvironment = E}
 
 }
 
-//abstract class Compota[E <: AnyEnvironment[E], N <: AnyNispero.of[E], U, C <: AnyCompotaConfiguration](
-//                                                                    override val nisperos: List[N],
-//                                                                    override val reducers: List[AnyQueueReducer.of[E]],
-//                                                                    val configuration: C)
-//  extends AnyCompota {
-//
-//  type Nispero = N
-//  type CompotaEnvironment = E
-//  type CompotaUnDeployActionContext = U
-//  type CompotaConfiguration = C
-//
-//}

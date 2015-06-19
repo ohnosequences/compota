@@ -9,7 +9,7 @@ import scala.util.{Try, Success, Failure}
 
 object AwsCompotaTest {
   val aws: Option[AWSClients] = {
-    ohnosequences.compota.test.generated.credentialsProvider.credentialsProvider.map (AWSClients.create(_))
+    AWSClients.create(ohnosequences.compota.test.generated.credentialsProvider.credentialsProvider)
   }
 
   val testMetadata: Metadata = ohnosequences.compota.test.generated.metadata.metadata

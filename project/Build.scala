@@ -45,12 +45,12 @@ object CompotaBuild extends Build {
         val text = """
                      |package ohnosequences.compota.test.generated
                      |
-                     |object awsCredentials {
+                     |object credentialsProvider {
                      |  val credentialsProvider: com.amazonaws.auth.AWSCredentialsProvider = $cred$
                      |}
                      |""".stripMargin
           .replace("$cred$", providerConstructorPrinter(testCredentialsProvider.value))
-        val file = (sourceManaged in Compile).value / "awsCredentials.scala"
+        val file = (sourceManaged in Compile).value / "credentialsProvider.scala"
         IO.write(file, text)
         Seq(file)
       },

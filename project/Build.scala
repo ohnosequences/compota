@@ -92,7 +92,7 @@ object CompotaBuild extends Build {
             (if (isMvn) "" else "jars/") +
               module +
               (if (isMvn) "-"+version.value else "") +
-              "-test.jar"
+              "-tests.jar"
           Seq( publishS3Resolver.value.url
             , organization.value
             , module

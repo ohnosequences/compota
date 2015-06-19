@@ -106,12 +106,13 @@ object wordCountCompota extends AwsCompota[Int](List(splitNispero, wordLengthNis
 
   override def configurationChecks(env: AwsEnvironment): Try[Unit] = {
     super.configurationChecks(env).flatMap { u =>
+      env.logger.info("checking test jar " + configuration.metadata.testJarUrl)
       configuration.metadata.testJarUrl match {
         case None => Failure(new Error("test jar URL is not specified"))
         case Some(jarLocation) => {
           ObjectAddress(jarLocation).flatMap { jarObject =>
             env.awsClients.s3.objectExists(jarObject).map {
-              case true => env.logger.info("test jar " + jarObject.url + " OK"); Success(())
+              case true => Success(())
               case false => Failure(new Error("test jar " + jarObject.url + " does not exists"))
             }
           }

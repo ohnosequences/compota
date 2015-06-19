@@ -157,7 +157,8 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
       ObjectAddress(configuration.metadata.jarUrl).flatMap { jarObject =>
         env.awsClients.s3.objectExists(jarObject).map {
           case true => {
-            env.logger.info("jar object " + jarObject.url + " OK")
+            //env.logger.info("jar object " + jarObject.url + " OK")
+            env.logger.info("checking notification e-mail: " + configuration.notificationEmail)
             if(configuration.notificationEmail.isEmpty) {
               Failure(new Error("notification email is empty"))
             } else {

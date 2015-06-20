@@ -37,7 +37,7 @@ Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp
         <tr>
           <td class="col-md-6">metamanager instance type</td>
           <td class="col-md-6">
-            {awsCompota.configuration.timeout.toMinutes + " mins"}
+            {awsCompota.configuration.managerAutoScalingGroup.launchingConfiguration.instanceSpecs.instanceType.toString}
           </td>
         </tr>
         <tr>
@@ -174,6 +174,12 @@ Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp
         <td class="col-md-6">instance type</td>
         <td class="col-md-6">
           {group.launchingConfiguration.instanceSpecs.instanceType.toString}
+        </td>
+      </tr>
+      <tr>
+        <td class="col-md-6">ssh key pair</td>
+        <td class="col-md-6">
+          {group.launchingConfiguration.instanceSpecs.keyName}
         </td>
       </tr>
   }

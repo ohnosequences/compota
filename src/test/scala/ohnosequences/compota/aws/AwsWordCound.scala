@@ -100,7 +100,7 @@ object wordLengthNispero extends AwsNispero(
   wordsQueue,
   countsQueue,
   wordLengthInstructions,
-  splitNisperoConfiguration
+  wordLengthNisperoConfiguration
 )
 
 object wordCountCompota extends AwsCompota[Int](List(splitNispero, wordLengthNispero), wordCountCompotaConfiguration) {
@@ -118,7 +118,12 @@ object wordCountCompota extends AwsCompota[Int](List(splitNispero, wordLengthNis
         case Some(jarLocation) => {
           ObjectAddress(jarLocation).flatMap { jarObject =>
             env.awsClients.s3.objectExists(jarObject).flatMap {
-              case true => Success(true)
+              case true => {
+                env.logger.info("nispero names: " + nisperosNames)
+                env.logger.info("nisperos: " + nisperos)
+
+                Success(true)
+              }
               case false => Failure(new Error("test jar " + jarObject.url + " does not exists"))
             }
           }

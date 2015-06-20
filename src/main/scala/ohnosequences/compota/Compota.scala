@@ -45,8 +45,12 @@ trait AnyCompota {
 
   def configurationChecks(env: CompotaEnvironment): Try[Boolean] = {
     env.logger.info("checking nispero graph")
-    nisperoGraph.graph.sort().map { c =>
-      true
+    nisperoGraph.graph.sort().flatMap { c =>
+      env.logger.info("checking nispero names")
+      if (!nisperos.forall { n => nisperosNames.contains(n.configuration.name) } || nisperos.size != nisperosNames.size) {
+        Failure(new Error("incorrect nispero names"))
+      }
+      Success(true)
     }
   }
 

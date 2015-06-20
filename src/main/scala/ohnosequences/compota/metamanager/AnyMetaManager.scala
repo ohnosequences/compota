@@ -255,7 +255,12 @@ trait AnyMetaManager {
                   logger.info("writing init message: " + printMessage(initMessage.toString))
                   writer.writeRaw(List((printMessage(initMessage.toString) + "_" + System.currentTimeMillis(), initMessage))).flatMap { res =>
                     logger.debug("starting message loop")
-                    val messageLoopContext = MessageLoopContext[MetaManagerEnvironment, MetaManagerCommand, MetaManagerControlQueueContext, controlQueue.QueueQueueMessage](env, queueChecker.queueOps.toList.map{_._2}, queueChecker, controlQueue, queueOp, reader, writer)
+                    val messageLoopContext = MessageLoopContext[MetaManagerEnvironment, MetaManagerCommand, MetaManagerControlQueueContext, controlQueue.QueueQueueMessage](
+                      env,
+                      queueChecker.queueOps.toList.map{_._2},
+                      queueChecker,
+                      controlQueue, queueOp, reader, writer)
+                    logger.debug("starting message queus with context: " + messageLoopContext)
                     messageLoop(messageLoopContext, messageLoopContext.processContext[MetaManagerUnDeployingActionContext])
                     Success(())
                   }

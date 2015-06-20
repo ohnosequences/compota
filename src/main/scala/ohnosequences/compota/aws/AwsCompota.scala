@@ -151,18 +151,18 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
   }
 
 
-  override def configurationChecks(env: AwsEnvironment): Try[Unit] = {
+  override def configurationChecks(env: AwsEnvironment): Try[Boolean] = {
     super.configurationChecks(env).flatMap { u =>
       env.logger.info("checking jar object " + configuration.metadata.jarUrl)
       ObjectAddress(configuration.metadata.jarUrl).flatMap { jarObject =>
-        env.awsClients.s3.objectExists(jarObject).map {
+        env.awsClients.s3.objectExists(jarObject).flatMap {
           case true => {
             //env.logger.info("jar object " + jarObject.url + " OK")
             env.logger.info("checking notification e-mail: " + configuration.notificationEmail)
             if(configuration.notificationEmail.isEmpty) {
               Failure(new Error("notification email is empty"))
             } else {
-              Success(())
+              Success(true)
             }
           };
           case false => Failure(new Error("jar object " + jarObject.url + " does not exists"))

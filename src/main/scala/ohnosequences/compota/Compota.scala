@@ -43,11 +43,11 @@ trait AnyCompota {
     NisperoGraph(nisperosNames)
   }
 
-  def configurationChecks(env: CompotaEnvironment): Try[Unit] = {
+  def configurationChecks(env: CompotaEnvironment): Try[Boolean] = {
     env.logger.info("checking nispero graph")
     nisperoGraph.graph.sort().map { c =>
       env.logger.info("checking nispero graph - OK")
-      ()
+      true
     }
   }
 

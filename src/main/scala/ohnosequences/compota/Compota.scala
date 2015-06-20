@@ -67,7 +67,8 @@ trait AnyCompota {
             }
           }
         }.recoverWith { case t =>
-          println("couldn't initializate initial environment")
+          logger.error("couldn't initializate initial environment")
+          logger.error(t)
           Failure(t)
         }
       }
@@ -86,7 +87,8 @@ trait AnyCompota {
         initialEnvironment.map { env =>
           metaManager.launchMetaManager(env)
         }.recoverWith { case t =>
-          println("couldn't initializate initial environment")
+          logger.error("couldn't initializate initial environment")
+          logger.error(t)
           Failure(t)
         }
       }

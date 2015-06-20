@@ -30,7 +30,8 @@ class AwsEnvironment(val instanceId: InstanceId,
   override def terminate(): Unit = {
     //terminate instance
     Try {
-      awsClients.ec2.terminateInstance(instanceId.id)
+      //awsClients.ec2.terminateInstance(instanceId.id)
+      logger.warn("termination disabled")
     }
   }
 

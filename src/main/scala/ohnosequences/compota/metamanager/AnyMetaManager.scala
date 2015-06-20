@@ -243,6 +243,7 @@ trait AnyMetaManager {
             env.reportError(new Error("failed detect compota starting time", t), env.namespace / "start_time")
             Failure(t)
           }.flatMap { startedTime =>
+
             logger.debug("creating control queue context")
             val qContext = controlQueueContext(env)
             logger.debug("creating control queue " + controlQueue.name)
@@ -260,10 +261,12 @@ trait AnyMetaManager {
                   }
                 }
               }
+            }.recoverWith { case t =>
+              env.reportError(new Error("Couldn't initiate control queue", t), env.namespace / Namespace.controlQueue)
+              Failure(t)
             }
+
           }
-        }.recover { case t =>
-          env.reportError(new Error("Couldn't initiate control queue", t), env.namespace / Namespace.controlQueue)
         }
       }
 

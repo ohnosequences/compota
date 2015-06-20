@@ -33,13 +33,13 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   def metadata: AnyMetadata
 
-  def localErrorThreshold: Int = 100
+  def localErrorThreshold: Int = 1000
 
-  def globalErrorThresholdPerNameSpace: Int = 10
+  def globalErrorThresholdPerNameSpace: Int = 20
 
   def name = metadata.artifact
 
-  def loggingDebug: Boolean = false
+  def loggingDebug: Boolean
 
   def amiId = "ami-a10897d6" //"ami-5256b825"
 
@@ -104,6 +104,8 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   override def errorThreshold: Int = 10
 
+
+
   def loggingDestination(instanceId: InstanceId, namespace: Namespace): Option[ObjectAddress] = (instanceId, namespace) match {
     case (id, Namespace.root) => {
       //instance log
@@ -124,6 +126,7 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 abstract class AwsNisperoConfiguration extends AnyNisperoConfiguration {
 
   def name: String
+
 
   def compotaConfiguration: AwsCompotaConfiguration
 
@@ -152,6 +155,8 @@ abstract class AwsNisperoConfiguration extends AnyNisperoConfiguration {
   def workerMinSize: Int = 0
   def workerDesiredSize: Int = 1
   def workerMaxSize: Int = 100
+
+
 
 
   override def workers: Int = workerDesiredSize

@@ -90,7 +90,7 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
 
     val localErrorCount = localErrorCounts.incrementAndGet()
      
-    if (localErrorCount > math.min(configuration.errorThreshold, configuration.localErrorThreshold)) {
+    if (localErrorCount > configuration.errorThreshold) {
       errorTable.getNamespaceErrorCount(namespace) match {
         case Failure(tt) => {
           logger.error("couldn't retrieve count from error table")
@@ -102,10 +102,12 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
           val message = "reached global error threshold for " + namespace.toString
           val fullMessage = message + System.lineSeparator() + stackTrace
           logger.error("reached global error threshold for " + namespace.toString)
+          logger.error(t)
           sendForceUnDeployCommand("error threshold reached", fullMessage)
         }
-        case Success(count) => {
+        case Success(count) if localErrorCounts.get > configuration.localErrorThreshold => {
           logger.error("reached local error threshold for " + namespace.toString + " [" + count + "]")
+          logger.error(t)
           stop(true)
           terminate()
         }

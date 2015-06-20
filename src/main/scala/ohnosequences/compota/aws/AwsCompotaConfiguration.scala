@@ -39,8 +39,6 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   def name = metadata.artifact
 
-  def loggingDebug: Boolean
-
   def amiId = "ami-a10897d6" //"ami-5256b825"
 
   def securityGroups = List("compota")

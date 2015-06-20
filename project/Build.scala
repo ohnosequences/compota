@@ -11,9 +11,14 @@ object CompotaBuild extends Build {
 
   val testNotificationEmail = SettingKey[String]("e-mail address for test notifications")
 
+  val testSSHKey = SettingKey[String]("ssh key pair for test")
+
+
   override lazy val settings = super.settings ++ Seq(
     testCredentialsProvider := new InstanceProfileCredentialsProvider(),
-    testNotificationEmail := "")
+    testNotificationEmail := "",
+    testSSHKey := ""
+    )
 
   def stringOptionPrinter(option: Option[String]): String = option match {
     case None => "None"
@@ -66,6 +71,19 @@ object CompotaBuild extends Build {
                      |""".stripMargin
           .replace("$email$", "\"" + testNotificationEmail.value + "\"")
         val file = (sourceManaged in Compile).value / "email.scala"
+        IO.write(file, text)
+        Seq(file)
+      },
+      sourceGenerators in Test += task[Seq[File]] {
+        val text = """
+                     |package ohnosequences.compota.test.generated
+                     |
+                     |object sshKey {
+                     |  val sshKey: String = $sshKey$
+                     |}
+                     |""".stripMargin
+          .replace("$sshKey$", "\"" + testSSHKey.value + "\"")
+        val file = (sourceManaged in Compile).value / "sshKey.scala"
         IO.write(file, text)
         Seq(file)
       },

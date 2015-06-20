@@ -69,6 +69,8 @@ object wordCountCompotaConfiguration extends AwsCompotaConfiguration {
 
   override val deleteErrorQueue: Boolean = false
   override val timeout: Duration = Duration(1, HOURS)
+
+  override def keyName: String = AwsCompotaTest.testSSHKey
 }
 
 object splitNisperoConfiguration extends AwsNisperoConfiguration {
@@ -103,7 +105,10 @@ object wordLengthNispero extends AwsNispero(
 
 object wordCountCompota extends AwsCompota[Int](List(splitNispero, wordLengthNispero), wordCountCompotaConfiguration) {
 
-  override def prepareUnDeployActions(env: AwsEnvironment): Try[Int] = Success(1000)
+  override def prepareUnDeployActions(env: AwsEnvironment): Try[Int] = {
+    Thread.sleep(1000 * 60 * 10)
+    Success(1000)
+  }
 
   override def configurationChecks(env: AwsEnvironment): Try[Boolean] = {
     super.configurationChecks(env).flatMap { u =>

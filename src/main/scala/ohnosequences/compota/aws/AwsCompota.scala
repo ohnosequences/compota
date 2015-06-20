@@ -172,6 +172,13 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
                 } else {
                   Success(true)
                 }
+              }.flatMap { t =>
+                env.logger.info("checking ssh key pair")
+                if(configuration.keyName.isEmpty) {
+                  Failure(new Error("ssh key pais is not specified"))
+                } else {
+                  Success(true)
+                }
               }
             }
           }

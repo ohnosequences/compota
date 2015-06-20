@@ -26,7 +26,9 @@ class AwsMetaManager[U](val compota: AnyAwsCompota.of[U]) extends BaseMetaManage
 
   override def controlQueueContext(env: MetaManagerEnvironment): MetaManagerControlQueueContext = env.createDynamoDBContext
 
-  override val controlQueue = new DynamoDBQueue[BaseMetaManagerCommand]("control_queue", BaseCommandSerializer)
+  override val controlQueue = new DynamoDBQueue[BaseMetaManagerCommand]("control_queue",
+    BaseCommandSerializer,
+    visibilityTimeout = compota.configuration.controlQueueVisibilityTimeout)
 
   override def process(command: BaseMetaManagerCommand,
                        ctx: AnyProcessContext.of[MetaManagerEnvironment, MetaManagerUnDeployingActionContext]

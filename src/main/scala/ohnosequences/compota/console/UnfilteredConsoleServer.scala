@@ -209,7 +209,7 @@ class UnfilteredConsoleServer(console: AnyConsole, currentAddress: String) {
 
 
   object users extends Users {
-    val userName = "nispero"
+    val userName = "compota"
     override def auth(u: String, p: String): Boolean = userName.equals(u) && p.equals(console.password)
   }
 
@@ -230,7 +230,7 @@ class UnfilteredConsoleServer(console: AnyConsole, currentAddress: String) {
   def startedMessage(customInfo: String): String = {
     val message = new StringBuilder()
     message.append("console address: " + printURL(currentAddress) + System.lineSeparator())
-    message.append("user: " + users.userName)
+    message.append("user: " + users.userName + System.lineSeparator())
     message.append("password: " + console.password + System.lineSeparator())
     if(!customInfo.isEmpty) {
       message.append(System.lineSeparator())

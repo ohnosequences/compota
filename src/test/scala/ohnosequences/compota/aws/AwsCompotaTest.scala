@@ -15,6 +15,8 @@ object AwsCompotaTest {
   val testMetadata: Metadata = ohnosequences.compota.test.generated.metadata.metadata
   val testCredentialsProvider: AWSCredentialsProvider = ohnosequences.compota.test.generated.credentialsProvider.credentialsProvider
   val testNotificationEmail: String = ohnosequences.compota.test.generated.email.email
+  val testSSHKey: String = ohnosequences.compota.test.generated.sshKey.sshKey
+
 }
 
 trait AwsCompotaTest {

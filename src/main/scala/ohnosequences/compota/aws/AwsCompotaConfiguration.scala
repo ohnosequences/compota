@@ -27,7 +27,7 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
     Resources.notificationTopic(notificationEmail)
   }
 
-
+  def controlQueueVisibilityTimeout: Duration = Duration(10, MINUTES)
 
   def notificationEmail: String
 

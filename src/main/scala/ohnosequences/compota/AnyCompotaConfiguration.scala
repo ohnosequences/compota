@@ -14,7 +14,7 @@ trait AnyCompotaConfiguration {
   def loggerDebug: Boolean
   def terminationDaemonIdleTime: Duration = Duration(100, SECONDS)
   def deleteErrorQueue: Boolean
-  def consolePassword: String = "nispero"
+  def consolePassword: String = "compota"
   def consoleHTTPS: Boolean = false
   def consoleInstancePageSize = 10
   def consoleMessagePageSize = 10

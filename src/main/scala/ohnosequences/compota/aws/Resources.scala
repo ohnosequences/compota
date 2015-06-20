@@ -16,7 +16,7 @@ object Resources {
 
   //def loggerBucket(metadata: AnyMetadata): String = "compota-" + metadata.artifact + "-logs"
 
-  def compotaBucket(metadata: AnyMetadata): String = "compota-" + metadata.artifact.replace("_", "-")
+  def compotaBucket(metadata: AnyMetadata): String = "compota-" + metadata.artifact.replace("_", "-").toLowerCase
 
   def controlQueue(metadata: AnyMetadata): String = dynamodbTable(metadata, "controlQueue")
 

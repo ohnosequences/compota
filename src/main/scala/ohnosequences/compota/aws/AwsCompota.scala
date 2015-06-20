@@ -81,7 +81,9 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
       val currentAddress = env.awsClients.ec2.getCurrentInstance.flatMap {_.getPublicDNS()}.getOrElse("<undefined>")
       val server = new UnfilteredConsoleServer(console, currentAddress)
       server.start()
+
       val message = server.startedMessage(customMessage)
+      env.logger.info("sending notification" + configuration.name + " started")
       sendNotification(env, configuration.name + " started", message)
       console
     }
@@ -99,7 +101,7 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
       configuration.loggingDirectory,
       "log.txt",
       configuration.loggingDestination(InstanceId(ec2InstanceId), Namespace.root),
-      debug = configuration.loggingDebug,
+      debug = configuration.loggerDebug,
       printToConsole = configuration.loggersPrintToConsole
     ).flatMap { logger =>
       AwsErrorTable.apply(logger, configuration.errorTable, awsClients).map { errorTable =>
@@ -157,17 +159,22 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
       ObjectAddress(configuration.metadata.jarUrl).flatMap { jarObject =>
         env.awsClients.s3.objectExists(jarObject).flatMap {
           case true => {
-            //env.logger.info("jar object " + jarObject.url + " OK")
             env.logger.info("checking notification e-mail: " + configuration.notificationEmail)
             if(configuration.notificationEmail.isEmpty) {
               Failure(new Error("notification email is empty"))
             } else {
-              Success(true)
-//                .flatMap { u =>
-//                configuration.managerAutoScalingGroup.launchingConfiguration.instanceSpecs.
-//              }
+              env.logger.info("checking notification topic")
+              Try {env.awsClients.sns.createTopic(configuration.notificationTopic)}.flatMap { topic =>
+                if (!topic.isEmailSubscribed(configuration.notificationEmail)) {
+                  topic.subscribeEmail(configuration.notificationEmail)
+                  env.logger.info("please confirm subscription")
+                  Failure(new Error("email " + configuration.notificationEmail + " is not subscribed to the notification topic"))
+                } else {
+                  Success(true)
+                }
+              }
             }
-          };
+          }
           case false => Failure(new Error("jar object " + jarObject.url + " does not exists"))
         }
       }
@@ -221,7 +228,9 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
 
   override def sendNotification(env: AwsEnvironment, subject: String, message: String): Try[Unit] = {
     Try {
+      env.logger.debug("sendting notification to the topic " + configuration.notificationTopic)
       val topic = env.awsClients.sns.createTopic(configuration.notificationTopic)
+
       topic.publish(message, subject)
     }
   }
@@ -242,10 +251,7 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
         nispero.outputQueue.delete(nispero.outputContext(env))
       }
     }
-    Try {
-      logger.warn("deleting control queue: " + metaManager.controlQueue.name)
-      metaManager.controlQueue.delete(metaManager.controlQueueContext(env))
-    }
+
 
     Success(()).flatMap { u =>
       forcedUnDeployActions(env)
@@ -254,6 +260,10 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
         sendNotification(env, configuration.name + " terminated", "reason: " + reason + System.lineSeparator() + message + System.lineSeparator() + m)
       }
       case Failure(t) => sendNotification(env, configuration.name + " terminated", "reason: " + reason + System.lineSeparator() + message)
+    }
+    Try {
+      logger.warn("deleting control queue: " + metaManager.controlQueue.name)
+      metaManager.controlQueue.delete(metaManager.controlQueueContext(env))
     }
     Try {
       deleteManager(env)

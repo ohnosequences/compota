@@ -64,7 +64,7 @@ object wordCountCompotaConfiguration extends AwsCompotaConfiguration {
   override def localAwsCredentialsProvider: AWSCredentialsProvider = AwsCompotaTest.testCredentialsProvider
 
   override def notificationEmail: String = AwsCompotaTest.testNotificationEmail
-  
+
   override def loggerDebug: Boolean = true
 
   override val deleteErrorQueue: Boolean = false

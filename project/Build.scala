@@ -11,7 +11,9 @@ object CompotaBuild extends Build {
 
   val testNotificationEmail = SettingKey[String]("e-mail address for test notifications")
 
-  override lazy val settings = super.settings ++ Seq(testCredentialsProvider := new InstanceProfileCredentialsProvider(), testNotificationEmail := "")
+  override lazy val settings = super.settings ++ Seq(
+    testCredentialsProvider := new InstanceProfileCredentialsProvider(),
+    testNotificationEmail := "")
 
   def stringOptionPrinter(option: Option[String]): String = option match {
     case None => "None"

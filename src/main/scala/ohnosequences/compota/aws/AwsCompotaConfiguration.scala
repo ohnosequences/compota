@@ -45,7 +45,7 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   def securityGroups = List("compota")
 
-  def keyName = "compota"
+  def keyName: String = "compota"
 
   def instanceProfile: Option[String] = Some("compota")
 
@@ -71,6 +71,8 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
   def managerInstanceSpecs = new InstanceSpecs(
     instanceType = managerInstanceType,
     instanceProfile = instanceProfile,
+    keyName = keyName,
+    securityGroups = securityGroups,
     deviceMapping = deviceMapping,
     amiId = amiId,
     userData = userScriptGenerator.generate("manager", "manager", metadata.jarUrl, metadata.testJarUrl, metadata.mainClass, workingDirectory.getAbsolutePath)
@@ -136,6 +138,8 @@ abstract class AwsNisperoConfiguration extends AnyNisperoConfiguration {
     instanceProfile = compotaConfiguration.instanceProfile,
     deviceMapping = compotaConfiguration.deviceMapping,
     amiId = compotaConfiguration.amiId,
+    keyName = compotaConfiguration.keyName,
+    securityGroups = compotaConfiguration.securityGroups,
     userData = userScriptGenerator.generate(name, "worker", compotaConfiguration.metadata.jarUrl, compotaConfiguration.metadata.testJarUrl, compotaConfiguration.metadata.mainClass, workerWorkingDirectory.getAbsolutePath)
   )
 

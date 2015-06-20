@@ -59,7 +59,7 @@ object countsQueue extends DynamoDBQueue[Int](
 }
 
 object wordCountCompotaConfiguration extends AwsCompotaConfiguration {
-  override def metadata: AnyMetadata = AwsCompotaTest.testMetadata.copy(mainClass = Some("ohnosequences.compota.test.aws.AwsWordCount$"))
+  override def metadata: AnyMetadata = AwsCompotaTest.testMetadata.copy(mainClass = Some("ohnosequences.compota.test.aws.wordCountCompota"))
 
   override def localAwsCredentialsProvider: AWSCredentialsProvider = AwsCompotaTest.testCredentialsProvider
 
@@ -144,10 +144,10 @@ class AwsWordCountTest {
       cliLogger.info("checking configuration for " + wordCountCompota)
       wordCountCompota.configurationChecks(env).flatMap { r =>
         cliLogger.info("checks passed. launching compota")
-//        wordCountCompota.launch(env).map { e =>
-//          cliLogger.info("started")
-//        }
-        Success(())
+        wordCountCompota.launch(env).map { e =>
+          cliLogger.info("started")
+        }
+       // Success(())
       }
     }.recoverWith { case t =>
       cliLogger.error(t)

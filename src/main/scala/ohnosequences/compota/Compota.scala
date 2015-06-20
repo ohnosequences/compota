@@ -46,7 +46,6 @@ trait AnyCompota {
   def configurationChecks(env: CompotaEnvironment): Try[Boolean] = {
     env.logger.info("checking nispero graph")
     nisperoGraph.graph.sort().map { c =>
-      env.logger.info("checking nispero graph - OK")
       true
     }
   }
@@ -83,7 +82,7 @@ trait AnyCompota {
           Failure(t)
         }
       }
-      case "run" :: "metamanager" :: Nil => {
+      case "run" :: "manager" :: "manager" :: Nil => {
         initialEnvironment.map { env =>
           metaManager.launchMetaManager(env)
         }.recoverWith { case t =>

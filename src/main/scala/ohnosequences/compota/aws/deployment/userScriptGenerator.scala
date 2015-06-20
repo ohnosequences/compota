@@ -15,19 +15,19 @@ object userScriptGenerator {
                   |exec &> log.txt
                   |chmod a+r log.txt
                   |
-                  |aws s3 cp s3://$jarUrl$ $workingDir$/$jarFile$ --region eu-west-1
+                  |aws s3 cp $jarUrl$ $jarFile$ --region eu-west-1
                   """.stripMargin +
         (testJarUrl match {
           case None => {
             mainClass match {
               case None => {
                 """
-                  |java -jar $workingDir$/$jarFile$ $component$ $name$
+                  |java -jar $jarFile$ run $component$ $name$
                   |""".stripMargin
               }
               case Some(mainClass0) => {
                 """
-                  |java -cp $workingDir$/$jarFile$ $mainClass$ $component$ $name$
+                  |java -cp $jarFile$ $mainClass$ run $component$ $name$
                   |""".stripMargin.replace("$mainClass$", mainClass0)
               }
             }
@@ -36,18 +36,18 @@ object userScriptGenerator {
             mainClass match {
               case None => {
                 """
-                  |aws s3 cp s3://$testJarUrl$ $workingDir$/$testJarFile$ --region eu-west-1
-                  |java -jar $workingDir$/$testJarFile$ -cp $workingDir$/$jarFile$ $component$ $name$
+                  |aws s3 cp $testJarUrl$ $testJarFile$ --region eu-west-1
+                  |java -jar $testJarFile$ -cp $jarFile$ run $component$ $name$
                 """.stripMargin
               } case Some(mainClass0) => {
                 """
-                  |aws s3 cp s3://$testJarUrl$ $workingDir$/$testJarFile$ --region eu-west-1
-                  |java -cp $workingDir$/$jarFile$;$workingDir$/$testJarFile$ $mainClass$ $component$ $name$
+                  |aws s3 cp $testJarUrl$ $testJarFile$ --region eu-west-1
+                  |java -cp $jarFile$:$testJarFile$ $mainClass$ run $component$ $name$
                 """.stripMargin.replace("$mainClass$", mainClass0)
               }
             }
           }
-      })).replace("jarUrl", jarUrl)
+      })).replace("$jarUrl$", jarUrl)
         .replace("$jarFile$", getFileName(jarUrl))
         .replace("$component$", component)
         .replace("$testJarUrl$", testJarUrl.getOrElse(""))

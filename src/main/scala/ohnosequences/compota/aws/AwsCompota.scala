@@ -163,6 +163,9 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
               Failure(new Error("notification email is empty"))
             } else {
               Success(true)
+//                .flatMap { u =>
+//                configuration.managerAutoScalingGroup.launchingConfiguration.instanceSpecs.
+//              }
             }
           };
           case false => Failure(new Error("jar object " + jarObject.url + " does not exists"))

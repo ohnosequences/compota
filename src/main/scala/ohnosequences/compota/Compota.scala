@@ -52,12 +52,17 @@ trait AnyCompota {
 
   def launch(env: CompotaEnvironment): Try[CompotaEnvironment]
 
+  def launchLogUploader(env: CompotaEnvironment): Unit = {}
+
+
   def main(args: Array[String]): Unit = {
     val logger = new ConsoleLogger("compotaCLI", false)
     args.toList match {
       case "run" :: "worker" :: name :: Nil => {
+
         initialEnvironment.map { env =>
           env.logger.info("starting worker for nispero: " + name)
+          launchLogUploader(env)
           nisperosNames.get(name) match {
             case None => {
               env.logger.error(new Error("nispero " + name + " doesn't exist"))
@@ -85,6 +90,7 @@ trait AnyCompota {
       }
       case "run" :: "manager" :: "manager" :: Nil => {
         initialEnvironment.map { env =>
+          launchLogUploader(env)
           metaManager.launchMetaManager(env)
         }.recoverWith { case t =>
           logger.error("couldn't initializate initial environment")

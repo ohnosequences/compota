@@ -43,7 +43,7 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   def securityGroups = List("compota")
 
-  def keyName: String = "compota"
+  def keyName: String
 
   def instanceProfile: Option[String] = Some("compota")
 

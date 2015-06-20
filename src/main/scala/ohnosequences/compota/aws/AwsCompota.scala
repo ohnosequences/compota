@@ -36,12 +36,14 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
 
   override val metaManager: CompotaMetaManager = new AwsMetaManager[CompotaUnDeployActionContext](AnyAwsCompota.this)
 
-  def launchLogUploader(env: CompotaEnvironment): Unit = {
+  override def launchLogUploader(env: CompotaEnvironment): Unit = {
     env.logger.info("starting log uploader")
     env.logger match {
       case s3Logger: S3Logger => {
         s3Logger.loggingDestination match {
-          case None => env.logger.info("log uploader is disabled")
+          case None => {
+            env.logger.info("log uploader is disabled")
+          }
           case Some(loggerDestination) => {
             env.subEnvironmentAsync(Left(Namespace.logUploader)) { logEnv =>
               @tailrec
@@ -64,7 +66,8 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
         }
       }
       case _ => {
-        env.logger.info("starting log uploader: unsupported logger")
+        val m = "starting log uploader: unsupported logger"
+        env.logger.info(m)
       }
     }
 
@@ -152,6 +155,13 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
     }
   }
 
+//  def check(failureMessage: String)(pred: => Boolean): Try[Boolean] = {
+//    if(pred) {
+//      Success(true)
+//    } else {
+//      Failure
+//    }
+//  }
 
   override def configurationChecks(env: AwsEnvironment): Try[Boolean] = {
     super.configurationChecks(env).flatMap { u =>
@@ -170,14 +180,16 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
                   env.logger.info("please confirm subscription")
                   Failure(new Error("email " + configuration.notificationEmail + " is not subscribed to the notification topic"))
                 } else {
-                  Success(true)
-                }
-              }.flatMap { t =>
-                env.logger.info("checking ssh key pair")
-                if(configuration.keyName.isEmpty) {
-                  Failure(new Error("ssh key pais is not specified"))
-                } else {
-                  Success(true)
+                  env.logger.info("checking ssh key pair")
+                  if(configuration.keyName.isEmpty) {
+                    Failure(new Error("ssh key pais is not specified"))
+                  } else {
+                    if (!nisperos.forall(!_.configuration.workerAutoScalingGroup.launchingConfiguration.instanceSpecs.keyName.isEmpty)) {
+                      Failure(new Error("ssh key pais is not specified"))
+                    } else {
+                      Success(true)
+                    }
+                  }
                 }
               }
             }

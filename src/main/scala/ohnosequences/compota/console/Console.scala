@@ -488,7 +488,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
   def mainHTML: String = {
-    val main = scala.io.Source.fromInputStream(getClass.getResourceAsStream("ohnosequences/compota/console/main.html")).mkString
+    val main = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/ohnosequences/compota/console/main.html")).mkString
     main
   }
 

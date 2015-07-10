@@ -3,6 +3,7 @@ package ohnosequences.compota.queues
 import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 
+import ohnosequences.awstools.dynamodb.RepeatConfiguration
 import ohnosequences.compota.environment.Env
 import ohnosequences.compota.monoid.Monoid
 import ohnosequences.compota.serialization.Serializer
@@ -19,6 +20,25 @@ trait AnyQueueMessage {
   def getBody: Try[Option[QueueMessageElement]]
 
   val id: String
+
+//  def toString(max: Int): String = {
+//    id.split(System.lineSeparator()).toList match {
+//      case line1 :: line2 :: tail => {
+//        if (line1.length > 50) {
+//          line1.take(50) + "..."
+//        } else {
+//          line1
+//        }
+//      }
+//      case _ => {
+//        if (id.length > 50) {
+//          id.take(50) + "..."
+//        } else {
+//          id
+//        }
+//      }
+//    }
+//  }
 }
 
 object AnyQueueMessage {
@@ -38,33 +58,28 @@ trait AnyQueueReader {
 
   val queueOp: AnyQueueOp
 
-  def receiveMessage(logger: Logger): Try[Option[QueueReaderMessage]]
+  def receiveMessage(env: Env): Try[Option[QueueReaderMessage]]
 
-  def waitForMessage(logger: Logger,
-                     isStopped: => Boolean = {
-                       false
-                     },
-                     initialTimeout: Duration = Duration(100, MILLISECONDS)
-                      ): Try[Option[QueueReaderMessage]] = {
-
+  def waitForMessage(env: Env): Try[Option[QueueReaderMessage]] = {
+    val repeatConfiguration = queueOp.queue.repeatConfiguration
     @tailrec
-    def waitForMessageRep(timeout: Long): Try[Option[QueueReaderMessage]] = {
-      if (isStopped) {
+    def waitForMessageRep(attempt: Int, timeout: Long): Try[Option[QueueReaderMessage]] = {
+      if (env.isStopped) {
         Success(None)
       } else {
         Try {
-          receiveMessage(logger)
+          receiveMessage(env)
         }.flatMap { e => e } match {
-          case Failure(t) if isStopped => {
+          case Failure(t) if env.isStopped => {
             Success(None)
           }
           case Failure(t) => {
             Failure(t)
           }
           case Success(None) => {
-            logger.debug("queue reader for " + queueOp.queue.name + " waiting for message")
+            env.logger.debug("queue reader for " + queueOp.queue.name + " waiting for message")
             Thread.sleep(timeout)
-            waitForMessageRep(timeout * 3 / 2)
+            waitForMessageRep(attempt + 1, repeatConfiguration.nextTimeout(timeout))
           }
           case Success(Some(message)) => {
             Success(Some(message))
@@ -73,7 +88,7 @@ trait AnyQueueReader {
       }
     }
 
-    waitForMessageRep(initialTimeout.toMillis)
+    waitForMessageRep(1, repeatConfiguration.initialTimeout.toMillis)
   }
 }
 
@@ -119,6 +134,11 @@ trait AnyQueue { queue =>
 
   type QueueElement
 
+  val repeatConfiguration: RepeatConfiguration = RepeatConfiguration(
+    timeoutThreshold = Duration(100, DAYS),
+    coefficient = 1.3
+  )
+
   type QueueQueueMessage <: AnyQueueMessage.of[QueueElement]
 
   type QueueQueueReader <: AnyQueueReader.of[QueueElement, QueueQueueMessage]
@@ -134,9 +154,6 @@ trait AnyQueue { queue =>
 
   def subQueues: List[AnyQueue] = List(queue)
 
-//  def reduce(env: Env, queueOp: AnyQueueOp.of1[QueueElement]): Try[Unit] = {
-//    Success(())
-//  }
 
   val reducer: AnyQueueReducer.of2[QueueElement, QueueContext] = new UnitQueueReducer(queue)
 
@@ -149,14 +166,6 @@ trait AnySerializableQueue extends AnyQueue {
 trait AnyMonoidQueue extends AnyQueue { monoidQueue =>
   val monoid: Monoid[QueueElement]
 
-//  def reducer: Option[AnyQueueReducer.of[QueueElement]]
-//
-//  override def reduce(env: Env, queueOp: AnyQueueOp.of1[QueueElement]): Try[Unit] = {
-//    reducer match {
-//      case None => Success(())
-//      case Some(r) => r.reduce(env, monoidQueue, queueOp)
-//    }
-//  }
 }
 
 

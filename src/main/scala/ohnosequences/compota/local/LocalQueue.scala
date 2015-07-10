@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{ConcurrentSkipListMap}
 
 import ohnosequences.compota.console.Pagination
+import ohnosequences.compota.environment.Env
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -129,7 +130,7 @@ class LocalQueueOp[T](val context: LocalContext, val queue: LocalQueue[T]) exten
 
 class LocalQueueReader[T](val queueOp: LocalQueueOp[T]) extends QueueReader[T, LocalMessage[T]] {
 
-  override def receiveMessage(logger: Logger): Try[Option[LocalMessage[T]]] = {
+  override def receiveMessage(env: Env): Try[Option[LocalMessage[T]]] = {
     Option(queueOp.queue.rawQueue.pollFirstEntry()) match {
       case None => Success(None)
       case Some(entry) => {
@@ -140,7 +141,7 @@ class LocalQueueReader[T](val queueOp: LocalQueueOp[T]) extends QueueReader[T, L
           override def run(): Unit = {
             Thread.sleep(queueOp.queue.visibilityTimeout.toMillis)
             if(!res.deleted.get()) {
-              logger.info("return message to queue: " + entry.getValue)
+              env.logger.info("return message to queue: " + entry.getValue)
               queueOp.queue.rawQueue.put(entry.getKey, entry.getValue)
             }
           }

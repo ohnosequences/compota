@@ -64,6 +64,11 @@ sealed trait BaseMetaManagerCommand extends AnyMetaManagerCommand {
       (if(action.isEmpty) "" else action) +
       (if(args.isEmpty) "" else ":_" + args.reduce(_ + "_" + _))
   }
+
+
+  //todo reduce it
+  def id: String = printMessage(prefix)
+
   def toCommand0 = Command0(component, action, args)
 
   def printMessage(message: String): String = {

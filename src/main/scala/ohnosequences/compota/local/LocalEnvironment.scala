@@ -26,7 +26,7 @@ class LocalEnvironment(val instanceId: InstanceId,
 
   val isStoppedFlag = new java.util.concurrent.atomic.AtomicBoolean(false)
 
-  override def subEnvironmentSync[R](subspaceOrInstance: Either[String, InstanceId], async: Boolean)(statement: LocalEnvironment => R): Try[(LocalEnvironment, R)] = {
+  override def prepareSubEnvironment[R](subspaceOrInstance: Either[String, InstanceId], async: Boolean)(statement: LocalEnvironment => R): Try[(LocalEnvironment, R)] = {
     Try {
       val (newInstance, newNamespace, newLogger, newWorkingDirectory) = subspaceOrInstance match {
         case Left(subspace) => {

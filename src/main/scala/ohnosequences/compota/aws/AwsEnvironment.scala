@@ -35,7 +35,7 @@ class AwsEnvironment(val instanceId: InstanceId,
     }
   }
 
-  override def subEnvironmentSync[R](subspaceOrInstance: Either[String, InstanceId], async: Boolean)(statement: AwsEnvironment => R): Try[(AwsEnvironment, R)] = {
+  override def prepareSubEnvironment[R](subspaceOrInstance: Either[String, InstanceId], async: Boolean)(statement: AwsEnvironment => R): Try[(AwsEnvironment, R)] = {
     Try {
       val (newInstance, newNamespace, newLogger, newWorkingDirectory) = subspaceOrInstance match {
         case Left(subspace) => {

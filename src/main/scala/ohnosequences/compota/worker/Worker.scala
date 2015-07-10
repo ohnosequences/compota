@@ -87,9 +87,7 @@ class Worker[In, Out, Env <: AnyEnvironment[Env], InContext, OutContext, IQ <: A
         Success(())
       } else {
         logger.debug("receiving message from queue " + inputQueue.name)
-        queueReader.waitForMessage(logger, {
-          env.isStopped
-        }).recoverWith { case t =>
+        queueReader.waitForMessage(env).recoverWith { case t =>
           env.reportError(new Error("couldn't receive message from the queue " + inputQueue.name, t), env.namespace / "receive_message")
           Failure(t)
         }.foreach {
@@ -110,7 +108,7 @@ class Worker[In, Out, Env <: AnyEnvironment[Env], InContext, OutContext, IQ <: A
               case Some(input) =>
                 logger.info("received: " + input.toString.take(100) + " id: " + message.id)
 
-                env.subEnvironmentSync(Left(message.id), async = false) { env =>
+                env.subEnvironmentSync(Left(message.id)) { env =>
                   val logger = env.logger
 
                   logger.debug("running " + nisperoName + " instructions")

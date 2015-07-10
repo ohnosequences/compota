@@ -106,7 +106,7 @@ object wordLengthNispero extends AwsNispero(
 object wordCountCompota extends AwsCompota[Int](List(splitNispero, wordLengthNispero), wordCountCompotaConfiguration) {
 
   override def prepareUnDeployActions(env: AwsEnvironment): Try[Int] = {
-    Thread.sleep(1000 * 60 * 10)
+  //  Thread.sleep(1000 * 60 * 10)
     Success(1000)
   }
 

@@ -1,5 +1,9 @@
 package ohnosequences.compota.metamanager
 
 trait AnyMetaManagerCommand {
-  def prefix: String
+
+  def id: String
+
+
+  def toString: String
 }

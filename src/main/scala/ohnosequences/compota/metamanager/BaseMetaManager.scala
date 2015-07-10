@@ -13,13 +13,13 @@ trait BaseMetaManager extends AnyMetaManager {
 
   override type MetaManagerCommand = BaseMetaManagerCommand
 
-  override def initMessage: BaseMetaManagerCommand = LaunchConsole
+  override def initCommand: BaseMetaManagerCommand = LaunchConsole
 
   def sendMessageToControlQueue(env: MetaManagerEnvironment, command: BaseMetaManagerCommand): Try[Unit] = {
     Success(()).flatMap { u =>
       controlQueue.create(controlQueueContext(env)).flatMap { controlQueueOp =>
         controlQueueOp.writer.flatMap { writer =>
-          writer.writeMessages(printMessage(command.prefix) + System.currentTimeMillis(), List(command))
+          writer.writeRaw(List((command.id, command)))
         }
       }
     }

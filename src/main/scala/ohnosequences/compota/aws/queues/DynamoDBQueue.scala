@@ -8,6 +8,7 @@ import ohnosequences.awstools.dynamodb.DynamoDBUtils
 import ohnosequences.awstools.utils.{SQSQueueInfo, SQSUtils}
 import ohnosequences.benchmark.Bench
 import ohnosequences.compota.aws.deployment.{AnyMetadata, Metadata}
+import ohnosequences.compota.environment.Env
 import ohnosequences.logging.{Logger, ConsoleLogger}
 
 import scala.collection.JavaConversions._
@@ -92,7 +93,7 @@ class DynamoDBMessage[T](val sqsMessage: Message, queueOp: DynamoDBQueueOP[T], b
 
 class DynamoDBQueueReader[T](val queueOp: DynamoDBQueueOP[T]) extends QueueReader[T, DynamoDBMessage[T]] {
 
-  override def receiveMessage(logger: Logger): Try[Option[DynamoDBMessage[T]]] = {
+  override def receiveMessage(env: Env): Try[Option[DynamoDBMessage[T]]] = {
     Try {
       val sqs = queueOp.aws.sqs
       val res = sqs.sqs.receiveMessage(new ReceiveMessageRequest()
@@ -103,6 +104,9 @@ class DynamoDBQueueReader[T](val queueOp: DynamoDBQueueOP[T]) extends QueueReade
       res.getMessages.headOption.map { sqsMessage =>
         new DynamoDBMessage(sqsMessage, queueOp, queueOp.bench)
       }
+    }.recoverWith {
+      case t if env.isStopped => Success(None)
+      case t => Failure(t)
     }
   }
 }

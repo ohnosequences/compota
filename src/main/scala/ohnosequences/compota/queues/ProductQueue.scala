@@ -1,6 +1,7 @@
 package ohnosequences.compota.queues
 
 
+import ohnosequences.compota.environment.Env
 import ohnosequences.compota.monoid.Monoid
 import ohnosequences.logging.Logger
 
@@ -66,14 +67,14 @@ case class ProductQueueReader[X, Y, XM <: AnyQueueMessage.of[X], YM <: AnyQueueM
   override type QueueReaderElement = (X, Y)
   override type QueueReaderMessage = ProductMessage[X, Y, XM, YM]
 
-  override def receiveMessage(logger: Logger): Try[Option[QueueReaderMessage]] = {
+  override def receiveMessage(env: Env): Try[Option[QueueReaderMessage]] = {
     if (scala.util.Random.nextBoolean()) {
-      xReader.receiveMessage(logger).map {
+      xReader.receiveMessage(env).map {
         case None => None
         case Some(xmsg) => Some(ProductMessage(Left(xmsg), queueOp.queue.xMonoid, queueOp.queue.yMonoid))
       }
     } else {
-      yReader.receiveMessage(logger).map {
+      yReader.receiveMessage(env).map {
         case None => None
         case Some(ymsg) => Some(ProductMessage(Right(ymsg), queueOp.queue.xMonoid, queueOp.queue.yMonoid))
       }

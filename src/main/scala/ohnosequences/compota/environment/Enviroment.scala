@@ -12,9 +12,7 @@ import scala.util.{Success, Failure, Try}
 case class InstanceId(id: String) {
   override def toString: String = id
 }
-//{
-//  def subInstance(subId: String) = InstanceId(id + "_" + subId)
-//}
+
 
 trait Env {
   val logger: Logger
@@ -28,12 +26,15 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
 
   val environments: ConcurrentHashMap[(InstanceId, Namespace), E]
 
-  def subEnvironmentSync[R](subspaceOrInstance: Either[String, InstanceId], async: Boolean)(statement: E => R): Try[(E, R)]
+  def prepareSubEnvironment[R](subspaceOrInstance: Either[String, InstanceId], async: Boolean)(statement: E => R): Try[(E, R)]
+
+  def subEnvironmentSync[R](subspaceOrInstance: Either[String, InstanceId])(statement: E => R): Try[(E, R)] =
+    prepareSubEnvironment[R](subspaceOrInstance, async = true)(statement)
 
   def threadName: String = instanceId.id + "." + namespace.toString
 
   def subEnvironmentAsync(subspaceOrInstance: Either[String, InstanceId])(statement: E => Unit): Try[E] = {
-    subEnvironmentSync(subspaceOrInstance, async = true) { env =>
+    prepareSubEnvironment(subspaceOrInstance, async = true) { env =>
       executor.execute(new Runnable {
         override def run(): Unit = {
           val oldName = Thread.currentThread().getName
@@ -43,7 +44,6 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
           Try {
             statement(env)
           }
-          //env.reportError()
           env.logger.debug("finishing " + env.threadName)
           env.logger.debug("changing thread name to " + oldName)
           Thread.currentThread().setName(oldName)
@@ -68,6 +68,7 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
   def sendForceUnDeployCommand(reason: String, message: String): Try[Unit]
 
   def stop(recursive: Boolean): Unit
+
   def terminate(): Unit
 
   /**
@@ -75,11 +76,6 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
    * shouldn't do nothing if env is terminated
    */
   def reportError(t: Throwable, namespace: Namespace = namespace): Unit = {
-
-//    val namespace = subSpace match {
-//      case None => anyEnvironment.namespace
-//      case Some(sub) => anyEnvironment.namespace / sub
-//    }
 
     val sb = new StringBuilder
     logger.printThrowable(t, { e =>
@@ -90,7 +86,12 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
 
     val localErrorCount = localErrorCounts.incrementAndGet()
      
-    if (localErrorCount > configuration.errorThreshold) {
+    if (localErrorCount > configuration.localErrorThreshold) {
+      logger.error("reached local error threshold for " + namespace.toString + " [" + localErrorCount + "]")
+      logger.error(t)
+      stop(recursive = true)
+      terminate()
+    } else {
       errorTable.getNamespaceErrorCount(namespace) match {
         case Failure(tt) => {
           logger.error("couldn't retrieve count from error table")
@@ -105,17 +106,14 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
           logger.error(t)
           sendForceUnDeployCommand("error threshold reached", fullMessage)
         }
-        case Success(count) if localErrorCounts.get > configuration.localErrorThreshold => {
-          logger.error("reached local error threshold for " + namespace.toString + " [" + count + "]")
-          logger.error(t)
-          stop(true)
-          terminate()
+        case Success(count) => {
+          logger.error(namespace.toString + " failed " + localErrorCount + " times [" + configuration.localErrorThreshold + "/" + configuration.errorThreshold + "]")
+          logger.debug(t)
+          errorTable.reportError(namespace, System.currentTimeMillis(), instanceId, t.toString, sb.toString())
+          val timeoutMs = (1000 * math.pow(1.2, count)).toLong
+          Thread.sleep(timeoutMs)
         }
       }
-    } else {
-      logger.error(namespace.toString + " failed " + localErrorCount + " times [" + configuration.localErrorThreshold + "/" + configuration.errorThreshold + "]")
-      logger.debug(t)
-      errorTable.reportError(namespace, System.currentTimeMillis(), instanceId, t.toString, sb.toString())
     }
   }
 

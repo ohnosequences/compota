@@ -1,5 +1,6 @@
 package ohnosequences.compota
 
+import ohnosequences.awstools.dynamodb.RepeatConfiguration
 import ohnosequences.compota.environment.InstanceId
 
 import scala.concurrent.duration.Duration
@@ -22,9 +23,11 @@ trait AnyCompotaConfiguration {
 
 
   def localErrorThreshold: Int
-  def errorThreshold: Int
+  def globalErrorThreshold: Int
 
   val loggersPrintToConsole: Boolean = true
+
+  def environmentRepeatConfiguration: RepeatConfiguration
 
 }
 

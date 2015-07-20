@@ -99,7 +99,7 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
           stop(true)
           terminate()
         }
-        case Success(count) if count >= configuration.errorThreshold => {
+        case Success(count) if count >= configuration.globalErrorThreshold => {
           val message = "reached global error threshold for " + namespace.toString
           val fullMessage = message + System.lineSeparator() + stackTrace
           logger.error("reached global error threshold for " + namespace.toString)
@@ -110,8 +110,7 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
           logger.error(namespace.toString + " failed " + localErrorCount + " times [" + configuration.localErrorThreshold + "/" + configuration.errorThreshold + "]")
           logger.debug(t)
           errorTable.reportError(namespace, System.currentTimeMillis(), instanceId, t.toString, sb.toString())
-          val timeoutMs = (1000 * math.pow(1.2, count)).toLong
-          Thread.sleep(timeoutMs)
+          Thread.sleep(configuration.environmentRepeatConfiguration.timeout(count))
         }
       }
     }

@@ -166,14 +166,15 @@ trait AnyCompota {
 
   def deleteManager(env: CompotaEnvironment): Try[Unit]
 
-  def launchTerminationDaemon(queueChecker: QueueChecker[CompotaEnvironment], env: CompotaEnvironment): Try[TerminationDaemon[CompotaEnvironment]] = {
-    startedTime(env).flatMap { t =>
-      val td = new TerminationDaemon[CompotaEnvironment](
-        compota = anyCompota,
-        queueChecker = queueChecker
-      )
-      td.start(env).map { u => td }
-
+  def launchTerminationDaemon(queueChecker: QueueChecker[CompotaEnvironment], env: CompotaEnvironment): Try[CompotaEnvironment] = {
+    env.subEnvironmentAsync(Namespace.terminationDaemon) { env =>
+      startedTime(env).flatMap { t =>
+        val td = new TerminationDaemon[CompotaEnvironment](
+          compota = anyCompota,
+          queueChecker = queueChecker
+        )
+        td.start(env).map { u => td }
+      }
     }
   }
 

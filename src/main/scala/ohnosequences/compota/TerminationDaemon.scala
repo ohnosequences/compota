@@ -32,7 +32,7 @@ class TerminationDaemon[E <: AnyEnvironment[E]](compota: AnyCompota.ofE[E], queu
               env.reportError( new Error("couldn't send force undeploy command", t), env.namespace / "send_force_undeploy")
                 Failure(t)
             }.map { sent =>
-              env.stop(recursive = false)
+              env.stop()
             }
 
           } else {
@@ -55,7 +55,7 @@ class TerminationDaemon[E <: AnyEnvironment[E]](compota: AnyCompota.ofE[E], queu
                       env.reportError(new Error("couldn't send undeploy command", t), env.namespace / "send_undeploy")
                       Failure(t)
                     }.map { success =>
-                      env.stop(recursive = false)
+                      env.stop()
                     }
                   }
                 }

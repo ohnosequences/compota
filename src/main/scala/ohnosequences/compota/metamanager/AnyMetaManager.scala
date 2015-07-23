@@ -125,7 +125,7 @@ trait AnyMetaManager {
 
   def controlQueueContext(env: MetaManagerEnvironment): MetaManagerControlQueueContext
 
-  def process(command: MetaManagerCommand, ctx: AnyProcessContext.of[MetaManagerEnvironment, MetaManagerUnDeployingActionContext]): Try[List[MetaManagerCommand]]
+  def process(command: MetaManagerCommand, commandEnv: MetaManagerEnvironment, ctx: AnyProcessContext.of[MetaManagerEnvironment, MetaManagerUnDeployingActionContext]): Try[List[MetaManagerCommand]]
 
   def launchMetaManager(env: MetaManagerEnvironment): Unit = {
 
@@ -148,26 +148,27 @@ trait AnyMetaManager {
           }
           case Some(message) => {
             logger.debug("parsing message " + message.id)
-            message.getBody.recoverWith { case t =>
-              env.reportError(new Error("couldn't parse message " + message.id + " from control queue", t), env.namespace / Namespace.controlQueue)
-              Failure(t)
-            }.flatMap {
-              case None => {
-                logger.warn("message " + message.id + " is deleted")
-                ctx.controlQueueOp.deleteMessage(message).recoverWith { case t =>
-                  env.reportError(new Error("couldn't delete message " + message.id + " from control queue", t), env.namespace / message.id)
-                  Failure(t)
+
+            env.subEnvironmentAsync(message.id) { env =>
+              message.getBody.recoverWith { case t =>
+                env.reportError(new Error("couldn't parse message " + message.id + " from control queue", t))
+                Failure(t)
+              }.flatMap {
+                case None => {
+                  logger.warn("message " + message.id + " is deleted")
+                  ctx.controlQueueOp.deleteMessage(message).recoverWith { case t =>
+                    env.reportError(new Error("couldn't delete message " + message.id + " from control queue", t))
+                    Failure(t)
+                  }
                 }
-              }
-              case Some(body) if ctx.processingCommands.containsKey(body) => {
-                logger.warn("command " + body.id + " is processing")
-                Success(())
-              }
-              case Some(body) => {
-                env.subEnvironmentSync(Left(body.id)) { env =>
+                case Some(body) if ctx.processingCommands.containsKey(body) => {
+                  logger.warn("command " + body.id + " is processing")
+                  Success(())
+                }
+                case Some(body) => {
                   logger.debug("processing command " + body.id)
                   ctx.processingCommands.put(body, env)
-                  process(body, processContext) match {
+                  process(body, env, processContext) match {
                     case Failure(t) => {
                       ctx.processingCommands.remove(body)
                       //command processing failure
@@ -187,7 +188,7 @@ trait AnyMetaManager {
                       }.flatMap { written =>
                         logger.debug("deleting message: " + message.id)
                         ctx.controlQueueOp.deleteMessage(message).recoverWith { case t =>
-                          env.reportError(new Error("couldn't delete message " + message.id + " from control queue", t), env.namespace / message.id)
+                          env.reportError(new Error("couldn't delete message " + message.id + " from control queue", t))
                           Failure(t)
                         }
                       }

@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import ohnosequences.benchmark.Bench
 import ohnosequences.compota.aws.deployment.Metadata
 import ohnosequences.compota.aws.queues._
+import ohnosequences.compota.environment.Env
 import ohnosequences.compota.serialization.intSerializer
 import ohnosequences.logging.{ConsoleLogger}
 import org.junit.Test
@@ -69,7 +70,7 @@ class QueueTests {
       } else if (idsToRead.isEmpty) {
         Success(())
       } else {
-        reader.receiveMessage(logger).flatMap { messageRaw =>
+        reader.receiveMessage(Env(logger)).flatMap { messageRaw =>
           val message = messageRaw.get
           message.getBody match {
             case Failure(t) => {

@@ -4,6 +4,7 @@ import java.io.File
 
 import com.amazonaws.auth.{InstanceProfileCredentialsProvider, AWSCredentialsProvider}
 import ohnosequences.awstools.autoscaling._
+import ohnosequences.awstools.dynamodb.RepeatConfiguration
 import ohnosequences.awstools.ec2.{InstanceType, InstanceSpecs}
 import ohnosequences.awstools.regions.Region
 import ohnosequences.awstools.s3.ObjectAddress
@@ -35,7 +36,18 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   def localErrorThreshold: Int = 1000
 
-  def globalErrorThresholdPerNameSpace: Int = 20
+  override def consoleHTTPS: Boolean = false
+
+  override def consolePort: Int = 80
+
+  override def environmentRepeatConfiguration: RepeatConfiguration = RepeatConfiguration(
+    attemptThreshold = 100,
+    initialTimeout = Duration(1, SECONDS),
+    timeoutThreshold = Duration(1, MINUTES),
+    coefficient = 1.2
+  )
+
+  override def globalErrorThreshold: Int = 10
 
   def name = metadata.artifact
 
@@ -100,7 +112,6 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   def workerPurchaseModel: PurchaseModel = SpotAuto
 
-  override def errorThreshold: Int = 10
 
 
 

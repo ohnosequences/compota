@@ -35,31 +35,23 @@ class AwsEnvironment(val instanceId: InstanceId,
     }
   }
 
-  override def prepareSubEnvironment[R](subspaceOrInstance: Either[String, InstanceId], async: Boolean)(statement: AwsEnvironment => R): Try[(AwsEnvironment, R)] = {
+
+  override def subEnvironment(subspace: String): Try[AwsEnvironment] = {
     Try {
-      val (newInstance, newNamespace, newLogger, newWorkingDirectory) = subspaceOrInstance match {
-        case Left(subspace) => {
-          val nWorkingDirectory = new File(workingDirectory, subspace)
-          logger.debug("creating working directory: " + nWorkingDirectory.getAbsolutePath)
-          nWorkingDirectory.mkdir()
-          val nNamespace =  namespace / subspace
-          val nLogger = logger match {
-            case s3Logger: S3Logger => {
-              s3Logger.subLogger(subspace, configuration.loggingDestination(instanceId, nNamespace))
-            }
-            case _ => {
-              logger.subLogger(subspace)
-            }
-          }
-          (instanceId, namespace / subspace, nLogger, nWorkingDirectory)
+      val newWorkingDirectory = new File(workingDirectory, subspace)
+      logger.debug("creating working directory: " + newWorkingDirectory.getAbsolutePath)
+      newWorkingDirectory.mkdir()
+      val newNamespace = namespace / subspace
+      val newLogger = logger match {
+        case s3Logger: S3Logger => {
+          s3Logger.subLogger(subspace, configuration.loggingDestination(instanceId, newNamespace))
         }
-        case Right(instance) => {
-          logger.warn("custom instances are not supported by AwsEnvironment")
-          (instanceId, namespace, logger, workingDirectory)
+        case _ => {
+          logger.subLogger(subspace)
         }
       }
       new AwsEnvironment(
-        instanceId = newInstance,
+        instanceId = instanceId,
         namespace = newNamespace,
         configuration = configuration,
         awsClients = awsClients,
@@ -72,18 +64,9 @@ class AwsEnvironment(val instanceId: InstanceId,
         originEnvironment = Some(awsEnvironment),
         localErrorCounts = localErrorCounts
       )
-    }.flatMap { env =>
-      environments.put((env.instanceId, env.namespace), env)
-      val res = Try {
-        logger.info(environments.toString)
-        (env, statement(env))
-      }
-      if (!async) {
-        environments.remove((env.instanceId, env.namespace))
-      }
-      res
     }
   }
+
 
   def createDynamoDBContext: DynamoDBContext = {
     DynamoDBContext(awsClients, configuration.metadata, logger)
@@ -95,11 +78,8 @@ class AwsEnvironment(val instanceId: InstanceId,
 
   override def isStopped: Boolean = isStoppedFlag.get()
 
-  override def stop(recursive: Boolean): Unit = {
+  override def stop(): Unit = {
     isStoppedFlag.set(true)
-    if (recursive) {
-      environments.foreach { case ((i, n), e) => e.stop(false)}
-    }
   }
 }
 

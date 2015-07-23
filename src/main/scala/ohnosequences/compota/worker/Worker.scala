@@ -88,34 +88,35 @@ class Worker[In, Out, Env <: AnyEnvironment[Env], InContext, OutContext, IQ <: A
       } else {
         logger.debug("receiving message from queue " + inputQueue.name)
         queueReader.waitForMessage(env).recoverWith { case t =>
-          env.reportError(new Error("couldn't receive message from the queue " + inputQueue.name, t), env.namespace / "receive_message")
+          env.reportError(new Error("couldn't receive message from the queue " + inputQueue.name, t), Namespace(inputQueue.name) / "receive_message")
           Failure(t)
         }.foreach {
-          case None => ()
+          case None => {
+            //terminated
+            ()
+          }
           case Some(message) =>
-            logger.debug("parsing the message " + message.id)
-            message.getBody.recoverWith { case t =>
-              env.reportError(new Error("couldn't parse the message " + message.id + " from the queue " + inputQueue.name, t), env.namespace / message.id)
-              Failure(t)
-            }.flatMap {
-              case None => {
-                logger.warn("message " + message.id + " deleted")
-                inputQueueOp.deleteMessage(message).recoverWith { case t =>
-                  env.reportError(new Error("couldn't delete message " + message.id + " from the queue " + inputQueue.name, t), env.namespace / message.id)
-                  Failure(t)
+            env.subEnvironmentSync(message.id) { env =>
+              val logger = env.logger
+              logger.debug("parsing the message " + message.id)
+              message.getBody.recoverWith { case t =>
+                env.reportError(new Error("couldn't parse the message " + message.id + " from the queue " + inputQueue.name, t))
+                Failure(t)
+              }.flatMap {
+                case None => {
+                  logger.warn("message " + message.id + " deleted")
+                  inputQueueOp.deleteMessage(message).recoverWith { case t =>
+                    env.reportError(new Error("couldn't delete message " + message.id + " from the queue " + inputQueue.name, t))
+                    Failure(t)
+                  }
                 }
-              }
-              case Some(input) =>
-                logger.info("received: " + input.toString.take(100) + " id: " + message.id)
-
-                env.subEnvironmentSync(Left(message.id)) { env =>
-                  val logger = env.logger
-
+                case Some(input) =>
+                  logger.info("received: " + input.toString.take(100) + " id: " + message.id)
                   logger.debug("running " + nisperoName + " instructions")
                   Try {
                     instructions.solve(env, instructionsContext, input)
                   }.flatMap { e => e }.recoverWith { case t =>
-                    env.reportError(new Error("instructions error", t), env.namespace / message.id)
+                    env.reportError(new Error("instructions error", t), env.namespace)
                     Failure(t)
                   }.flatMap { output =>
                     logger.info("result: " + output.toString().take(100))
@@ -123,12 +124,12 @@ class Worker[In, Out, Env <: AnyEnvironment[Env], InContext, OutContext, IQ <: A
                     logger.debug("writing result to queue " + outputQueue.name + " with message id " + newId)
 
                     queueWriter.writeMessages(newId, output).recoverWith { case t =>
-                      env.reportError(new Error("couldn't write message " + newId + " to the queue " + outputQueue.name, t), env.namespace / newId)
+                      env.reportError(new Error("couldn't write message " + newId + " to the queue " + outputQueue.name, t))
                       Failure(t)
                     }.flatMap { written =>
                       logger.debug("deleting message with id " + message.id + " from queue " + inputQueue.name)
                       inputQueueOp.deleteMessage(message).recoverWith { case t =>
-                        env.reportError(new Error("couldn't delete message " + message.id + " from the queue " + inputQueue.name, t), env.namespace / message.id)
+                        env.reportError(new Error("couldn't delete message " + message.id + " from the queue " + inputQueue.name, t))
                         Failure(t)
                       }
                       logger.debug("cleaning working directory: " + env.workingDirectory)
@@ -136,7 +137,7 @@ class Worker[In, Out, Env <: AnyEnvironment[Env], InContext, OutContext, IQ <: A
                       Success(())
                     }
                   }
-                }
+              }
             }
         }
         messageLoopRec()

@@ -112,9 +112,9 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
           </td>
         </tr>
         <tr>
-          <td class="col-md-6">error threshold</td>
+          <td class="col-md-6">global error threshold</td>
           <td class="col-md-6">
-            {localCompota.configuration.errorThreshold}
+            {localCompota.configuration.globalErrorThreshold}
           </td>
         </tr>
       </tbody>

@@ -15,7 +15,7 @@ resolvers := Seq[Resolver](
 libraryDependencies ++= Seq(
   "commons-io"      %  "commons-io"               % "2.4",
   "org.json4s"      %% "json4s-native"            % "3.2.11",
-  "ohnosequences"   %% "aws-scala-tools"          % "0.13.1-SNAPSHOT",
+  "ohnosequences"   %% "aws-scala-tools"          % "0.13.2-SNAPSHOT",
   "net.databinder"  %% "unfiltered-filter"        % "0.8.4",
   "net.databinder"  %% "unfiltered-netty"         % "0.8.4",
   "net.databinder"  %% "unfiltered-netty-server"  % "0.8.4"

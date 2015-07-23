@@ -50,7 +50,9 @@ abstract class AnyConsole {
 
   def sidebar: NodeSeq
 
-  def isHTTPS = true
+  def port: Int
+
+  def isHttps: Boolean
 
   def errorsPage: NodeSeq
 
@@ -176,7 +178,9 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
 
   override def password: String = compota.configuration.consolePassword
 
-  override def isHTTPS: Boolean = compota.configuration.consoleHTTPS
+  override def port: Int = compota.configuration.consolePort
+
+  override def isHttps: Boolean = compota.configuration.consoleHTTPS
 
   def compotaInfoPage: NodeSeq = {
     compotaInfoPageHeader ++ compotaInfoPageDetailsTable ++ compotaControlQueueDetails

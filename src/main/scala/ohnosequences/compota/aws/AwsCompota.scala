@@ -45,7 +45,7 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
             env.logger.info("log uploader is disabled")
           }
           case Some(loggerDestination) => {
-            env.subEnvironmentAsync(Left(Namespace.logUploader)) { logEnv =>
+            env.subEnvironmentAsync(Namespace.logUploader) { logEnv =>
               @tailrec
               def launchLogUploaderRec(timeout: Duration = configuration.logUploaderTimeout): Unit = {
                 if (env.isStopped) {
@@ -74,21 +74,23 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
   }
 
   override def launchConsole(nisperoGraph: QueueChecker[CompotaEnvironment], controlQueue: AnyQueueOp, env: CompotaEnvironment): Try[AnyConsole] = {
-    Try {
+    Success(()).flatMap { u =>
       //todo move to separated command
 
       env.awsClients.s3.createBucket(configuration.resultsBucket)
       env.awsClients.s3.createBucket(configuration.loggerBucket)
 
       val console = new AwsConsole[CompotaNispero](awsCompota, env, controlQueue, nisperoGraph)
-      val currentAddress = env.awsClients.ec2.getCurrentInstance.flatMap {_.getPublicDNS()}.getOrElse("<undefined>")
+      val currentAddress = env.awsClients.ec2.getCurrentInstance.flatMap {
+        _.getPublicDNS()
+      }.getOrElse("<undefined>")
       val server = new UnfilteredConsoleServer(console, currentAddress)
-      server.start()
-
-      val message = server.startedMessage(customMessage)
-      env.logger.info("sending notification" + configuration.name + " started")
-      sendNotification(env, configuration.name + " started", message)
-      console
+      server.start().map { s =>
+        val message = s.startedMessage(customMessage)
+        env.logger.info("sending notification" + configuration.name + " started")
+        sendNotification(env, configuration.name + " started", message)
+        console
+      }
     }
   }
 
@@ -287,7 +289,7 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
     Try {
       deleteManager(env)
     }
-    env.stop(true)
+    env.stop()
     env.terminate()
     Success(())
   }

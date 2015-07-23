@@ -65,6 +65,7 @@ trait AnyQueueReader {
     @tailrec
     def waitForMessageRep(attempt: Int, timeout: Long): Try[Option[QueueReaderMessage]] = {
       if (env.isStopped) {
+        env.logger.debug("waiting from the queue " + queueOp.queue.name + " cancelled")
         Success(None)
       } else {
         Try {
@@ -77,7 +78,7 @@ trait AnyQueueReader {
             Failure(t)
           }
           case Success(None) => {
-            env.logger.debug("queue reader for " + queueOp.queue.name + " waiting for message")
+            env.logger.debug("queue reader for " + queueOp.queue.name + " waiting for message [for " + timeout + " ms]")
             Thread.sleep(timeout)
             waitForMessageRep(attempt + 1, repeatConfiguration.nextTimeout(timeout))
           }
@@ -135,8 +136,10 @@ trait AnyQueue { queue =>
   type QueueElement
 
   val repeatConfiguration: RepeatConfiguration = RepeatConfiguration(
-    timeoutThreshold = Duration(100, DAYS),
-    coefficient = 1.3
+    attemptThreshold = Int.MaxValue,
+    initialTimeout = Duration(1, SECONDS),
+    timeoutThreshold = Duration(2, MINUTES),
+    coefficient = 1.2
   )
 
   type QueueQueueMessage <: AnyQueueMessage.of[QueueElement]

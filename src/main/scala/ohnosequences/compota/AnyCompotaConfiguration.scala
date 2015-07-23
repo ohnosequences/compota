@@ -17,6 +17,7 @@ trait AnyCompotaConfiguration {
   def deleteErrorQueue: Boolean
   def consolePassword: String = "compota"
   def consoleHTTPS: Boolean = false
+  def consolePort: Int = 9000
   def consoleInstancePageSize = 10
   def consoleMessagePageSize = 10
   def consoleErrorsPageSize = 10

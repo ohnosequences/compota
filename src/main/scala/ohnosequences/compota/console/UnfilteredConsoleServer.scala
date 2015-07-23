@@ -48,8 +48,8 @@ case class HtmlCustom(s: String) extends ComposeResponse[Any](HtmlContent ~> Res
 
 @io.netty.channel.ChannelHandler.Sharable
 class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
-                                                                  with SynchronousExecution
-                                                                  with ServerErrorResponse {
+with SynchronousExecution
+with ServerErrorResponse {
   val logger = console.logger
 
   def intent = AuthWithLogging(users, logger) {
@@ -100,11 +100,11 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
       ResponseString("ok")
     }
 
-    case GET(Path(Seg("queue" :: queueName ::  "messages" :: Nil))) => {
+    case GET(Path(Seg("queue" :: queueName :: "messages" :: Nil))) => {
       ResponseString(console.printMessages(queueName, None).toString())
     }
 
-    case GET(Path(Seg("queue" :: queueName ::  "messages" :: lastToken :: Nil))) => {
+    case GET(Path(Seg("queue" :: queueName :: "messages" :: lastToken :: Nil))) => {
       ResponseString(console.printMessages(queueName, Some(lastToken)).toString())
     }
 
@@ -128,11 +128,11 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
       ResponseString(console.stackTraceInstance(id, namespace).toString)
     }
 
-    case GET(Path(Seg("instance" ::  "terminate" :: id :: namespace))) => {
+    case GET(Path(Seg("instance" :: "terminate" :: id :: namespace))) => {
       ResponseString(console.terminateInstance(id, namespace).toString)
     }
 
-    case GET(Path(Seg("queue" :: queueName ::  "message" :: id :: Nil))) => {
+    case GET(Path(Seg("queue" :: queueName :: "message" :: id :: Nil))) => {
       console.getMessage(queueName, id) match {
         case Failure(t) => ResponseString(t.toString)
         case Success(Left(url)) => Redirect(url.toString)
@@ -154,11 +154,11 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
       }
     }
 
-    case GET(Path(Seg("nispero" :: nispero :: "workers" ::  Nil))) => {
+    case GET(Path(Seg("nispero" :: nispero :: "workers" :: Nil))) => {
       ResponseString(console.printWorkers(nispero, None).toString())
     }
 
-    case GET(Path(Seg("nispero" :: nispero :: "workers" ::  lastToken :: Nil))) => {
+    case GET(Path(Seg("nispero" :: nispero :: "workers" :: lastToken :: Nil))) => {
       ResponseString(console.printWorkers(nispero, Some(lastToken)).toString())
     }
 
@@ -197,7 +197,7 @@ class ConsolePlan(users: Users, console: AnyConsole) extends Plan with Secured
     }
 
     case GET(Path("/main.css")) => {
-     // val main = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/console/main.css")).mkString
+      // val main = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/console/main.css")).mkString
       CssContent ~> ResponseString(console.mainCSS)
     }
   }
@@ -210,6 +210,7 @@ class UnfilteredConsoleServer(console: AnyConsole, currentAddress: String) {
 
   object users extends Users {
     val userName = "compota"
+
     override def auth(u: String, p: String): Boolean = userName.equals(u) && p.equals(console.password)
   }
 
@@ -218,11 +219,11 @@ class UnfilteredConsoleServer(console: AnyConsole, currentAddress: String) {
     Runtime.getRuntime().halt(0)
   }
 
-//  def currentAddress: String = {
-//    aws.ec2.getCurrentInstance.flatMap {_.getPublicDNS()}.getOrElse("<undefined>")
-//  }
+  //  def currentAddress: String = {
+  //    aws.ec2.getCurrentInstance.flatMap {_.getPublicDNS()}.getOrElse("<undefined>")
+  //  }
 
-  def printURL(domain: String): String = console.isHTTPS match {
+  def printURL(domain: String): String = console.isHttps match {
     case true => "https://" + domain
     case false => "http://" + domain
   }
@@ -232,7 +233,7 @@ class UnfilteredConsoleServer(console: AnyConsole, currentAddress: String) {
     message.append("console address: " + printURL(currentAddress) + System.lineSeparator())
     message.append("user: " + users.userName + System.lineSeparator())
     message.append("password: " + console.password + System.lineSeparator())
-    if(!customInfo.isEmpty) {
+    if (!customInfo.isEmpty) {
       message.append(System.lineSeparator())
       message.append(System.lineSeparator())
       message.append(customInfo)
@@ -241,33 +242,35 @@ class UnfilteredConsoleServer(console: AnyConsole, currentAddress: String) {
   }
 
 
-  def start() {
-
-    console.logger.info("starting console server")
-
-    try {
-      val server: Server = if (console.isHTTPS) {
-        unfiltered.netty.Server.https(port = 443, ssl = SslContextProvider.selfSigned(new io.netty.handler.ssl.util.SelfSignedCertificate)).handler(new ConsolePlan(users, console))
+  def start(): Try[UnfilteredConsoleServer] = {
+    Try {
+      console.logger.info("starting console server")
+      val server: Server = if (console.isHttps) {
+        unfiltered.netty.Server.https(port = console.port, ssl = SslContextProvider.selfSigned(new io.netty.handler.ssl.util.SelfSignedCertificate)).handler(new ConsolePlan(users, console))
       } else {
-        unfiltered.netty.Server.http(port = 80).handler(new ConsolePlan(users, console))
+        unfiltered.netty.Server.http(port = console.port).handler(new ConsolePlan(users, console))
       }
       //Starts server in the background
       server.start()
-      console.logger.info("console server started on port " + server.ports.head)
-
-    } catch {
-      case t: Throwable => {
-        val server = if(console.isHTTPS) {
-          unfiltered.netty.Server.https(443, "localhost", ssl = SslContextProvider.selfSigned(new io.netty.handler.ssl.util.SelfSignedCertificate)).handler(new ConsolePlan(users, console))
+      server
+    }.recoverWith { case t =>
+      console.logger.warn("binding to default host failed, trying to bind to localhost")
+      Try {
+        val server = if (console.isHttps) {
+          unfiltered.netty.Server.https(port = console.port, "localhost", ssl = SslContextProvider.selfSigned(new io.netty.handler.ssl.util.SelfSignedCertificate)).handler(new ConsolePlan(users, console))
         } else {
-          unfiltered.netty.Server.http(80, "localhost").handler(new ConsolePlan(users, console))
+          unfiltered.netty.Server.http(port = console.port, "localhost").handler(new ConsolePlan(users, console))
         }
         //Starts server in the background
         server.start()
-        console.logger.info("console server started on port " + server.ports.head)
-
+        server
+      }
+    } match {
+      case Failure(t) => Failure(new Error("failed to start console server", t))
+      case Success(s) => {
+        console.logger.info("console server started on port " + s.ports.head)
+        Success(UnfilteredConsoleServer.this)
       }
     }
   }
-
 }

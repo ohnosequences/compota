@@ -31,6 +31,7 @@ class AwsMetaManager[U](val compota: AnyAwsCompota.of[U]) extends BaseMetaManage
     visibilityTimeout = compota.configuration.controlQueueVisibilityTimeout)
 
   override def process(command: BaseMetaManagerCommand,
+                       commandEnv: MetaManagerEnvironment,
                        ctx: AnyProcessContext.of[MetaManagerEnvironment, MetaManagerUnDeployingActionContext]
                       ): Try[List[BaseMetaManagerCommand]] = {
     command match {
@@ -46,7 +47,7 @@ class AwsMetaManager[U](val compota: AnyAwsCompota.of[U]) extends BaseMetaManage
 //          }
 //        }
 //      }
-      case c => super.process(c, ctx)
+      case c => super.process(c, commandEnv, ctx)
     }
   }
 

@@ -1,10 +1,7 @@
 package ohnosequences.compota.metamanager
 
-import ohnosequences.compota.metamanager.UnDeployMetaManger
 import ohnosequences.compota.{Namespace, TerminationDaemon}
-import ohnosequences.compota.console.AnyConsole
-import ohnosequences.compota.graphs.QueueChecker
-import ohnosequences.compota.queues.AnyQueueOp
+
 
 import scala.util.{Failure, Success, Try}
 
@@ -26,6 +23,7 @@ trait BaseMetaManager extends AnyMetaManager {
   }
 
   override def process(command: BaseMetaManagerCommand,
+                       comamndEnv: MetaManagerEnvironment,
                        ctx: AnyProcessContext.of[MetaManagerEnvironment, MetaManagerUnDeployingActionContext]
                         ): Try[List[BaseMetaManagerCommand]] = {
     val env = ctx.env
@@ -37,26 +35,19 @@ trait BaseMetaManager extends AnyMetaManager {
     command match {
 
       case LaunchConsole => {
-
-        env.subEnvironmentAsync(Left(Namespace.console)) { env =>
-          compota.launchConsole(queueChecker, controlQueueOp, env)
-         // SendNotification(compota.configuration.name + " started", message)
-        }.map { env =>
+        compota.launchConsole(queueChecker, controlQueueOp, env).map { env =>
           List[BaseMetaManagerCommand](LaunchTerminationDaemon)
         }
       }
 
       case SendNotification(subject, message) => {
-
         compota.sendNotification(env, subject, message).map { res =>
           List[BaseMetaManagerCommand]()
         }
       }
 
       case LaunchTerminationDaemon => {
-        env.subEnvironmentAsync(Left(Namespace.terminationDaemon)) { env =>
-          compota.launchTerminationDaemon(queueChecker, env)
-        }.map { tEnv =>
+        compota.launchTerminationDaemon(queueChecker, env).map { env =>
           List[BaseMetaManagerCommand](AddTasks)
         }
       }
@@ -69,9 +60,9 @@ trait BaseMetaManager extends AnyMetaManager {
           } else {
             logger.info("adding tasks")
             //todo give user access to writers
-//            val queueWriters: Map[String, AnyQueue ctx.queueOps.map { queueOp =>
-//              (queueOp.queue, queueOp.writer.get)
-//            }.toMap
+            //            val queueWriters: Map[String, AnyQueue ctx.queueOps.map { queueOp =>
+            //              (queueOp.queue, queueOp.writer.get)
+            //            }.toMap
 
 
             compota.addTasks(env).map { res =>
@@ -131,11 +122,6 @@ trait BaseMetaManager extends AnyMetaManager {
         Success(List(DeleteNisperoWorkers(0)))
       }
 
-//      case UnDeploy(reason, force) => {
-//        logger.info("undeploying reason: " + reason + " force: " + force)
-//        Success(List(DeleteNisperoWorkers(0, reason, force)))
-//      }
-
       case DeleteNisperoWorkers(index) if index < compota.nisperos.size => {
         val nispero = compota.nisperos(index)
         Try {
@@ -149,7 +135,7 @@ trait BaseMetaManager extends AnyMetaManager {
         Success(List(ReduceQueue(0)))
       }
 
-      case ReduceQueue(index) if index < queueOps.size  => {
+      case ReduceQueue(index) if index < queueOps.size => {
         val queueOp = queueOps(index)
         Success(()).flatMap { u =>
           logger.info("reducing queue " + queueOp)
@@ -204,7 +190,7 @@ trait BaseMetaManager extends AnyMetaManager {
             compota.sendNotification(env, compota.configuration.name + " finished", "reason: " + reason + System.lineSeparator() + message)
             controlQueueOp.delete()
             compota.deleteManager(env)
-            env.stop(recursive = true)
+            env.stop()
             env.terminate()
           }
 

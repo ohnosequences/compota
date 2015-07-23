@@ -26,27 +26,44 @@ class LocalEnvironment(val instanceId: InstanceId,
 
   val isStoppedFlag = new java.util.concurrent.atomic.AtomicBoolean(false)
 
-  override def prepareSubEnvironment[R](subspaceOrInstance: Either[String, InstanceId], async: Boolean)(statement: LocalEnvironment => R): Try[(LocalEnvironment, R)] = {
+
+  override def subEnvironment(subspace: String): Try[LocalEnvironment] = {
     Try {
-      val (newInstance, newNamespace, newLogger, newWorkingDirectory) = subspaceOrInstance match {
-        case Left(subspace) => {
-          val nWorkingDirectory = new File(workingDirectory, subspace)
-          logger.debug("creating working directory: " + nWorkingDirectory.getAbsolutePath)
-          nWorkingDirectory.mkdir()
-          val nLogger = logger.subLogger(subspace)
-          (instanceId, namespace / subspace, nLogger, nWorkingDirectory)
-        }
-        case Right(instance) => {
-          val nWorkingDirectory = new File(workingDirectory, instanceId.id)
-          logger.debug("creating working directory: " + nWorkingDirectory.getAbsolutePath)
-          nWorkingDirectory.mkdir()
-          val nLogger = logger.subLogger(instance.id)
-          (instance, Namespace.root, nLogger, nWorkingDirectory)
-        }
-      }
+      val newWorkingDirectory = new File(workingDirectory, subspace)
+      logger.debug("creating working directory: " + newWorkingDirectory.getAbsolutePath)
+      newWorkingDirectory.mkdir()
       new LocalEnvironment(
-        instanceId = newInstance,
-        namespace = newNamespace,
+        instanceId = instanceId,
+        namespace = namespace / subspace,
+        workingDirectory = newWorkingDirectory,
+        logger = logger.subLogger(subspace),
+        executor = executor,
+        errorTable = errorTable,
+        configuration = configuration,
+        sendForceUnDeployCommand0 = sendForceUnDeployCommand0,
+        environments = environments,
+        originEnvironment = Some(localEnvironment),
+        localErrorCounts = localErrorCounts
+      )
+    }
+  }
+
+  def subEnvironment(instanceId: InstanceId): Try[LocalEnvironment] = {
+    Try {
+      val newWorkingDirectory = new File(configuration.workingDirectory, instanceId.id)
+      logger.debug("creating working directory: " + newWorkingDirectory.getAbsolutePath)
+      newWorkingDirectory.mkdir()
+
+      val newLogger = FileLogger(instanceId.id,
+        new File(configuration.loggingDirectory, instanceId.id),
+        "log.txt",
+        configuration.loggerDebug,
+        printToConsole = configuration.loggersPrintToConsole
+      ).get
+
+      new LocalEnvironment(
+        instanceId = instanceId,
+        namespace = Namespace.root,
         workingDirectory = newWorkingDirectory,
         logger = newLogger,
         executor = executor,
@@ -57,15 +74,6 @@ class LocalEnvironment(val instanceId: InstanceId,
         originEnvironment = Some(localEnvironment),
         localErrorCounts = localErrorCounts
       )
-    }.flatMap { env =>
-      environments.put((env.instanceId, env.namespace), env)
-      val res = Try {
-        (env, statement(env))
-      }
-      if (!async) {
-        environments.remove((env.instanceId, env.namespace))
-      }
-      res
     }
   }
 
@@ -77,11 +85,8 @@ class LocalEnvironment(val instanceId: InstanceId,
 
   override def isStopped: Boolean = isStoppedFlag.get()
 
-  override def stop(recursive: Boolean): Unit ={
+  override def stop(): Unit ={
     isStoppedFlag.set(true)
-    if (recursive) {
-      environments.foreach { case ((i, n), e) => e.stop(false)}
-    }
   }
 
   def sendForceUnDeployCommand(reason: String, message: String): Try[Unit] = sendForceUnDeployCommand0(localEnvironment, reason, message)

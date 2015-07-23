@@ -16,41 +16,73 @@ case class InstanceId(id: String) {
 
 trait Env {
   val logger: Logger
+
   def isStopped: Boolean
+
   val workingDirectory: File
 }
 
-abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironment =>
+object Env {
+  def apply(logger: Logger): Env = new Env {
+    override def isStopped: Boolean = false
+
+    override val workingDirectory: File = new File(".")
+    override val logger: Logger = logger
+  }
+}
+
+abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env {
+  anyEnvironment =>
 
   def originEnvironment: Option[E]
 
   val environments: ConcurrentHashMap[(InstanceId, Namespace), E]
 
-  def prepareSubEnvironment[R](subspaceOrInstance: Either[String, InstanceId], async: Boolean)(statement: E => R): Try[(E, R)]
+  def subEnvironment(subspace: String): Try[E]
 
-  def subEnvironmentSync[R](subspaceOrInstance: Either[String, InstanceId])(statement: E => R): Try[(E, R)] =
-    prepareSubEnvironment[R](subspaceOrInstance, async = true)(statement)
+  def subEnvironmentSync[R](subspace: String)(statement: E => R): Try[(E, R)] = {
+    subEnvironment(subspace).flatMap { env =>
+      runSubEnvironmentSync(env)(statement)
+    }
+  }
 
-  def threadName: String = instanceId.id + "." + namespace.toString
+  def runSubEnvironmentSync[R](env: E)(statement: E => R): Try[(E, R)] = {
+    environments.put((env.instanceId, env.namespace), env)
+    val res = Try {
+      (env, statement(env))
+    }
+    environments.remove((env.instanceId, env.namespace))
+    res
+  }
 
-  def subEnvironmentAsync(subspaceOrInstance: Either[String, InstanceId])(statement: E => Unit): Try[E] = {
-    prepareSubEnvironment(subspaceOrInstance, async = true) { env =>
+  def runSubEnvironmentAsync(env: E)(statement: E => Unit): Try[E] = {
+    Try {
       executor.execute(new Runnable {
         override def run(): Unit = {
           val oldName = Thread.currentThread().getName
           env.logger.debug("changing thread name from " + Thread.currentThread().getName + " to " + env.threadName)
           Thread.currentThread().setName(env.threadName)
-          env.logger.debug("new name: " + Thread.currentThread().getName)
-          Try {
-            statement(env)
+          env.logger.debug("new thread name: " + Thread.currentThread().getName)
+          environments.put((env.instanceId, env.namespace), env)
+          val res = Try {
+            (env, statement(env))
           }
-          env.logger.debug("finishing " + env.threadName)
+          environments.remove((env.instanceId, env.namespace))
+          env.logger.debug("environment " + env.threadName + " finished")
           env.logger.debug("changing thread name to " + oldName)
           Thread.currentThread().setName(oldName)
-          env.environments.remove((env.instanceId, env.namespace))
         }
       })
-    }.map(_._1)
+      env
+    }
+  }
+
+  def threadName: String = instanceId.id + "." + namespace.toString
+
+  def subEnvironmentAsync(subspace: String)(statement: E => Unit): Try[E] = {
+    subEnvironment(subspace).flatMap { env =>
+      runSubEnvironmentAsync(env)(statement)
+    }
   }
 
   def instanceId: InstanceId
@@ -67,7 +99,7 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
 
   def sendForceUnDeployCommand(reason: String, message: String): Try[Unit]
 
-  def stop(recursive: Boolean): Unit
+  def stop(): Unit
 
   def terminate(): Unit
 
@@ -85,18 +117,18 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
     val stackTrace = sb.toString()
 
     val localErrorCount = localErrorCounts.incrementAndGet()
-     
+
     if (localErrorCount > configuration.localErrorThreshold) {
       logger.error("reached local error threshold for " + namespace.toString + " [" + localErrorCount + "]")
       logger.error(t)
-      stop(recursive = true)
+      stop()
       terminate()
     } else {
       errorTable.getNamespaceErrorCount(namespace) match {
         case Failure(tt) => {
           logger.error("couldn't retrieve count from error table")
           errorTable.recover()
-          stop(true)
+          stop()
           terminate()
         }
         case Success(count) if count >= configuration.globalErrorThreshold => {
@@ -107,7 +139,8 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env { anyEnvironme
           sendForceUnDeployCommand("error threshold reached", fullMessage)
         }
         case Success(count) => {
-          logger.error(namespace.toString + " failed " + localErrorCount + " times [" + configuration.localErrorThreshold + "/" + configuration.errorThreshold + "]")
+          logger.error(namespace.toString + " failed " + localErrorCount +
+            " times [" + configuration.localErrorThreshold + "/" + configuration.globalErrorThreshold + "]")
           logger.debug(t)
           errorTable.reportError(namespace, System.currentTimeMillis(), instanceId, t.toString, sb.toString())
           Thread.sleep(configuration.environmentRepeatConfiguration.timeout(count))

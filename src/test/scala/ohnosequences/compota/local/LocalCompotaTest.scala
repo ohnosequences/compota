@@ -55,8 +55,6 @@ object wordCountCompotaConfiguration extends AnyLocalCompotaConfiguration {
   override val timeout= Duration(1000, SECONDS)
   override val terminationDaemonIdleTime =  Duration(10, SECONDS)
   override val visibilityTimeout: Duration = Duration(60, SECONDS)
-
-  override def errorThreshold: Int = 3
 }
 
 object splitNispero extends LocalNisperoLocal (
@@ -131,14 +129,14 @@ class LocalCompotaTest {
       env.logger.info("waiting")
       env.logger.info(metaManager.controlQueue.rawQueue.toString)
       env.logger.info(metaManager.controlQueue.rawQueueP.toString)
-      //Thread.sleep(5000)
+//      Thread.sleep(2 * 60 * 1000)
       Success("message context = " +context)
 
     }
   }
 
 
- // @Test
+  @Test
   def localCompotaTest(): Unit = {
     val cliLogger = new ConsoleLogger("localCompotaTest")
     wordLenghtCompota.localEnvironment(cliLogger, List[String]()).flatMap { env =>

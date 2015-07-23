@@ -49,13 +49,13 @@ Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp
         <tr>
           <td class="col-md-6">local error threshold</td>
           <td class="col-md-6">
-            {awsCompota.configuration.errorThreshold}
+            {awsCompota.configuration.localErrorThreshold}
           </td>
         </tr>
         <tr>
           <td class="col-md-6">global error threshold</td>
           <td class="col-md-6">
-            {awsCompota.configuration.globalErrorThresholdPerNameSpace}
+            {awsCompota.configuration.globalErrorThreshold}
           </td>
         </tr>
       </tbody>

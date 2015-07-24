@@ -110,7 +110,7 @@ trait AnyCompota {
           }
         }.recoverWith { case t =>
           logger.error(new Error("configuration checks failed", t))
-          t.printStackTrace()
+          logger.error(t, stackThreshold = 3)
           Failure(t)
         }
       }

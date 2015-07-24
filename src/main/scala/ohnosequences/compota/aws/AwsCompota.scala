@@ -96,7 +96,7 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
 
   override def initialEnvironment: Try[AwsEnvironment] = {
 
-    val awsClients = AWSClients.create(configuration.localAwsCredentialsProvider, configuration.awsRegion)
+    val awsClients = AWSClients.create(configuration.instanceAwsCredentialsProvider, configuration.awsRegion)
 
     val ec2InstanceId = awsClients.ec2.getCurrentInstanceId.getOrElse("unknown_" + System.currentTimeMillis())
     configuration.workingDirectory.mkdir()
@@ -146,7 +146,7 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
         configuration = configuration,
         awsClients = awsClients,
         logger = cliLogger,
-        workingDirectory = new File("."),
+        workingDirectory = new File("compota"),
         executor = Executors.newCachedThreadPool(),
         errorTable = new LocalErrorTable,
         sendForceUnDeployCommand0 = sendForceUnDeployCommand,
@@ -184,12 +184,11 @@ trait AnyAwsCompota extends AnyCompota { awsCompota =>
                 } else {
                   env.logger.info("checking ssh key pair")
                   if(configuration.keyName.isEmpty) {
-                    Failure(new Error("ssh key pais is not specified"))
+                    Failure(new Error("ssh key pair is not specified"))
                   } else {
-                    if (!nisperos.forall(!_.configuration.workerAutoScalingGroup.launchingConfiguration.instanceSpecs.keyName.isEmpty)) {
-                      Failure(new Error("ssh key pais is not specified"))
-                    } else {
-                      Success(true)
+                    nisperos.find(_.configuration.workerAutoScalingGroup.launchingConfiguration.instanceSpecs.keyName.isEmpty) match {
+                      case Some(n) => Failure(new Error("ssh key pair is not specified for nispero: " + n.configuration.name))
+                      case None => Success(true)
                     }
                   }
                 }

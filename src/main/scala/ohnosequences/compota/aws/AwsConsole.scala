@@ -25,58 +25,13 @@ Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp
 
   import ohnosequences.compota.console.GeneralComponents._
 
-  override def compotaInfoPageDetailsTable: NodeSeq = {
-    <table class="table table-striped topMargin20">
-      <tbody>
-        <tr>
-          <td class="col-md-6">metamanager auto scaling group</td>
-          <td class="col-md-6">
-            {awsCompota.configuration.managerAutoScalingGroup.name}
-          </td>
-        </tr>
-        <tr>
-          <td class="col-md-6">metamanager instance type</td>
-          <td class="col-md-6">
-            {awsCompota.configuration.managerAutoScalingGroup.launchingConfiguration.instanceSpecs.instanceType.toString}
-          </td>
-        </tr>
-        <tr>
-          <td class="col-md-6">timeout</td>
-          <td class="col-md-6">
-            {awsCompota.configuration.timeout.toMinutes + " mins"}
-          </td>
-        </tr>
-        <tr>
-          <td class="col-md-6">local error threshold</td>
-          <td class="col-md-6">
-            {awsCompota.configuration.localErrorThreshold}
-          </td>
-        </tr>
-        <tr>
-          <td class="col-md-6">global error threshold</td>
-          <td class="col-md-6">
-            {awsCompota.configuration.globalErrorThreshold}
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
-  }
-
-  def metamanagerInfo(): NodeSeq = {
-    <h3>Metamanager autoscaling group</h3>
-    <table class="table table-striped topMargin20">
-      <tbody>
-        {autoScalingGroupInfo(awsCompota.configuration.managerAutoScalingGroup)}
-      </tbody>
-    </table>
-  }
 
 
   class AwsInstanceInfo(instanceInfo: com.amazonaws.services.autoscaling.model.Instance) extends AnyInstanceInfo {
 
     override def printState: NodeSeq = {
-      <p>{instanceInfo.getLifecycleState}</p>    }
+      <p>{instanceInfo.getLifecycleState}</p>
+    }
 
     override def namespace: Namespace = Namespace.root
 
@@ -135,8 +90,6 @@ Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp
   }
 
 
-
-
   override def listWorkers(nispero: N, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[AwsInstanceInfo])] = {
     AutoScalingUtils.describeInstances(env.awsClients.as.as, nispero.configuration.workerAutoScalingGroup.name, lastToken, limit).map { case (lToken, instances) =>
       (lToken, instances.map { i => new AwsInstanceInfo(i) })
@@ -149,39 +102,32 @@ Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp
     }
   }
 
-  override def nisperoInfoDetails(nispero: N): NodeSeq = {
-    <table class="table table-striped topMargin20">
-      <tbody>
-        {autoScalingGroupInfo(nispero.configuration.workerAutoScalingGroup)}
-      </tbody>
-    </table>
+
+
+  override def nisperoProperties(nispero: N): Map[String, NodeSeq] = {
+    autoScalingGroupProperties(nispero.configuration.workerAutoScalingGroup)
   }
 
-  def autoScalingGroupInfo(group: AutoScalingGroup): NodeSeq = {
-    <tr>
-      <td class="col-md-6">auto scaling group name</td>
-      <td class="col-md-6">
-        {group.name}
-      </td>
-    </tr>
-      <tr>
-        <td class="col-md-6">desired capacity</td>
-        <td class="col-md-6">
-          {group.desiredCapacity}
-        </td>
-      </tr>
-      <tr>
-        <td class="col-md-6">instance type</td>
-        <td class="col-md-6">
-          {group.launchingConfiguration.instanceSpecs.instanceType.toString}
-        </td>
-      </tr>
-      <tr>
-        <td class="col-md-6">ssh key pair</td>
-        <td class="col-md-6">
-          {group.launchingConfiguration.instanceSpecs.keyName}
-        </td>
-      </tr>
+  override def metamanagerProperties(): Map[String, NodeSeq] = {
+    autoScalingGroupProperties(awsCompota.configuration.managerAutoScalingGroup)
+  }
+
+  override def compotaProperties(): Map[String, NodeSeq] = {
+    Map(
+      "notifications e-mail" -> <p>{awsCompota.configuration.notificationEmail}</p>,
+      "timeout" -> <p>{awsCompota.configuration.timeout.toMinutes + " mins"}</p>,
+      "local error threshold" -> <p>{awsCompota.configuration.localErrorThreshold}</p>,
+      "global error threshold" -> <p>{awsCompota.configuration.globalErrorThreshold}</p>
+    )
+  }
+
+  def autoScalingGroupProperties(group: AutoScalingGroup): Map[String, NodeSeq] = {
+    Map(
+      "auto scaling group name" -> <p>{group.name}</p>,
+      "desired capacity" -> <p>{group.desiredCapacity}</p>,
+      "instance type" -> <p>{group.launchingConfiguration.instanceSpecs.instanceType}</p>,
+      "ssh key pair" -> <p>{group.launchingConfiguration.instanceSpecs.keyName}</p>
+    )
   }
 
   override def namespacePage: NodeSeq = errorDiv(logger, "namespaces are not supported by AWS compota console")

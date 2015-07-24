@@ -4,6 +4,8 @@ publishArtifact in (Test, packageBin) := true
 
 fatArtifactSettings
 
+s3overwrite := true
+
 // fat jar merge conflict settings
 mergeStrategy in assembly <<= (mergeStrategy in assembly) {
 

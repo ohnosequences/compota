@@ -146,7 +146,7 @@ object wordCountCompota extends AwsCompota[Int](List(splitNispero, wordLengthNis
 }
 
 class AwsWordCountTest {
-  //@Test
+//  @Test
   def awsWordCoundTest(): Unit = {
     val cliLogger = new ConsoleLogger("awsWordCountTest")
     cliLogger.info("started")

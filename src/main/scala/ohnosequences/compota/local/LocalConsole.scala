@@ -83,44 +83,26 @@ class LocalConsole[N <: AnyLocalNispero](localCompota: AnyLocalCompota.of2[N],
     }
   }
 
-  override def nisperoInfoDetails(nispero: N): NodeSeq = {
-    <table class="table table-striped topMargin20">
-      <tbody>
-        <tr>
-          <td class="col-md-6">workers amount</td>
-          <td class="col-md-6">
-            {nispero.configuration.workers}
-          </td>
-        </tr>
-        <tr>
-          <td class="col-md-6">working directory</td>
-          <td class="col-md-6">
-            {nispero.configuration.workingDirectory.getAbsolutePath}
-          </td>
-        </tr>
-      </tbody>
-    </table>
+
+  override def nisperoProperties(nispero: N): Map[String, NodeSeq] = {
+    Map(
+      "workers amount" -> <p>{nispero.configuration.workers}</p>,
+      "working directory" -> <p>{nispero.configuration.workingDirectory.getAbsolutePath}</p>
+    )
   }
 
-  override def compotaInfoPageDetailsTable: NodeSeq = {
-    <table class="table table-striped topMargin20">
-      <tbody>
-        <tr>
-          <td class="col-md-6">working directory</td>
-          <td class="col-md-6">
-            {localCompota.configuration.workingDirectory.getAbsolutePath}
-          </td>
-        </tr>
-        <tr>
-          <td class="col-md-6">global error threshold</td>
-          <td class="col-md-6">
-            {localCompota.configuration.globalErrorThreshold}
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
+  override def metamanagerProperties(): Map[String, NodeSeq] = {
+    Map()
   }
+
+  override def compotaProperties(): Map[String, NodeSeq] = {
+    Map(
+      "working directory" -> <p>{localCompota.configuration.workingDirectory.getAbsolutePath}</p>,
+      "global error threshold" -> <p>{localCompota.configuration.globalErrorThreshold}</p>,
+      "local error threshold" -> <p>{localCompota.configuration.localErrorThreshold}</p>
+    )
+  }
+
 
   override def namespacePage: NodeSeq = {
     <h2>Instances and namespaces</h2>

@@ -183,7 +183,7 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   override def isHttps: Boolean = compota.configuration.consoleHTTPS
 
   def compotaInfoPage: NodeSeq = {
-    compotaInfoPageHeader ++ compotaInfoPageDetailsTable ++ compotaControlQueueDetails
+    compotaInfoPageHeader ++ compotaInfoPageDetails ++ printControlQueueDetails
   }
 
   def compotaInfoPageHeader: NodeSeq = {
@@ -194,62 +194,80 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
     </div>
   }
 
-  def queueStatus(queueOp: AnyQueueOp): NodeSeq = {
-    <h3>{queueOp.queue.name}</h3>
-    <table class="table table-striped topMargin20">
-      <tbody>
-        {queueOp match {
-          case localQueueOp: LocalQueueOp[_] => {
-            <tr>
-              <td class="col-md-6">queue size</td>
-              <td class="col-md-6">
-                {localQueueOp.queue.rawQueue.size()}
-              </td>
-            </tr>
-              <tr>
-                <td class="col-md-6">persistant queue size</td>
-                <td class="col-md-6">
-                  {localQueueOp.queue.rawQueueP.size()}
-                </td>
-              </tr>
-          }
-          case dynamoQueueOp: DynamoDBQueueOP[_] => {
-            dynamoQueueOp.sqsInfo() match {
-              case Failure(t) =>  xml.NodeSeq.Empty
-              case Success(sqsInfo) => {
-                <tr>
-                  <td class="col-md-6">SQS queue messages (approx)</td>
-                  <td class="col-md-6">
-                    {sqsInfo.approx}
-                  </td>
-                </tr>
-                <tr>
-                    <td class="col-md-6">SQS messages in flight (approx)</td>
-                    <td class="col-md-6">
-                      {sqsInfo.inFlight}
-                    </td>
-                </tr>
-              }
-            }
-          }
-          case _: AnyQueueOp => {
-            xml.NodeSeq.Empty
-          }
-      }}
-      </tbody>
-    </table>
-    <a class="btn btn-info showQueueMessages" href="#" data-queue={queueOp.queue.name}>
-      <i class="icon-refresh icon-white"></i>
-      Show messages
-    </a>
+  def compotaInfoPageDetails: NodeSeq = {
+    <div>
+      <div>
+        {printPropertiesTable(compotaProperties())}
+      </div>
+      <div class="page-header">
+        <h3>Metamanagers</h3>
+      </div>
+      <div>
+        {printPropertiesTable(metamanagerProperties())}
+      </div>
+      {printInstancesDetails(None)}
+    </div>
   }
 
+  def printPropertiesTable(props: Map[String, NodeSeq]): NodeSeq = {
+    <table class="table table-striped topMargin20">
+      <tbody>
+        {
+          props.map { case (key, value) =>
+            <tr>
+              <td class="col-md-6">{key}</td>
+              <td class="col-md-6">{value}</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>  
+  }
 
-  def compotaInfoPageDetailsTable: NodeSeq
+  def compotaProperties(): Map[String, NodeSeq]
 
-  def compotaControlQueueDetails: NodeSeq = {
-    <h2>Control queue</h2>
-    queueStatus(controlQueueOp)
+  def metamanagerProperties(): Map[String, NodeSeq]
+
+  def printQueueDetails(queueOp: AnyQueueOp): NodeSeq = {
+
+    val queueProperties: Map[String, NodeSeq] = queueOp match {
+      case localQueueOp: LocalQueueOp[_] => {
+        Map(
+          "queue size" -> <p>{localQueueOp.queue.rawQueue.size().toString}</p>,
+          "persistant queue size" -> <p>{localQueueOp.queue.rawQueueP.size().toString}</p>
+        )
+      }
+      case dynamoQueueOp: DynamoDBQueueOP[_] => {
+        dynamoQueueOp.sqsInfo() match {
+          case Failure(t) =>  Map[String, NodeSeq]()
+          case Success(sqsInfo) => {
+            Map(
+              "SQS queue messages (approx)" -> <p>{sqsInfo.approx}</p>,
+              "SQS messages in flight (approx)" -> <p>{sqsInfo.inFlight}</p>
+            )
+          }
+        }
+      }
+      case other => {
+        Map[String, NodeSeq]()
+      }
+    }
+    <div>
+      <div class="page-header">
+        <h2>{queueOp.queue.name}</h2>
+      </div>
+      {printPropertiesTable(queueProperties)}
+      <a class="btn btn-info showQueueMessages" href="#" data-queue={queueOp.queue.name}>
+        <i class="icon-refresh icon-white"></i>
+        Show messages
+      </a>
+    </div>
+  }
+
+  def printControlQueueDetails: NodeSeq = {
+    <div>
+      {printQueueDetails(controlQueueOp)}
+    </div>
   }
 
 
@@ -286,23 +304,22 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
   }
 
 
-
-
-
   def nisperoInfoPage(nisperoName: String): NodeSeq = {
     compota.nisperosNames.get(nisperoName) match {
       case None => {
         errorDiv(logger, nisperoName + " doesn't exist")
       }
-      case Some(nispero) =>
-        <div class="page-header">
-          <h1>
-            {compota.configuration.name}
-            <small>{nisperoName} nispero</small>
-          </h1>
-        </div>
+      case Some(nispero) => {
+        <div>
+          <div class="page-header">
+            <h1>
+              {compota.configuration.name}<small>
+              {nisperoName}
+              nispero</small>
+            </h1>
+          </div>
           <div>
-            {nisperoInfoDetails(nispero)}
+            {printNisperoDetails(nispero)}
           </div>
 
           <div class="page-header">
@@ -312,9 +329,9 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
             {nispero.inputQueue.subQueues.map { queue =>
             nisperoGraph.queueOps.get(queue.name) match {
               case None => xml.NodeSeq.Empty
-              case Some(queueOp) => queueStatus(queueOp)
+              case Some(queueOp) => printQueueDetails(queueOp)
             }
-            }}
+          }}
           </div>
           <div class="page-header">
             <h2>output</h2>
@@ -323,26 +340,40 @@ abstract class Console[E <: AnyEnvironment[E], N <: AnyNispero.of[E], C <: AnyCo
             {nispero.outputQueue.subQueues.map { queue =>
             nisperoGraph.queueOps.get(queue.name) match {
               case None => xml.NodeSeq.Empty
-              case Some(queueOp) => queueStatus(queueOp)
+              case Some(queueOp) => printQueueDetails(queueOp)
             }
           }}
-          </div>
-          <div class="page-header">
-            <h2>instances</h2>
-          </div>
-          <table class="table table-striped topMargin20">
-            <tbody id="nisperoWorkersTableBody">
-              {printWorkers(nisperoName, None)}
-            </tbody>
-          </table>
-          <p><a class="btn btn-info loadMoreNisperoWorkers" href="#" data-nispero={nispero.configuration.name}>
-            <i class="icon-refresh icon-white"></i>
-            Show more
-          </a></p>
+          </div>{printInstancesDetails(Some(nispero))}
+        </div>
+      }
     }
   }
 
-  def nisperoInfoDetails(nispero: N): NodeSeq
+  def printInstancesDetails(nispero: Option[N]): NodeSeq = {
+    <div>
+      <div class="page-header">
+        <h4>Instances</h4>
+      </div>
+      <table class="table table-striped topMargin20">
+        <tbody id="instanceTableBody">
+          {nispero match {
+          case Some(n) => printWorkers(n.configuration.name, None)
+          case None => printManagers(None)
+        }}
+        </tbody>
+      </table>
+      <p><a class="btn btn-info loadInstances" href="#" data-nispero={nispero.map(_.configuration.name).getOrElse("")}>
+        <i class="icon-refresh icon-white"></i>
+        Show more
+      </a></p>
+    </div>
+  }
+
+  def nisperoProperties(nispero: N): Map[String, NodeSeq]
+  
+  def printNisperoDetails(nispero: N): NodeSeq = {
+    printPropertiesTable(nisperoProperties(nispero))
+  }
 
   def printErrorTable(lastToken: Option[String]): NodeSeq = {
     listErrorTable(lastToken, Some(10)) match {

@@ -129,7 +129,7 @@ class LocalCompotaTest {
       env.logger.info("waiting")
       env.logger.info(metaManager.controlQueue.rawQueue.toString)
       env.logger.info(metaManager.controlQueue.rawQueueP.toString)
-//      Thread.sleep(2 * 60 * 1000)
+      Thread.sleep(2 * 60 * 1000)
       Success("message context = " +context)
 
     }

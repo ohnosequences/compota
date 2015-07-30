@@ -185,7 +185,7 @@
         bindSSHCommand();
         function sshInstance(instance, namespace) {
             console.info('sshInstance(' + instance + ', ' + namespace + ')');
-            $('.sshInstanceBody').load('/instance/ssh' + instance + '/' + namespace);
+            $('.sshInstanceBody').load('/instance/ssh/' + instance + '/' + namespace);
             $('#sshInstanceModal').modal('show')
         }
 
@@ -269,17 +269,26 @@
             })
         });
 
-        $('.loadMoreNisperoWorkers').click(function () {
-            var lastToken = $('#nisperoWorkersTableBody').find('tr:last-child').data('lasttoken');
+        $('.loadInstances').click(function () {
             var nispero = $(event.target).data('nispero');
-            var query = '/nispero/' + nispero + '/workers';
-            if (lastToken) {
+            var lastToken = $('#instanceTableBody').find('tr:last-child').data('lasttoken');
+
+            var query = ""
+            if (nispero) {
+              var query = '/nispero/' + nispero + '/workers';
+              if (lastToken) {
                 query += "/" + lastToken
+              }
+            } else {
+              var query = '/managers';
+              if (lastToken) {
+                query += "/" + lastToken
+              }
             }
 
-            console.info("loadMoreNisperoWorkers : " + query);
+            console.info("loadMoreWorkers : " + query);
             $.get(query, function (data) {
-                $('#nisperoWorkersTableBody').append(data)
+                $('#instanceTableBody').append(data)
             })
 
         });

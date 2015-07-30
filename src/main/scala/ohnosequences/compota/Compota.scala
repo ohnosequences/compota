@@ -134,7 +134,9 @@ trait AnyCompota {
     }
   }
 
-  def unDeployActions(env: CompotaEnvironment, context: CompotaUnDeployActionContext): Try[String]
+  def unDeployActions(env: CompotaEnvironment, context: CompotaUnDeployActionContext): Try[String] = {
+    Success("")
+  }
 
   def forcedUnDeployActions(env: CompotaEnvironment): Try[String] = {
     Success("")
@@ -154,7 +156,7 @@ trait AnyCompota {
   //send command to metamanager that reduce queues etc
   def sendUnDeployCommand(env: CompotaEnvironment): Try[Unit]
 
-  def addTasks(environment: CompotaEnvironment): Try[Unit]
+  def addTasks(env: CompotaEnvironment): Try[Unit]
 
   def startedTime(env: CompotaEnvironment): Try[Long]
 

@@ -1,6 +1,5 @@
 package ohnosequences.compota.environment
 
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentHashMap, ExecutorService}
 
 import ohnosequences.compota.{AnyCompotaConfiguration, ErrorTable, Namespace}
@@ -23,11 +22,11 @@ trait Env {
 }
 
 object Env {
-  def apply(logger: Logger): Env = new Env {
+  def apply(logger0: Logger): Env = new Env {
     override def isStopped: Boolean = false
 
     override val workingDirectory: File = new File(".")
-    override val logger: Logger = logger
+    override val logger: Logger = logger0
   }
 }
 
@@ -89,15 +88,15 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env {
 
   def namespace: Namespace
 
+  val localErrorTable: ErrorTable
+
   val errorTable: ErrorTable
 
   val executor: ExecutorService
 
   val configuration: AnyCompotaConfiguration
 
-  def localErrorCounts: AtomicInteger
-
-  def sendForceUnDeployCommand(reason: String, message: String): Try[Unit]
+  def forceUndeploy(reason: String, message: String): Try[Unit]
 
   def stop(): Unit
 
@@ -116,34 +115,43 @@ abstract class AnyEnvironment[E <: AnyEnvironment[E]] extends Env {
     })
     val stackTrace = sb.toString()
 
-    val localErrorCount = localErrorCounts.incrementAndGet()
-
-    if (localErrorCount > configuration.localErrorThreshold) {
-      logger.error("reached local error threshold for " + namespace.toString + " [" + localErrorCount + "]")
-      logger.error(t)
-      stop()
-      terminate()
-    } else {
-      errorTable.getNamespaceErrorCount(namespace) match {
-        case Failure(tt) => {
-          logger.error("couldn't retrieve count from error table")
-          errorTable.recover()
-          stop()
-          terminate()
-        }
-        case Success(count) if count >= configuration.globalErrorThreshold => {
-          val message = "reached global error threshold for " + namespace.toString
-          val fullMessage = message + System.lineSeparator() + stackTrace
-          logger.error("reached global error threshold for " + namespace.toString)
-          logger.error(t)
-          sendForceUnDeployCommand("error threshold reached", fullMessage)
-        }
-        case Success(count) => {
-          logger.error(namespace.toString + " failed " + localErrorCount +
-            " times [" + configuration.localErrorThreshold + "/" + configuration.globalErrorThreshold + "]")
-          logger.debug(t)
-          errorTable.reportError(namespace, System.currentTimeMillis(), instanceId, t.toString, sb.toString())
-          Thread.sleep(configuration.environmentRepeatConfiguration.timeout(count))
+    errorTable.getNamespaceErrorCount(namespace) match {
+      case Failure(tt) => {
+        logger.error("couldn't retrieve counts from error table")
+        errorTable.recover()
+        stop()
+        terminate()
+      }
+      case Success(count) if count >= configuration.globalErrorThreshold => {
+        val message = "reached global error threshold for " + namespace.toString
+        val fullMessage = message + System.lineSeparator() + stackTrace
+        logger.error("reached global error threshold for " + namespace.toString)
+        logger.error(t)
+        forceUndeploy("error threshold reached", fullMessage)
+      }
+      case Success(count) => {
+        localErrorTable.getNamespaceErrorCount(namespace) match {
+          case Failure(lt) => {
+            val message = "couldn't retrieve error count from local table"
+            val fullMessage = message + System.lineSeparator() + stackTrace
+            logger.error(message)
+            logger.error(t)
+            reportError(new Error(message, t), Namespace("localErrorTable"))
+          }
+          case Success(localCount) if localCount > configuration.localErrorThreshold => {
+            logger.error("reached local error threshold for " + namespace.toString + " [" + localCount + "]")
+            logger.error(t)
+            stop()
+            terminate()
+          }
+          case Success(localCount) => {
+            logger.warn(namespace.toString + " failed " + localCount + " times locally " +
+              " and " + count + " globally")
+            logger.debug(t)
+            localErrorTable.reportError(namespace, System.currentTimeMillis(), instanceId, t.toString, sb.toString())
+            errorTable.reportError(namespace, System.currentTimeMillis(), instanceId, t.toString, sb.toString())
+            Thread.sleep(configuration.environmentRepeatConfiguration.timeout(count))
+          }
         }
       }
     }

@@ -3,8 +3,9 @@ package ohnosequences.compota.local
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ExecutorService, ConcurrentHashMap}
-import ohnosequences.compota.Namespace
+import ohnosequences.compota.{ErrorTable, Namespace}
 import ohnosequences.compota.environment.{AnyEnvironment, InstanceId}
+import ohnosequences.compota.metamanager.ForceUnDeploy
 import ohnosequences.logging.{Logger, FileLogger}
 
 import scala.util.{Success, Try}
@@ -18,7 +19,7 @@ class LocalEnvironment(val instanceId: InstanceId,
                        val executor: ExecutorService,
                        val errorTable: LocalErrorTable,
                        val configuration: AnyLocalCompotaConfiguration,
-                       val sendForceUnDeployCommand0: (LocalEnvironment, String, String) => Try[Unit],
+                       val forceUnDeploy0: (LocalEnvironment, String, String) => Try[Unit],
                        val environments: ConcurrentHashMap[(InstanceId, Namespace), LocalEnvironment],
                        val originEnvironment: Option[LocalEnvironment],
                        val localErrorCounts: AtomicInteger
@@ -26,6 +27,8 @@ class LocalEnvironment(val instanceId: InstanceId,
 
   val isStoppedFlag = new java.util.concurrent.atomic.AtomicBoolean(false)
 
+
+  override val localErrorTable: ErrorTable = new LocalErrorTable
 
   override def subEnvironment(subspace: String): Try[LocalEnvironment] = {
     Try {
@@ -40,7 +43,7 @@ class LocalEnvironment(val instanceId: InstanceId,
         executor = executor,
         errorTable = errorTable,
         configuration = configuration,
-        sendForceUnDeployCommand0 = sendForceUnDeployCommand0,
+        forceUnDeploy0 = forceUnDeploy0,
         environments = environments,
         originEnvironment = Some(localEnvironment),
         localErrorCounts = localErrorCounts
@@ -69,7 +72,7 @@ class LocalEnvironment(val instanceId: InstanceId,
         executor = executor,
         errorTable = errorTable,
         configuration = configuration,
-        sendForceUnDeployCommand0 = sendForceUnDeployCommand0,
+        forceUnDeploy0 = forceUnDeploy0,
         environments = environments,
         originEnvironment = Some(localEnvironment),
         localErrorCounts = localErrorCounts
@@ -89,7 +92,7 @@ class LocalEnvironment(val instanceId: InstanceId,
     isStoppedFlag.set(true)
   }
 
-  def sendForceUnDeployCommand(reason: String, message: String): Try[Unit] = sendForceUnDeployCommand0(localEnvironment, reason, message)
+  def forceUndeploy(reason: String, message: String): Try[Unit] = forceUnDeploy0(localEnvironment, reason, message)
 
   def getThreadInfo: Option[(Thread, Array[StackTraceElement])] = {
     Thread.getAllStackTraces.find { case (t, st) =>

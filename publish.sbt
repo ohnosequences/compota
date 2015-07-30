@@ -2,7 +2,7 @@ bucketSuffix := "era7.com"
 
 publishArtifact in (Test, packageBin) := true
 
-fatArtifactSettings
+//fatArtifactSettings
 
 s3overwrite := true
 

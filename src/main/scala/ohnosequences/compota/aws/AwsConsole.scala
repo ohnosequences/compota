@@ -91,6 +91,7 @@ Console[AwsEnvironment, N, AnyAwsCompota.ofN[N]](awsCompota, env, controlQueueOp
 
 
   override def listWorkers(nispero: N, lastToken: Option[String], limit: Option[Int]): Try[(Option[String], List[AwsInstanceInfo])] = {
+    
     AutoScalingUtils.describeInstances(env.awsClients.as.as, nispero.configuration.workerAutoScalingGroup.name, lastToken, limit).map { case (lToken, instances) =>
       (lToken, instances.map { i => new AwsInstanceInfo(i) })
     }

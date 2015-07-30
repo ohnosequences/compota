@@ -47,6 +47,6 @@ trait AnyLocalCompotaConfiguration extends AnyCompotaConfiguration {
 }
 
 
-case class LocalCompotaConfiguration(name: String, loggerDebug: Boolean, timeout: Duration, visibilityTimeout: Duration = Duration(10, MINUTES)) extends AnyLocalCompotaConfiguration {
+case class LocalCompotaConfiguration(name: String, override val loggerDebug: Boolean, timeout: Duration, visibilityTimeout: Duration = Duration(10, MINUTES)) extends AnyLocalCompotaConfiguration {
 
 }

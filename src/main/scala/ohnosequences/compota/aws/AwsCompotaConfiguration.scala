@@ -34,7 +34,7 @@ trait AwsCompotaConfiguration extends AnyCompotaConfiguration {
 
   def metadata: AnyMetadata
 
-  def localErrorThreshold: Int = 1000
+  def localErrorThreshold: Int = 9
 
   override def consoleHTTPS: Boolean = false
 

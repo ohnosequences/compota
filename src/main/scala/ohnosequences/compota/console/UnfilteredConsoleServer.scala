@@ -87,12 +87,8 @@ with ServerErrorResponse {
       HtmlCustom(page)
     }
 
-    case GET(Path(Seg("errors" :: Nil))) => {
-      ResponseString(console.printErrorTable(None).toString())
-    }
-
-    case GET(Path(Seg("errors" :: lastToken :: Nil))) => {
-      ResponseString(console.printErrorTable(Some(lastToken)).toString())
+    case GET(Path(Seg("errors" :: args))) => {
+      ResponseString(console.printErrorTable(args.headOption).toString())
     }
 
     case GET(Path("/shutdown")) => {
@@ -100,12 +96,8 @@ with ServerErrorResponse {
       ResponseString("ok")
     }
 
-    case GET(Path(Seg("queue" :: queueName :: "messages" :: Nil))) => {
-      ResponseString(console.printMessages(queueName, None).toString())
-    }
-
-    case GET(Path(Seg("queue" :: queueName :: "messages" :: lastToken :: Nil))) => {
-      ResponseString(console.printMessages(queueName, Some(lastToken)).toString())
+    case GET(Path(Seg("queue" :: queueName :: "messages" :: args))) => {
+      ResponseString(console.printMessages(queueName, args.headOption).toString())
     }
 
     case GET(Path(Seg("logging" :: "raw" :: instanceId :: namespace))) => {
@@ -154,20 +146,17 @@ with ServerErrorResponse {
       }
     }
 
-    case GET(Path(Seg("nispero" :: nispero :: "workers" :: Nil))) => {
-      ResponseString(console.printWorkers(nispero, None).toString())
+    case GET(Path(Seg("nispero" :: nispero :: "workers" :: args))) => {
+      ResponseString(console.printWorkers(nispero, args.headOption).toString())
     }
 
-    case GET(Path(Seg("nispero" :: nispero :: "workers" :: lastToken :: Nil))) => {
-      ResponseString(console.printWorkers(nispero, Some(lastToken)).toString())
+    case GET(Path(Seg("metamanagers" :: args))) => {
+      ResponseString(console.printManagers(args.headOption).toString())
     }
 
-    case GET(Path(Seg("namespaces" :: Nil))) => {
-      ResponseString(console.printNamespaces(None).toString())
-    }
 
-    case GET(Path(Seg("namespaces" :: lastToken :: Nil))) => {
-      ResponseString(console.printNamespaces(Some(lastToken)).toString())
+    case GET(Path(Seg("namespaces" :: args))) => {
+      ResponseString(console.printNamespaces(args.headOption).toString())
     }
 
     case GET(Path("/threads")) => {

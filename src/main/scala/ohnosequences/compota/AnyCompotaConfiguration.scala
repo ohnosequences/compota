@@ -12,9 +12,9 @@ trait AnyCompotaConfiguration {
 
   def name: String
   def timeout: Duration
-  def loggerDebug: Boolean
+  def loggerDebug: Boolean = false
   def terminationDaemonIdleTime: Duration = Duration(100, SECONDS)
-  def deleteErrorQueue: Boolean
+  def deleteErrorQueue: Boolean = true
   def consolePassword: String = "compota"
   def consoleHTTPS: Boolean = false
   def consolePort: Int = 9000

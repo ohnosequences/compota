@@ -5,6 +5,7 @@ import java.util.concurrent.{ConcurrentHashMap, ExecutorService}
 import java.util.concurrent.atomic.{AtomicInteger, AtomicBoolean}
 
 import ohnosequences.awstools.AWSClients
+import ohnosequences.compota.local.LocalErrorTable
 import ohnosequences.compota.{ErrorTable, Namespace}
 import ohnosequences.compota.aws.queues.DynamoDBContext
 import ohnosequences.compota.environment.{InstanceId, AnyEnvironment}
@@ -21,7 +22,7 @@ class AwsEnvironment(val instanceId: InstanceId,
                      val executor: ExecutorService,
                      val environments: ConcurrentHashMap[(InstanceId, Namespace), AwsEnvironment],
                      val errorTable: ErrorTable,
-                     val sendForceUnDeployCommand0: (AwsEnvironment, String, String) => Try[Unit],
+                     val forceUndeploy0: (AwsEnvironment, String, String) => Try[Unit],
                      val originEnvironment: Option[AwsEnvironment],
                      val localErrorCounts: AtomicInteger) extends AnyEnvironment[AwsEnvironment] {
   awsEnvironment =>
@@ -59,7 +60,7 @@ class AwsEnvironment(val instanceId: InstanceId,
         workingDirectory = newWorkingDirectory,
         executor = executor,
         errorTable = errorTable,
-        sendForceUnDeployCommand0 = sendForceUnDeployCommand0,
+        forceUndeploy0 = forceUndeploy0,
         environments = environments,
         originEnvironment = Some(awsEnvironment),
         localErrorCounts = localErrorCounts
@@ -74,13 +75,15 @@ class AwsEnvironment(val instanceId: InstanceId,
 
   val isStoppedFlag = new AtomicBoolean(false)
 
-  override def sendForceUnDeployCommand(reason: String, message: String): Try[Unit] = sendForceUnDeployCommand0(awsEnvironment, reason, message)
+  override def forceUndeploy(reason: String, message: String): Try[Unit] = forceUndeploy0(awsEnvironment, reason, message)
 
   override def isStopped: Boolean = isStoppedFlag.get()
 
   override def stop(): Unit = {
     isStoppedFlag.set(true)
   }
+
+  override val localErrorTable: ErrorTable = new LocalErrorTable
 }
 
 

@@ -210,15 +210,14 @@ trait AnyMetaManager {
     logger.info("starting metamanager")
 
     while (!env.isStopped) {
-      QueueChecker(env, compota.nisperoGraph).recoverWith { case t =>
-        env.reportError(new Error("failed to create nispero graph", t), env.namespace / Namespace.queueChecker)
+      compota.startedTime(env).recoverWith { case t =>
+        env.reportError(new Error("failed detect compota starting time", t), env.namespace / "start_time")
         Failure(t)
-      }.flatMap { queueChecker =>
-        compota.startedTime(env).recoverWith { case t =>
-          env.reportError(new Error("failed detect compota starting time", t), env.namespace / "start_time")
+      }.flatMap { startedTime =>
+        QueueChecker(env, compota.nisperoGraph).recoverWith { case t =>
+          env.reportError(new Error("failed to create nispero graph", t), env.namespace / Namespace.queueChecker)
           Failure(t)
-        }.flatMap { startedTime =>
-
+        }.flatMap { queueChecker =>
           logger.debug("creating control queue context")
           val qContext = controlQueueContext(env)
           logger.debug("creating control queue " + controlQueue.name)
@@ -248,7 +247,6 @@ trait AnyMetaManager {
             env.reportError(new Error("Couldn't initiate control queue", t), env.namespace / Namespace.controlQueue)
             Failure(t)
           }
-
         }
       }
     }

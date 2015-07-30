@@ -7,7 +7,6 @@ import ohnosequences.awstools.autoscaling.AutoScaling
 import ohnosequences.awstools.sqs.SQS
 import ohnosequences.awstools.sns.SNS
 import ohnosequences.awstools.s3.S3
-import ohnosequences.awstools.dynamodb.DynamoDB
 import ohnosequences.awstools.regions.Region.Ireland
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient
 import java.io.File
@@ -45,7 +44,7 @@ class AWS(credentialsFile: File, region: ohnosequences.awstools.regions.Region =
 
  // val ddb = DynamoDB.create(credentialsProvider)
   val ddb = new AmazonDynamoDBClient(credentialsProvider)
-  ddb.setRegion(region)
+  ddb.setRegion(com.amazonaws.regions.Region.getRegion(region))
 }
 
 

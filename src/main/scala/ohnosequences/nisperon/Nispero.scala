@@ -4,6 +4,7 @@ import ohnosequences.nisperon.queues.{MonoidQueueAux, MonoidQueue}
 import ohnosequences.nisperon.bundles._
 
 import ohnosequences.awstools.s3.ObjectAddress
+import ohnosequences.statika.instructions._
 import org.clapper.avsl.Logger
 import ohnosequences.nisperon.logging.FailTable
 
@@ -67,21 +68,18 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
 
   val logger = Logger(this.getClass)
 
-  import ohnosequences.statika._
-  import ohnosequences.statika.ami.AMI149f7863
-
-
-  object instructionsBundle extends InstructionsBundle()
+  object instructionsBundle extends InstructionsBundle(instructions)
 
   object workerBundle extends WorkerBundle(instructionsBundle) {
 
-    override def install[D <: AnyDistribution](distribution: D): InstallResults = {
+    override def install: Results = {
       worker.runInstructions()
-      success("worker finished")
+      success(s"Module ${bundleFullName} is installed")
     }
+
   }
 
-  object managerDistribution extends ManagerDistribution(workerBundle) {
+  object managerDistribution extends ManagerCompatible {
     import ohnosequences.statika.{AnyDistribution, InstallResults, success}
 
     val logger = Logger(this.getClass)

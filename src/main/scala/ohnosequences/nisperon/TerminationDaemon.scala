@@ -6,8 +6,6 @@ import org.clapper.avsl.Logger
 class TerminationDaemon(nisperon: Nisperon) extends Thread {
   val logger = Logger(this.getClass)
 
-
-
   val initLaunchTime = {
 
     var ititTime= 0L

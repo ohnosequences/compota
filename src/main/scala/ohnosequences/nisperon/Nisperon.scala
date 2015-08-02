@@ -35,20 +35,19 @@ abstract class Nisperon {
   def checks()
 
   class S3Queue[T](name: String, monoid: Monoid[T], serializer: Serializer[T]) extends
-     S3QueueAbstract(aws, Naming.s3name(nisperonConfiguration,  name), monoid, serializer,
-       deadLetterQueueName = nisperonConfiguration.deadLettersQueue) {
+  S3QueueAbstract(aws, Naming.s3name(nisperonConfiguration, name), monoid, serializer,
+    deadLetterQueueName = nisperonConfiguration.deadLettersQueue) {
 
   }
 
   class DynamoDBQueue[T](name: String, monoid: Monoid[T], serializer: Serializer[T], writeBodyToTable: Boolean = true, throughputs: (Int, Int)) extends
-    DynamoDBQueueAbstract(aws, Naming.name(nisperonConfiguration,  name), monoid, serializer, throughputs, deadLetterQueueName = nisperonConfiguration.deadLettersQueue)
+  DynamoDBQueueAbstract(aws, Naming.name(nisperonConfiguration, name), monoid, serializer, throughputs, deadLetterQueueName = nisperonConfiguration.deadLettersQueue)
 
 
-  class S3MapQueue[K, V](name: String, monoid: Monoid[V],  kSerializer: Serializer[K],
+  class S3MapQueue[K, V](name: String, monoid: Monoid[V], kSerializer: Serializer[K],
                          vSerializer: Serializer[V], incrementSerializer: IncrementalSerializer[V])
-    extends S3MapQueueAbstract[K, V](aws, Naming.name(nisperonConfiguration,  name), monoid, kSerializer,
-    vSerializer, incrementSerializer, ObjectAddress(nisperonConfiguration.bucket, name))
-
+    extends S3MapQueueAbstract[K, V](aws, Naming.name(nisperonConfiguration, name), monoid, kSerializer,
+      vSerializer, incrementSerializer, ObjectAddress(nisperonConfiguration.bucket, name))
 
 
   //in secs
@@ -65,14 +64,14 @@ abstract class Nisperon {
   }
 
 
-  class NisperoWithDefaults[I, O, IQ <: MonoidQueue[I], OQ <: MonoidQueue[O]] (
-    inputQueue: IQ, outputQueue: OQ, instructions: Instructions[I, O], nisperoConfiguration: NisperoConfiguration
-  ) extends Nispero[I, O, IQ, OQ](aws, inputQueue, outputQueue, instructions, nisperoConfiguration)
+  class NisperoWithDefaults[I, O, IQ <: MonoidQueue[I], OQ <: MonoidQueue[O]](
+                                                                               inputQueue: IQ, outputQueue: OQ, instructions: Instructions[I, O], nisperoConfiguration: NisperoConfiguration
+                                                                               ) extends Nispero[I, O, IQ, OQ](aws, inputQueue, outputQueue, instructions, nisperoConfiguration)
 
 
-  def nispero[I, O, IQ <: MonoidQueue[I], OQ <: MonoidQueue[O]] (
-    inputQueue: IQ, outputQueue: OQ, instructions: Instructions[I, O], nisperoConfiguration: NisperoConfiguration
-  ): Nispero[I, O, IQ, OQ] = {
+  def nispero[I, O, IQ <: MonoidQueue[I], OQ <: MonoidQueue[O]](
+                                                                 inputQueue: IQ, outputQueue: OQ, instructions: Instructions[I, O], nisperoConfiguration: NisperoConfiguration
+                                                                 ): Nispero[I, O, IQ, OQ] = {
 
     val r = new NisperoWithDefaults(inputQueue, outputQueue, instructions, nisperoConfiguration)
     nisperos.put(nisperoConfiguration.name, r)
@@ -88,7 +87,6 @@ abstract class Nisperon {
     aws.sns.createTopic(nisperonConfiguration.controlTopic).publish(wrap)
   }
 
-  //todo fix this ugly wrapping
   def sendUndeployCommand(reason: String, force: Boolean, notifyManagers: Boolean = false) {
     //aws.sns.sns.
     logger.info("sending undeploy message to metemanager")
@@ -111,7 +109,32 @@ abstract class Nisperon {
 
   def addTasks(): Unit
 
-  def checkTasks(verbose: Boolean): Boolean = true
+
+  def checkConfiguration(verbose: Boolean): Boolean = {
+    logger.info("creating notification topic: " + nisperonConfiguration.notificationTopic)
+    val topic = aws.sns.createTopic(nisperonConfiguration.notificationTopic)
+
+    if (topic.isEmailSubscribed(nisperonConfiguration.email)) {
+      logger.info("subscribing " + nisperonConfiguration.email + " to notification topic")
+      topic.subscribeEmail(nisperonConfiguration.email)
+      logger.info("please confirm subscription")
+      false
+    } else {
+      aws.s3.objectExists(nisperonConfiguration.artifactAddress) match {
+        case Failure(t) => {
+          logger.error("artifact jar has not been published: " + nisperonConfiguration.artifactAddress)
+          false
+        }
+        case Success(false) => {
+          logger.error("artifact jar has not been published: " + nisperonConfiguration.artifactAddress)
+          false
+        }
+        case _ => {
+          true
+        }
+      }
+    }
+  }
 
   def main(args: Array[String]) {
 
@@ -121,34 +144,24 @@ abstract class Nisperon {
       case "manager" :: nisperoId :: Nil => nisperos(nisperoId).installManager()
       case "worker" :: nisperoId :: Nil => nisperos(nisperoId).installWorker()
 
+      case "check" :: "configuration" :: verboseArgs => {
+        logger.info("checking configuration")
+        val verbose = verboseArgs.headOption.map(_.toBoolean).getOrElse(false)
+        checkConfiguration(verbose) match {
+          case true => logger.info("configuration checks passed")
+          case false =>
+        }
+      }
+
       case "run" :: Nil => {
-        //check jar
-
-          logger.info("creating notification topic: " + nisperonConfiguration.notificationTopic)
-          val topic = aws.sns.createTopic(nisperonConfiguration.notificationTopic)
-
-          logger.info("creating dead letter queue: " + nisperonConfiguration.deadLettersQueue)
-        //  val deadLettersQueue = new SQSQueue[Unit](aws.sqs.sqs, nisperonConfiguration.deadLettersQueue, unitSerializer).createQueue()
-
-          if (!topic.isEmailSubscribed(nisperonConfiguration.email)) {
-            logger.info("subscribing " + nisperonConfiguration.email + " to notification topic")
-            topic.subscribeEmail(nisperonConfiguration.email)
-            logger.info("please confirm subscription")
-          }
-
+        logger.info("checking configuration")
+        if (checkConfiguration(false)) {
+          logger.error("configuration checks failed")
+        } else {
           logger.info("creating failures table")
-          val failTable =  new FailTable(aws, nisperonConfiguration.errorTable)
+          val failTable = new FailTable(aws, nisperonConfiguration.errorTable)
           failTable.create()
 
-
-          aws.s3.objectExists(nisperonConfiguration.artifactAddress) match {
-            case Failure(t) => {
-              throw new Error("jar isn't published: " + nisperonConfiguration.artifactAddress, t)
-            }
-            case Success(false) => {
-              throw new Error("jar isn't published: " + nisperonConfiguration.artifactAddress)
-            }
-          }
 
           logger.info("creating bucket " + nisperonConfiguration.bucket)
           aws.s3.createBucket(nisperonConfiguration.bucket)
@@ -161,8 +174,6 @@ abstract class Nisperon {
           val bundle = new WhateverBundle(Nisperon.this, "meta", "meta")
           val userdata = bundle.userScript(bundle)
 
-
-
           val metagroup = nisperonConfiguration.metamanagerGroupConfiguration.autoScalingGroup(
             name = nisperonConfiguration.metamanagerGroup,
             amiId = bundle.ami.id,
@@ -172,18 +183,9 @@ abstract class Nisperon {
 
           addTasks()
 
-          logger.info("launching metamanager")
-          //println(metagroup)
-
+          logger.info("launching metamanager autoscaling group")
           aws.as.createAutoScalingGroup(metagroup)
-
-
-         
-         // notification(nisperonConfiguration.id + " started", "started")
-
-          //todo fix closing
-         // System.exit(0)
-
+        }
       }
 
       case "check" :: "queues" :: Nil => {
@@ -219,14 +221,14 @@ abstract class Nisperon {
 
       case "list" :: Nil => {
         nisperos.foreach {
-          case (id, nispero) => println( id + " -> " + nispero.nisperoConfiguration.workersGroupName)
+          case (id, nispero) => println(id + " -> " + nispero.nisperoConfiguration.workersGroupName)
         }
       }
 
       case "undeploy" :: "actions" :: Nil => undeployActions(false)
 
-      case "check":: "tasks" :: Nil => {
-        println("tasks are ok: " + checkTasks(verbose = true))
+      case "check" :: "tasks" :: Nil => {
+        println("tasks are ok: " + checkConfiguration(verbose = true))
       }
 
       case "dot" :: "dot" :: Nil => {
@@ -264,7 +266,6 @@ abstract class Nisperon {
   }
 
 
-
   def additionalHandler(args: List[String])
 
 
@@ -277,8 +278,8 @@ object Nisperon {
   def unsafeAction(name: String, action: => Unit, logger: Logger, limit: Int = 10) {
 
     var done = false
-    var c =1
-    while(!done && c < limit) {
+    var c = 1
+    while (!done && c < limit) {
       c += 1
       try {
         logger.info(name)
@@ -296,7 +297,7 @@ object Nisperon {
   }
 
 
-  def reportFailure(aws: AWS, nisperonConfiguration: NisperonConfiguration, taskId: String, t: Throwable,  terminateInstance: Boolean, failTable: FailTable, messagePrefix: String = "", maxAttempts: Int = 10) {
+  def reportFailure(aws: AWS, nisperonConfiguration: NisperonConfiguration, taskId: String, t: Throwable, terminateInstance: Boolean, failTable: FailTable, messagePrefix: String = "", maxAttempts: Int = 10) {
 
     logger.error(messagePrefix + " " + t.toString + " " + t.getLocalizedMessage)
     t.printStackTrace()
@@ -305,7 +306,7 @@ object Nisperon {
     var attempt = maxAttempts
     val instanceId = aws.ec2.getCurrentInstanceId.getOrElse("unknown" + System.currentTimeMillis())
 
-    while(attempt > 0) {
+    while (attempt > 0) {
       attempt -= 1
       try {
         failTable.fail(taskId, instanceId, messagePrefix + " " + t.toString)
@@ -316,7 +317,7 @@ object Nisperon {
     }
 
     attempt = maxAttempts
-    while(attempt > 0) {
+    while (attempt > 0) {
       attempt -= 1
       try {
         InstanceLogging.putLog(aws, nisperonConfiguration, instanceId)
@@ -326,7 +327,7 @@ object Nisperon {
       }
     }
 
-    if(terminateInstance) {
+    if (terminateInstance) {
       logger.error("terminating instance")
       aws.ec2.getCurrentInstance.foreach(_.terminate())
     }

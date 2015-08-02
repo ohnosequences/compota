@@ -37,8 +37,6 @@ trait MonoidQueueAux {
 
   def sqsQueueInfo(): Option[SQSQueueInfo]
 
-
-
   def isEmpty: Boolean
 
   def list(): List[String]

@@ -8,6 +8,8 @@ import ohnosequences.awstools.ddb.Utils
 import scala.collection.mutable.ListBuffer
 import ohnosequences.nisperon.Tasks
 
+import scala.util.{Success, Failure, Try}
+
 class DynamoDBQueueAbstract[T](
                         aws: AWS,
                         name: String,
@@ -139,13 +141,22 @@ class DynamoDBQueueAbstract[T](
 
 
   def isEmpty: Boolean = {
-    val count = aws.ddb.scan(new ScanRequest()
-      .withTableName(name)
-      .withSelect(Select.COUNT)
-      .withLimit(1)
-    ).getCount
-    println(count)
-    count == 0
+    Try {
+      val count = aws.ddb.scan(new ScanRequest()
+        .withTableName(name)
+        .withSelect(Select.COUNT)
+        .withLimit(1)
+      ).getCount
+      //println(count)
+      count == 0
+    } match {
+      case Failure(t) => {
+        false
+      }
+      case Success(b) => {
+        b
+      }
+    }
   }
 
   def list(): List[String] = {

@@ -15,6 +15,8 @@ import ohnosequences.awstools.ddb.Utils
 import ohnosequences.nisperon.logging.FailTable
 import ohnosequences.nisperon.logging.InstanceLogging
 
+import scala.util.{Success, Failure}
+
 
 abstract class Nisperon {
 
@@ -138,8 +140,14 @@ abstract class Nisperon {
           val failTable =  new FailTable(aws, nisperonConfiguration.errorTable)
           failTable.create()
 
-          if(!aws.s3.objectExists(nisperonConfiguration.artifactAddress)) {
-            throw new Error("jar isn't published: " + nisperonConfiguration.artifactAddress)
+
+          aws.s3.objectExists(nisperonConfiguration.artifactAddress) match {
+            case Failure(t) => {
+              throw new Error("jar isn't published: " + nisperonConfiguration.artifactAddress, t)
+            }
+            case Success(false) => {
+              throw new Error("jar isn't published: " + nisperonConfiguration.artifactAddress)
+            }
           }
 
           logger.info("creating bucket " + nisperonConfiguration.bucket)

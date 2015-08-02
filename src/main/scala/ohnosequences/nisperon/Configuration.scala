@@ -11,7 +11,7 @@ import ohnosequences.nisperon.queues.SQSQueue
 object NisperonConfiguration {
 
   val defaultInstanceSpecs = InstanceSpecs(
-    instanceType = InstanceType.T1Micro,
+    instanceType = InstanceType.t1_micro,
     amiId = "",
     securityGroups = List("nispero"),
     keyName = "nispero",
@@ -85,7 +85,7 @@ abstract class GroupConfiguration {
 }
 
 case class SingleGroup(
-  instanceType: InstanceType = InstanceType.T1Micro,
+  instanceType: InstanceType = InstanceType.t1_micro,
   purchaseModel: PurchaseModel = OnDemand
 ) extends GroupConfiguration {
   val min = 1
@@ -94,7 +94,7 @@ case class SingleGroup(
 }
 
 case class Group(
-  instanceType: InstanceType = InstanceType.T1Micro,
+  instanceType: InstanceType = InstanceType.t1_micro,
   min: Int = 0,
   max: Int = 10,
   size: Int,

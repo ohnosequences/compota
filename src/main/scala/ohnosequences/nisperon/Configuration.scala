@@ -1,12 +1,10 @@
 package ohnosequences.nisperon
 
-import ohnosequences.awstools.ec2.{InstanceSpecs, InstanceType}
-import ohnosequences.awstools.autoscaling._
-import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.statika._
 import ohnosequences.nisperon.bundles.NisperonMetadataBuilder
-import org.clapper.avsl.Logger
-import ohnosequences.nisperon.queues.SQSQueue
+
+import ohnosequences.awstools.autoscaling._
+import ohnosequences.awstools.ec2.{InstanceSpecs, InstanceType}
+import ohnosequences.awstools.s3.ObjectAddress
 
 object NisperonConfiguration {
 
@@ -19,6 +17,7 @@ object NisperonConfiguration {
     deviceMapping = Map("/dev/xvdb" -> "ephemeral0")
   )
 }
+
 case class NisperonConfiguration(
                                   metadataBuilder: NisperonMetadataBuilder,
                                   email: String,
@@ -38,10 +37,10 @@ case class NisperonConfiguration(
 
   def notificationTopic: String = Naming.notificationTopic(this)
 
-
   def id = metadataBuilder.id
 
   def metamanagerQueue = Naming.name(this, "metamanager")
+
   def metamanagerGroup = Naming.name(this, "metamanager")
 
   def bucket = Naming.s3name(this)
@@ -51,6 +50,7 @@ case class NisperonConfiguration(
   def deadLettersQueue = Naming.name(this, "deadletters")
 
   def errorTable = Naming.name(this, "errors")
+
 }
 
 
@@ -85,31 +85,30 @@ abstract class GroupConfiguration {
 }
 
 case class SingleGroup(
-  instanceType: InstanceType = InstanceType.t1_micro,
-  purchaseModel: PurchaseModel = OnDemand
-) extends GroupConfiguration {
+                        instanceType: InstanceType = InstanceType.t1_micro,
+                        purchaseModel: PurchaseModel = OnDemand
+                        ) extends GroupConfiguration {
   val min = 1
   val max = 1
   val size = 1
 }
 
 case class Group(
-  instanceType: InstanceType = InstanceType.t1_micro,
-  min: Int = 0,
-  max: Int = 10,
-  size: Int,
-  purchaseModel: PurchaseModel = OnDemand
-) extends GroupConfiguration
-
+                  instanceType: InstanceType = InstanceType.t1_micro,
+                  min: Int = 0,
+                  max: Int = 10,
+                  size: Int,
+                  purchaseModel: PurchaseModel = OnDemand
+                  ) extends GroupConfiguration
 
 
 case class NisperoConfiguration(nisperonConfiguration: NisperonConfiguration, name: String, workerGroup: GroupConfiguration = SingleGroup()) {
 
-  def workersGroupName = Naming.name(nisperonConfiguration, this,  "worker")
+  def workersGroupName = Naming.name(nisperonConfiguration, this, "worker")
 
-  def managerGroupName = Naming.name(nisperonConfiguration, this,  "manager")
+  def managerGroupName = Naming.name(nisperonConfiguration, this, "manager")
 
-  def controlQueueName = Naming.name(nisperonConfiguration, this,  "control")
+  def controlQueueName = Naming.name(nisperonConfiguration, this, "control")
 
 }
 

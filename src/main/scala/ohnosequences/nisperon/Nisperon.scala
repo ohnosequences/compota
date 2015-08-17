@@ -1,20 +1,23 @@
 package ohnosequences.nisperon
 
-
 import ohnosequences.nisperon.queues._
-import scala.collection.mutable
-import ohnosequences.awstools.s3.ObjectAddress
-import java.io.{PrintWriter, File}
-import ohnosequences.nisperon.bundles.{WhateverBundle, NisperonMetadataBuilder}
-import com.amazonaws.services.autoscaling.model.UpdateAutoScalingGroupRequest
-import com.amazonaws.AmazonServiceException
-import com.amazonaws.services.sqs.model.DeleteQueueRequest
-import org.clapper.avsl.Logger
-import ohnosequences.awstools.ec2.InstanceType
-import ohnosequences.awstools.ddb.Utils
 import ohnosequences.nisperon.logging.FailTable
 import ohnosequences.nisperon.logging.InstanceLogging
+import ohnosequences.nisperon.bundles.{MetaManagerCompatible, MetaManagerBundle}
 
+import ohnosequences.awstools.s3.ObjectAddress
+
+import com.amazonaws.services.autoscaling.model.UpdateAutoScalingGroupRequest
+import ohnosequences.statika.aws.amazonLinuxAMIs.AmazonLinuxAMIOps
+import ohnosequences.statika.instructions
+import ohnosequences.statika.instructions.Results
+
+import org.clapper.avsl.Logger
+
+import java.io.{PrintWriter, File}
+
+import scala.collection.mutable
+import scala.util.Success
 
 abstract class Nisperon {
 
@@ -24,29 +27,28 @@ abstract class Nisperon {
 
   val mergingQueues: List[MonoidQueueAux] = List[MonoidQueueAux]()
 
-  //val credentialsFile = new File(System.getProperty("user.home"), "nispero.credentials")
+  val credentialsFile = new File(System.getProperty("user.home"), "nispero.credentials")
 
-  val aws: AWS = new AWS(new File(System.getProperty("user.home"), "nispero.credentials"))
+  val aws: AWS = new AWS(credentialsFile)
 
   val logger = Logger(this.getClass)
 
   def checks()
 
   class S3Queue[T](name: String, monoid: Monoid[T], serializer: Serializer[T]) extends
-     S3QueueAbstract(aws, Naming.s3name(nisperonConfiguration,  name), monoid, serializer,
-       deadLetterQueueName = nisperonConfiguration.deadLettersQueue) {
+  S3QueueAbstract(aws, Naming.s3name(nisperonConfiguration, name), monoid, serializer,
+    deadLetterQueueName = nisperonConfiguration.deadLettersQueue) {
 
   }
 
   class DynamoDBQueue[T](name: String, monoid: Monoid[T], serializer: Serializer[T], writeBodyToTable: Boolean = true, throughputs: (Int, Int)) extends
-    DynamoDBQueueAbstract(aws, Naming.name(nisperonConfiguration,  name), monoid, serializer, throughputs, deadLetterQueueName = nisperonConfiguration.deadLettersQueue)
+  DynamoDBQueueAbstract(aws, Naming.name(nisperonConfiguration, name), monoid, serializer, throughputs, deadLetterQueueName = nisperonConfiguration.deadLettersQueue)
 
 
-  class S3MapQueue[K, V](name: String, monoid: Monoid[V],  kSerializer: Serializer[K],
+  class S3MapQueue[K, V](name: String, monoid: Monoid[V], kSerializer: Serializer[K],
                          vSerializer: Serializer[V], incrementSerializer: IncrementalSerializer[V])
-    extends S3MapQueueAbstract[K, V](aws, Naming.name(nisperonConfiguration,  name), monoid, kSerializer,
-    vSerializer, incrementSerializer, ObjectAddress(nisperonConfiguration.bucket, name))
-
+    extends S3MapQueueAbstract[K, V](aws, Naming.name(nisperonConfiguration, name), monoid, kSerializer,
+      vSerializer, incrementSerializer, ObjectAddress(nisperonConfiguration.bucket, name))
 
 
   //in secs
@@ -63,14 +65,14 @@ abstract class Nisperon {
   }
 
 
-  class NisperoWithDefaults[I, O, IQ <: MonoidQueue[I], OQ <: MonoidQueue[O]] (
-    inputQueue: IQ, outputQueue: OQ, instructions: Instructions[I, O], nisperoConfiguration: NisperoConfiguration
-  ) extends Nispero[I, O, IQ, OQ](aws, inputQueue, outputQueue, instructions, nisperoConfiguration)
+  class NisperoWithDefaults[I, O, IQ <: MonoidQueue[I], OQ <: MonoidQueue[O]](
+                                                                               inputQueue: IQ, outputQueue: OQ, instructions: Instructions[I, O], nisperoConfiguration: NisperoConfiguration
+                                                                               ) extends Nispero[I, O, IQ, OQ](aws, inputQueue, outputQueue, instructions, nisperoConfiguration)
 
 
-  def nispero[I, O, IQ <: MonoidQueue[I], OQ <: MonoidQueue[O]] (
-    inputQueue: IQ, outputQueue: OQ, instructions: Instructions[I, O], nisperoConfiguration: NisperoConfiguration
-  ): Nispero[I, O, IQ, OQ] = {
+  def nispero[I, O, IQ <: MonoidQueue[I], OQ <: MonoidQueue[O]](
+                                                                 inputQueue: IQ, outputQueue: OQ, instructions: Instructions[I, O], nisperoConfiguration: NisperoConfiguration
+                                                                 ): Nispero[I, O, IQ, OQ] = {
 
     val r = new NisperoWithDefaults(inputQueue, outputQueue, instructions, nisperoConfiguration)
     nisperos.put(nisperoConfiguration.name, r)
@@ -111,70 +113,80 @@ abstract class Nisperon {
 
   def checkTasks(verbose: Boolean): Boolean = true
 
+  object metaManagerBundle extends MetaManagerBundle {
+
+    val logger = Logger(this.getClass)
+
+    override def install: Results = {
+
+      instructions.success(s"Module ${bundleFullName} is installed")
+    }
+
+  }
+
+  object metaManagerCompatible extends MetaManagerCompatible(
+    metaManagerBundle,
+    nisperonConfiguration.metadataBuilder.build("meta", "meta")
+  )
+
   def main(args: Array[String]) {
 
     args.toList match {
       case "meta" :: "meta" :: Nil => new MetaManager(Nisperon.this).run()
 
       case "manager" :: nisperoId :: Nil => nisperos(nisperoId).installManager()
+
       case "worker" :: nisperoId :: Nil => nisperos(nisperoId).installWorker()
 
       case "run" :: Nil => {
-        //check jar
 
-          logger.info("creating notification topic: " + nisperonConfiguration.notificationTopic)
-          val topic = aws.sns.createTopic(nisperonConfiguration.notificationTopic)
+        logger.info("creating notification topic: " + nisperonConfiguration.notificationTopic)
+        val topic = aws.sns.createTopic(nisperonConfiguration.notificationTopic)
 
-          logger.info("creating dead letter queue: " + nisperonConfiguration.deadLettersQueue)
+        logger.info("creating dead letter queue: " + nisperonConfiguration.deadLettersQueue)
         //  val deadLettersQueue = new SQSQueue[Unit](aws.sqs.sqs, nisperonConfiguration.deadLettersQueue, unitSerializer).createQueue()
 
-          if (!topic.isEmailSubscribed(nisperonConfiguration.email)) {
-            logger.info("subscribing " + nisperonConfiguration.email + " to notification topic")
-            topic.subscribeEmail(nisperonConfiguration.email)
-            logger.info("please confirm subscription")
-          }
+        if (!topic.isEmailSubscribed(nisperonConfiguration.email)) {
+          logger.info("subscribing " + nisperonConfiguration.email + " to notification topic")
+          topic.subscribeEmail(nisperonConfiguration.email)
+          logger.info("please confirm subscription")
+        }
 
-          logger.info("creating failures table")
-          val failTable =  new FailTable(aws, nisperonConfiguration.errorTable)
-          failTable.create()
+        logger.info("creating failures table")
+        val failTable = new FailTable(aws, nisperonConfiguration.errorTable)
+        failTable.create()
 
-          if(!aws.s3.objectExists(nisperonConfiguration.artifactAddress)) {
-            throw new Error("jar isn't published: " + nisperonConfiguration.artifactAddress)
-          }
+        aws.s3.objectExists(nisperonConfiguration.artifactAddress) match {
+          case Success(true) => ()
+          case _ => throw new Error("jar isn't published: " + nisperonConfiguration.artifactAddress)
+        }
 
-          logger.info("creating bucket " + nisperonConfiguration.bucket)
-          aws.s3.createBucket(nisperonConfiguration.bucket)
+        logger.info("creating bucket " + nisperonConfiguration.bucket)
+        aws.s3.createBucket(nisperonConfiguration.bucket)
 
-          nisperos.foreach {
-            case (id, nispero) =>
-              nispero.runManager()
-          }
-
-          val bundle = new WhateverBundle(Nisperon.this, "meta", "meta")
-          val userdata = bundle.userScript(bundle)
-
+        nisperos.foreach {
+          case (id, nispero) =>
+            logger.info("deploying nispero " + id)
+            nispero.deploy()
+        }
 
 
-          val metagroup = nisperonConfiguration.metamanagerGroupConfiguration.autoScalingGroup(
-            name = nisperonConfiguration.metamanagerGroup,
-            amiId = bundle.ami.id,
-            defaultInstanceSpecs = nisperonConfiguration.defaultInstanceSpecs,
-            userData = userdata
-          )
-
-          addTasks()
-
-          logger.info("launching metamanager")
-          //println(metagroup)
-
-          aws.as.createAutoScalingGroup(metagroup)
+        val env = metaManagerCompatible.environment
+        val envOps = AmazonLinuxAMIOps(metaManagerCompatible)
+        val userData = envOps.userScript
 
 
-         
-         // notification(nisperonConfiguration.id + " started", "started")
+        val metagroup = nisperonConfiguration.metamanagerGroupConfiguration.autoScalingGroup(
+          name = nisperonConfiguration.metamanagerGroup,
+          amiId = metaManagerCompatible.environment.amiVersion,
+          defaultInstanceSpecs = nisperonConfiguration.defaultInstanceSpecs,
+          userData = userData
+        )
 
-          //todo fix closing
-         // System.exit(0)
+        addTasks()
+
+        logger.info("launching metamanager")
+        aws.as.createAutoScalingGroup(metagroup)
 
       }
 
@@ -211,13 +223,13 @@ abstract class Nisperon {
 
       case "list" :: Nil => {
         nisperos.foreach {
-          case (id, nispero) => println( id + " -> " + nispero.nisperoConfiguration.workersGroupName)
+          case (id, nispero) => println(id + " -> " + nispero.nisperoConfiguration.workersGroupName)
         }
       }
 
       case "undeploy" :: "actions" :: Nil => undeployActions(false)
 
-      case "check":: "tasks" :: Nil => {
+      case "check" :: "tasks" :: Nil => {
         println("tasks are ok: " + checkTasks(verbose = true))
       }
 
@@ -250,11 +262,10 @@ abstract class Nisperon {
         nisperos(nispero)
       }
 
-      case args => additionalHandler(args)
+      case otherArgs => additionalHandler(otherArgs)
 
     }
   }
-
 
 
   def additionalHandler(args: List[String])
@@ -269,8 +280,8 @@ object Nisperon {
   def unsafeAction(name: String, action: => Unit, logger: Logger, limit: Int = 10) {
 
     var done = false
-    var c =1
-    while(!done && c < limit) {
+    var c = 1
+    while (!done && c < limit) {
       c += 1
       try {
         logger.info(name)
@@ -288,7 +299,7 @@ object Nisperon {
   }
 
 
-  def reportFailure(aws: AWS, nisperonConfiguration: NisperonConfiguration, taskId: String, t: Throwable,  terminateInstance: Boolean, failTable: FailTable, messagePrefix: String = "", maxAttempts: Int = 10) {
+  def reportFailure(aws: AWS, nisperonConfiguration: NisperonConfiguration, taskId: String, t: Throwable, terminateInstance: Boolean, failTable: FailTable, messagePrefix: String = "", maxAttempts: Int = 10) {
 
     logger.error(messagePrefix + " " + t.toString + " " + t.getLocalizedMessage)
     t.printStackTrace()
@@ -297,7 +308,7 @@ object Nisperon {
     var attempt = maxAttempts
     val instanceId = aws.ec2.getCurrentInstanceId.getOrElse("unknown" + System.currentTimeMillis())
 
-    while(attempt > 0) {
+    while (attempt > 0) {
       attempt -= 1
       try {
         failTable.fail(taskId, instanceId, messagePrefix + " " + t.toString)
@@ -308,7 +319,7 @@ object Nisperon {
     }
 
     attempt = maxAttempts
-    while(attempt > 0) {
+    while (attempt > 0) {
       attempt -= 1
       try {
         InstanceLogging.putLog(aws, nisperonConfiguration, instanceId)
@@ -318,7 +329,7 @@ object Nisperon {
       }
     }
 
-    if(terminateInstance) {
+    if (terminateInstance) {
       logger.error("terminating instance")
       aws.ec2.getCurrentInstance.foreach(_.terminate())
     }

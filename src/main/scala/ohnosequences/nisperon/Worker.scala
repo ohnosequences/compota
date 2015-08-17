@@ -1,8 +1,9 @@
 package ohnosequences.nisperon
 
 import ohnosequences.nisperon.queues._
-import org.clapper.avsl.Logger
 import ohnosequences.nisperon.logging.{InstanceLogging, FailTable, S3Logger}
+
+import org.clapper.avsl.Logger
 
 //todo use failed table failed if failed from several machines
 
@@ -25,7 +26,6 @@ abstract class WorkerAux {
   val logger = Logger(this.getClass)
 
 
-
   //todo add links to instance logs
   def runInstructions() {
 
@@ -46,7 +46,7 @@ abstract class WorkerAux {
         case t: Throwable =>
           logger.error("error during initializing queues")
           start = false
-          Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, "worker", t,  true, failTable, "error during initializing queues")
+          Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, "worker", t, true, failTable, "error during initializing queues")
       }
 
       var startTime = 0L
@@ -90,7 +90,7 @@ abstract class WorkerAux {
         } catch {
           case t: Throwable => {
             if (message == null) {
-              Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, "worker", t,  true, failTable, "error during reading from queue")
+              Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, "worker", t, true, failTable, "error during reading from queue")
             } else {
               if (failTable.fails(message.id) > nisperoConfiguration.nisperonConfiguration.errorThreshold) {
                 logger.error("message " + message.id + " failed more than " + nisperoConfiguration.nisperonConfiguration.errorThreshold)
@@ -111,7 +111,6 @@ abstract class WorkerAux {
 
     }
   }
-
 
 
   def deleteMessage(message: Message[inputQueue.MA]) {

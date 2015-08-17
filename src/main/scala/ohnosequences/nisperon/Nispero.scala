@@ -2,11 +2,12 @@ package ohnosequences.nisperon
 
 import ohnosequences.nisperon.queues.{MonoidQueueAux, MonoidQueue}
 import ohnosequences.nisperon.bundles._
-
-import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.statika.instructions._
-import org.clapper.avsl.Logger
 import ohnosequences.nisperon.logging.FailTable
+
+import ohnosequences.statika.aws.amazonLinuxAMIs.AmazonLinuxAMIOps
+import ohnosequences.statika.instructions._
+
+import org.clapper.avsl.Logger
 
 
 trait NisperoAux {
@@ -39,18 +40,16 @@ trait NisperoAux {
 
   def installWorker()
 
-  def runManager()
+  def deploy()
 }
 
 class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: MonoidQueue[Output]](
-  val aws: AWS,
-  val inputQueue: InputQueue,
-  val outputQueue: OutputQueue,
-  val instructions: Instructions[Input, Output],
- // val addressCreator: AddressCreator,
-  val nisperoConfiguration: NisperoConfiguration
-
-) extends NisperoAux {
+                                                                                                    val aws: AWS,
+                                                                                                    val inputQueue: InputQueue,
+                                                                                                    val outputQueue: OutputQueue,
+                                                                                                    val instructions: Instructions[Input, Output],
+                                                                                                    val nisperoConfiguration: NisperoConfiguration
+                                                                                                    ) extends NisperoAux {
 
   type IQ = InputQueue
 
@@ -58,13 +57,13 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
 
   type I = Instructions[Input, Output]
 
-  type W =  Worker[Input, Output, InputQueue, OutputQueue]
+  type W = Worker[Input, Output, InputQueue, OutputQueue]
 
   type M = Manager
 
   val worker = new Worker(aws, inputQueue, outputQueue, instructions, nisperoConfiguration)
 
-  val manager = new Manager(aws,nisperoConfiguration)
+  val manager = new Manager(aws, nisperoConfiguration)
 
   val logger = Logger(this.getClass)
 
@@ -79,37 +78,25 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
 
   }
 
-  object managerDistribution extends ManagerCompatible {
-    import ohnosequences.statika.{AnyDistribution, InstallResults, success}
+  object managerBundle extends ManagerBundle {
 
     val logger = Logger(this.getClass)
 
-    val metadata = nisperoConfiguration.nisperonConfiguration.metadataBuilder.build("worker", nisperoConfiguration.name, nisperoConfiguration.nisperonConfiguration.workingDir)
-
-    def test() {
-      userScript(workerBundle)
-    }
-
-    def installWorker() {
-      installWithDeps(workerBundle)
-    }
-
-    override def install[Dist <: AnyDistribution](distribution: Dist): InstallResults = {
-
+    override def install: Results = {
       val failTable = new FailTable(aws, nisperoConfiguration.nisperonConfiguration.errorTable)
-
-
       try {
         val workersGroup = nisperoConfiguration.workerGroup
 
         logger.info("nispero " + nisperoConfiguration.name + ": generating user script")
-        val script = userScript(worker)
+        val env = workerCompatible.environment
+        val envOps = AmazonLinuxAMIOps(workerCompatible)
+        val script = envOps.userScript
 
         logger.info("nispero " + nisperoConfiguration.name + ": launching workers group")
         val workers = workersGroup.autoScalingGroup(
           name = nisperoConfiguration.workersGroupName,
           defaultInstanceSpecs = nisperoConfiguration.nisperonConfiguration.defaultInstanceSpecs,
-          amiId = managerDistribution.ami.id,
+          amiId = workerCompatible.environment.amiVersion,
           userData = script
         )
 
@@ -119,67 +106,55 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
 
         manager.runControlQueueHandler()
 
-        //todo tagging
       } catch {
         case t: Throwable =>
           Nisperon.reportFailure(aws, nisperoConfiguration.nisperonConfiguration, "manager", t, true, failTable)
-
       }
 
-
-
-      success("manager finished")
+      success(s"Module ${bundleFullName} is installed")
     }
 
   }
 
-  object nisperoDistribution extends NisperoDistribution(managerDistribution) {
-    //  import ohnosequences.statika.{success}
+  object managerCompatible extends ManagerCompatible(
+    managerBundle,
+    nisperoConfiguration.nisperonConfiguration.metadataBuilder.build("manager", nisperoConfiguration.name)
+  )
 
-    val logger = Logger(this.getClass)
+  object workerCompatible extends WorkerCompatible(
+    workerBundle,
+    nisperoConfiguration.nisperonConfiguration.metadataBuilder.build("worker", nisperoConfiguration.name, nisperoConfiguration.nisperonConfiguration.workingDir)
+  )
 
-    val metadata = nisperoConfiguration.nisperonConfiguration.metadataBuilder.build("manager", nisperoConfiguration.name)
-
-    def runManager() {
-      val managerGroup = nisperoConfiguration.nisperonConfiguration.managerGroupConfiguration
-
-      logger.info("nispero " + nisperoConfiguration.name + ": generating user script")
-      val script = userScript(managerDistribution)
-
-      logger.info("nispero " + nisperoConfiguration.name + ": launching manager group")
-      val managerASGroup = managerGroup.autoScalingGroup(
-        name = nisperoConfiguration.managerGroupName,
-        defaultInstanceSpecs = nisperoConfiguration.nisperonConfiguration.defaultInstanceSpecs,
-        amiId = managerDistribution.ami.id,
-        userData = script
-      )
-
-      aws.as.createAutoScalingGroup(managerASGroup)
-
-      // success("nisperoDistribution finished")
-
-    }
-
-    def installManager() {
-      installWithDeps(managerDistribution)
-    }
-  }
 
   def installManager() {
-    nisperoDistribution.installManager()
+
+    managerBundle.install
   }
 
   def installWorker() {
-    managerDistribution.installWorker()
+    workerBundle.install
   }
 
-  def runManager() {
-    nisperoDistribution.runManager()
+  def deploy() {
+
+    val managerGroup = nisperoConfiguration.nisperonConfiguration.managerGroupConfiguration
+
+    logger.info("nispero " + nisperoConfiguration.name + ": generating user script")
+    val env = managerCompatible.environment
+    val envOps = AmazonLinuxAMIOps(managerCompatible)
+    val script = envOps.userScript
+
+    logger.info("nispero " + nisperoConfiguration.name + ": launching manager group")
+    val managerASGroup = managerGroup.autoScalingGroup(
+      name = nisperoConfiguration.managerGroupName,
+      defaultInstanceSpecs = nisperoConfiguration.nisperonConfiguration.defaultInstanceSpecs,
+      amiId = managerCompatible.environment.amiVersion,
+      userData = script
+    )
+
+    aws.as.createAutoScalingGroup(managerASGroup)
   }
-
-
-
-
 
 
 }

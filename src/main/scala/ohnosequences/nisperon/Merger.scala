@@ -1,10 +1,11 @@
 package ohnosequences.nisperon
 
-import ohnosequences.awstools.s3.{ObjectAddress, S3}
-import java.io.{PrintWriter, File}
 import ohnosequences.nisperon.logging.Logger
+import ohnosequences.awstools.s3.{ObjectAddress, S3}
+
 import scala.collection.mutable
 
+import java.io.{PrintWriter, File}
 
 trait Merger[T] {
   def merge(destination: ObjectAddress, parts: Traversable[T], total: Option[Int])

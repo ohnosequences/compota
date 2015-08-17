@@ -1,16 +1,18 @@
 package ohnosequences.nisperon
 
 import java.io.InputStream
-import com.amazonaws.services.s3.model.{CompleteMultipartUploadRequest, UploadPartRequest, InitiateMultipartUploadRequest, PartETag}
 import java.util
+
+import com.amazonaws.services.s3.model.{CompleteMultipartUploadRequest, InitiateMultipartUploadRequest, PartETag, UploadPartRequest}
 import ohnosequences.awstools.s3.{ObjectAddress, S3}
 
-//low level stuff for uploading
-//implicit context restricts way of usage
+
 trait Uploader {
   type Context
   val initialContext: Context
+
   def start(): Context
+
   def addPart(context: Context, s: InputStream, size: Long, partNumber: Int): Context
 
   def finish(context: Context)
@@ -66,29 +68,5 @@ class MultiPartUploader(s3: S3, objectAddress: ObjectAddress) extends Uploader {
     )
   }
 }
-
-
-//trait MergeSerializer[T]{
-//  val serializer: Serializer[T]
-//  def start(): String
-//  def addPart(part: T): String
-//  def finish(): String
-//}
-//
-//
-//class MergeUploader[T](mergeSerializer: MergeSerializer[T], uploader: Uploader) extends Merger[T] {
-//
-//  var context = uploader.initialContext
-//
-//  def start() {
-//    context = uploader.start(mergeSerializer.start())
-//  }
-//  def addPart(part: T) {
-//    uploader.addPart(context, mergeSerializer.addPart(part))
-//  }
-//  def finish() {
-//    uploader.finish(context, mergeSerializer.finish())
-//  }
-//}
 
 

@@ -1,5 +1,6 @@
 package ohnosequences.nisperon
-import collection.mutable
+
+import scala.collection.mutable
 
 trait Monoid[M] {
 
@@ -48,14 +49,11 @@ object stringMonoid extends Monoid[String] {
   def mult(x: String, y: String): String = x + y
 }
 
-
-
 object unitMonoid extends Monoid[Unit] {
   def unit: Unit = ()
   def mult(x: Unit, y: Unit): Unit = ()
 }
 
-//todo fix it!
 class MapMonoid[K, V](vMonoid: Monoid[V]) extends Monoid[Map[K, V]] {
 
   override def unit: Map[K, V] = Map[K, V]()

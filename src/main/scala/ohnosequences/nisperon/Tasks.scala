@@ -4,7 +4,6 @@ package ohnosequences.nisperon
 object Tasks {
   def generateChild(parentId: String, nispero: String, count: Int) = parentId + "." + nispero + "_" + count
 
-  //todo nisperoName regexp!!!!
   val idR = """.+_(\d+)_(\d+)$""".r
 
   def getOperand(id: String): Option[Int] = {

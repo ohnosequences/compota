@@ -10,15 +10,12 @@ trait InstructionsAux {
 
   type Context
 
- // val arity: Int
-
   def solve(input: I, logger: S3Logger, context: Context): List[O]
 
   def prepare(): Context
 }
 
-  trait Instructions[Input, Output] extends InstructionsAux {
-
+trait Instructions[Input, Output] extends InstructionsAux {
 
   type I = Input
 
@@ -26,10 +23,10 @@ trait InstructionsAux {
 
 }
 
-//results with one message
+/**
+ * Intructions that returns only one message
+ */
 abstract class MapInstructions[Input, Output] extends Instructions[Input, Output] {
-
-  //val arity = 1
 
   def solve(input: I, logger: S3Logger, context: Context): List[Output] = {
     List(apply(input, logger, context))

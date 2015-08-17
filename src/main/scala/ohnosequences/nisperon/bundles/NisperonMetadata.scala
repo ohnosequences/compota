@@ -28,7 +28,7 @@ class NisperonMetadataBuilder(fatMetadata: AnyArtifactMetadata) {
   val id = generateId(fatMetadata)
 }
 
-class NisperonMetadata(fatMetadata: AnyArtifactMetadata, val component: String, val nisperoId: String, val workingDir: String = "/root") extends AnyMetadata {
+class NisperonMetadata(fatMetadata: AnyArtifactMetadata, val component: String, val nisperoId: String, val workingDir: String = "/root") extends AnyArtifactMetadata {
   val organization: String = fatMetadata.organization
   val artifact: String = fatMetadata.artifact
   val version: String = fatMetadata.version
@@ -37,6 +37,8 @@ class NisperonMetadata(fatMetadata: AnyArtifactMetadata, val component: String, 
 
   val jarAddress: ObjectAddress = getAddress(fatMetadata.artifactUrl)
 
+
+  override val artifactUrl: String = fatMetadata.artifactUrl
 
   def getAddress(url: String): ObjectAddress = {
     val s3url = """s3://(.+)/(.+)""".r

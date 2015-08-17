@@ -14,9 +14,8 @@ libraryDependencies ++= Seq(
   "org.clapper"   %% "avsl" % "1.0.2",
   "org.json4s"    %% "json4s-native" % "3.2.11",
   "ohnosequences" %% "aws-scala-tools" % "0.13.2",
-  "ohnosequences" %% "statika" % "2.0.0-M2",
-  "ohnosequences" %% "aws-statika" % "2.0.0-M2",
-  //"ohnosequences" %% "amazon-linux-ami" % "0.14.1",
+  "ohnosequences" %% "statika" % "2.0.0-M3",
+  "ohnosequences" %% "aws-statika" % "2.0.0-M3",
   "net.databinder" %% "unfiltered-filter" % "0.7.1",
   "net.databinder" %% "unfiltered-netty" % "0.7.1",
   "net.databinder" %% "unfiltered-netty-server" % "0.7.1"
@@ -36,7 +35,7 @@ resolvers +=  Resolver.url("era7" + " public ivy snapshots",  url("http://snapsh
 
 dependencyOverrides += "ohnosequences" %% "aws-scala-tools" % "0.13.2"
 
-dependencyOverrides += "ohnosequences" %% "statika" % "2.0.0-M2"
+//dependencyOverrides += "ohnosequences" %% "statika" % "2.0.0-M3"
 
 //dependencyOverrides += "ohnosequences" % "amazon-linux-ami_2.10" % "0.14.1"
 

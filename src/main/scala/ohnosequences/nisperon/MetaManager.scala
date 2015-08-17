@@ -1,10 +1,11 @@
 package ohnosequences.nisperon
 
-import org.clapper.avsl.Logger
+
 import ohnosequences.nisperon.queues.{DefaultQueueMerger, QueueMerger, SQSQueue}
 import ohnosequences.nisperon.logging.FailTable
 import ohnosequences.nisperon.console.Server
 
+import org.clapper.avsl.Logger
 
 class MetaManager(nisperon: Nisperon) {
   import nisperon._
@@ -22,8 +23,6 @@ class MetaManager(nisperon: Nisperon) {
   }
 
 
-  //todo remove notification topic
- // todo use sync queue reader!!!
   def run() {
 
     val failTable = new FailTable(nisperon.aws, nisperon.nisperonConfiguration.errorTable)
@@ -64,8 +63,6 @@ class MetaManager(nisperon: Nisperon) {
       val reader = controlQueue.getSyncReader()
 
       val writer = controlQueue.getWriter(new ListMonoid[MetaManagerCommand0]())
-
-
 
       val terminationDaemon = new TerminationDaemon(nisperon)
       terminationDaemon.start()

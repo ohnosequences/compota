@@ -151,6 +151,7 @@ class DynamoDBQueueAbstract[T](
       count == 0
     } match {
       case Failure(t) => {
+        logger.warn("couldn't check emptiness of DynamoDB table " + name)
         false
       }
       case Success(b) => {

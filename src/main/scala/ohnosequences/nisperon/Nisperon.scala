@@ -32,8 +32,6 @@ abstract class Nisperon {
 
   val logger = Logger(this.getClass)
 
-  def checks()
-
   class S3Queue[T](name: String, monoid: Monoid[T], serializer: Serializer[T]) extends
   S3QueueAbstract(aws, Naming.s3name(nisperonConfiguration, name), monoid, serializer,
     deadLetterQueueName = nisperonConfiguration.deadLettersQueue) {

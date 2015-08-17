@@ -157,8 +157,12 @@ class MetaManager(nisperon: Nisperon) {
             } catch {
               case t: Throwable => {
                 if (failTable.fails(m0.id) > nisperonConfiguration.errorThreshold) {
-                  logger.error("message " + m0.id + " failed more than " + nisperonConfiguration.errorThreshold)
-                  m0.delete()
+                  val msg = "message " + m0.id + " failed more than " + nisperonConfiguration.errorThreshold
+                  logger.error(msg)
+                  //m0.delete()
+                  nisperon.undeployActions(true)
+                  writer.write("deleteResources", List(DeleteResources(msg).marshall()))
+                  writer.flush()
                 } else {
                   Nisperon.reportFailure(nisperon.aws, nisperon.nisperonConfiguration, "metamanager", t, terminateInstance = false, failTable = failTable)
                 }

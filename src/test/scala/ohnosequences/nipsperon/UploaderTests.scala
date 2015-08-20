@@ -2,7 +2,7 @@ package ohnosequences.nipsperon
 
 import org.junit.Test
 import org.junit.Assert._
-import ohnosequences.nisperon.{MultiPartUploadingContext, MultiPartUploader, AWS}
+import ohnosequences.compota.{MultiPartUploadingContext, MultiPartUploader, AWS}
 import java.io.File
 import scala.util.Random
 import ohnosequences.awstools.s3.ObjectAddress

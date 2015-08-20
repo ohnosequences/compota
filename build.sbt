@@ -2,7 +2,7 @@ Nice.scalaProject
 
 name := "compota"
 
-description := "compota (ex nisperon)"
+description := "compota (ex compota)"
 
 organization := "ohnosequences"
 
@@ -11,7 +11,6 @@ isPrivate := false
 libraryDependencies ++= Seq(
   "commons-io"     % "commons-io" % "2.1",
   "com.novocode"   % "junit-interface" % "0.10" % "test",
-  "org.clapper"   %% "avsl" % "1.0.2",
   "org.json4s"    %% "json4s-native" % "3.2.11",
   "ohnosequences" %% "aws-scala-tools" % "0.13.2",
   "ohnosequences" %% "statika" % "2.0.0-M3",

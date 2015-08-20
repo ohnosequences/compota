@@ -2,10 +2,9 @@ package ohnosequences.awstools.ddb
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.dynamodbv2.model._
-import org.clapper.avsl.Logger
+import ohnosequences.logging.Logger
 
 import scala.collection.JavaConversions._
-
 
 object Utils {
 

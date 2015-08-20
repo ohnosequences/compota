@@ -2,7 +2,7 @@ package ohnosequences.nipsperon
 
 import org.junit.Test
 import org.junit.Assert._
-import ohnosequences.nisperon.{MapSerializer, JsonSerializer}
+import ohnosequences.compota.{MapSerializer, JsonSerializer}
 
 class SerializerTests {
 

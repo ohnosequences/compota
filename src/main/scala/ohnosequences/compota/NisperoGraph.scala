@@ -66,7 +66,7 @@ class Graph[N, E](val edges: List[Edge[E, N]]) {
 }
 
 
-class NisperoGraph(nisperos: HashMap[String, NisperoAux]) {
+class NisperoGraph(nisperos: Map[String, NisperoAux]) {
 
 
 

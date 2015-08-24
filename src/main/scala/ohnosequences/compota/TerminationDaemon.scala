@@ -51,7 +51,7 @@ class TerminationDaemon(nisperon: Compota) extends Thread {
         }
       }
 
-      if (launchTime() > nisperon.compotaConfiguration.timeout) {
+      if (launchTime() > nisperon.compotaConfiguration.timeout.toSeconds) {
         logger.info("terminating due to timeout")
         nisperon.sendUndeployCommand("timeout " + nisperon.compotaConfiguration.timeout + " sec", force = true)
         stopped = true

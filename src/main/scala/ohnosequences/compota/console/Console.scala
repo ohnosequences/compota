@@ -21,7 +21,7 @@ case class Console(compota: Compota, server: Server) {
 
   val failTable = new FailTable(aws, compota.compotaConfiguration.errorTable)
 
-  val nisperoGraph = new NisperoGraph(compota.nisperos)
+  val nisperoGraph = new NisperoGraph(compota.nisperoNames)
 
   val queues = nisperoGraph.queues
 
@@ -41,7 +41,7 @@ case class Console(compota: Compota, server: Server) {
 //  <li><a href="/shutdown">shutdown</a></li>
 
   def nisperosLinks(): NodeSeq = {
-    val l = for {(name, nispero) <- compota.nisperos}
+    val l = for {(name, nispero) <- compota.nisperoNames}
     yield <li>
         <a href={"/nispero/" + name}>
           {name}
@@ -146,7 +146,7 @@ case class Console(compota: Compota, server: Server) {
   //          </p>
   def nisperoInfo(nisperoName: String): NodeSeq = {
 
-    compota.nisperos.get(nisperoName) match {
+    compota.nisperoNames.get(nisperoName) match {
       case None => {
         <div class="alert alert-danger">
           {nisperoName + " doesn't exist"}
@@ -332,7 +332,7 @@ case class Console(compota: Compota, server: Server) {
   def workersInfo(nisperoName: String): NodeSeq = {
 
 
-    compota.nisperos.get(nisperoName) match {
+    compota.nisperoNames.get(nisperoName) match {
       case None => {
 //        <div class="alert alert-danger">
 //          {nisperoName + " doesn't exist"}

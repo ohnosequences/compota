@@ -1,5 +1,6 @@
 package ohnosequences.compota
 
+
 import ohnosequences.compota.queues.{MonoidQueueAux, MonoidQueue}
 import ohnosequences.compota.bundles._
 import ohnosequences.compota.logging.FailTable
@@ -9,7 +10,7 @@ import ohnosequences.statika.aws.amazonLinuxAMIs.AmazonLinuxAMIOps
 import ohnosequences.statika.instructions._
 
 
-trait NisperoAux {
+trait NisperoAux { nispero =>
 
   type IQ <: MonoidQueueAux
 
@@ -40,35 +41,12 @@ trait NisperoAux {
   def installWorker()
 
   def deploy()
-}
 
-class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: MonoidQueue[Output]](
-                                                                                                    val aws: AWS,
-                                                                                                    val inputQueue: InputQueue,
-                                                                                                    val outputQueue: OutputQueue,
-                                                                                                    val instructions: Instructions[Input, Output],
-                                                                                                    val nisperoConfiguration: NisperoConfiguration
-                                                                                                    ) extends NisperoAux {
+  val compotaClassName: String
 
-  type IQ = InputQueue
+  case object instructionsBundle extends InstructionsBundle(instructions)
 
-  type OQ = OutputQueue
-
-  type I = Instructions[Input, Output]
-
-  type W = Worker[Input, Output, InputQueue, OutputQueue]
-
-  type M = Manager
-
-  val worker = new Worker(aws, inputQueue, outputQueue, instructions, nisperoConfiguration)
-
-  val manager = new Manager(aws, nisperoConfiguration)
-
-  val logger = new ConsoleLogger("nispero")
-
-  object instructionsBundle extends InstructionsBundle(instructions)
-
-  object workerBundle extends WorkerBundle(instructionsBundle) {
+  case object workerBundle extends WorkerBundle(instructionsBundle) {
 
     override def install: Results = {
       worker.runInstructions()
@@ -77,7 +55,7 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
 
   }
 
-  object managerBundle extends ManagerBundle {
+  case object managerBundle extends ManagerBundle {
 
     val logger = new ConsoleLogger("manager bundle")
 
@@ -115,15 +93,44 @@ class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: Mo
 
   }
 
-  object managerCompatible extends ManagerCompatible(
+  case object managerCompatible extends ManagerCompatible(
     managerBundle,
-    nisperoConfiguration.nisperonConfiguration.metadataBuilder.build("manager", nisperoConfiguration.name)
+    nisperoConfiguration.nisperonConfiguration.metadataBuilder.build("manager", nisperoConfiguration.name),
+    compotaClassName + "." + nispero.getClass.getSimpleName.replace("$", "")
   )
 
-  object workerCompatible extends WorkerCompatible(
+  case object workerCompatible extends WorkerCompatible(
     workerBundle,
-    nisperoConfiguration.nisperonConfiguration.metadataBuilder.build("worker", nisperoConfiguration.name, nisperoConfiguration.nisperonConfiguration.workingDir)
+    nisperoConfiguration.nisperonConfiguration.metadataBuilder.build("worker", nisperoConfiguration.name, nisperoConfiguration.nisperonConfiguration.workingDir),
+    compotaClassName + "." + nispero.getClass.getSimpleName.replace("$", "")
   )
+}
+
+class Nispero[Input, Output, InputQueue <: MonoidQueue[Input], OutputQueue <: MonoidQueue[Output]](
+                                                                                                    val aws: AWS,
+                                                                                                    val inputQueue: InputQueue,
+                                                                                                    val outputQueue: OutputQueue,
+                                                                                                    val instructions: Instructions[Input, Output],
+                                                                                                    val nisperoConfiguration: NisperoConfiguration,
+                                                                                                    val compotaClassName: String
+                                                                                                    ) extends NisperoAux {
+
+  type IQ = InputQueue
+
+  type OQ = OutputQueue
+
+  type I = Instructions[Input, Output]
+
+  type W = Worker[Input, Output, InputQueue, OutputQueue]
+
+  type M = Manager
+
+  val worker = new Worker(aws, inputQueue, outputQueue, instructions, nisperoConfiguration)
+
+  val manager = new Manager(aws, nisperoConfiguration)
+
+  val logger = new ConsoleLogger("nispero")
+
 
 
   def installManager() {

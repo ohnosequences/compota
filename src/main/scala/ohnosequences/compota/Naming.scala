@@ -14,8 +14,8 @@ object Naming {
     ("nispero-" + nisperon.id + "-" + suffix).replace("_", "-").toLowerCase
   }
 
-  def s3name(nisperon: CompotaConfiguration): String = {
-    "nispero-" + nisperon.id.replace("_", "-").toLowerCase
+  def s3name(nisperonId: String): String = {
+    "nispero-" + nisperonId.replace("_", "-").toLowerCase
   }
 
   def notificationTopic(nisperon: CompotaConfiguration): String = {

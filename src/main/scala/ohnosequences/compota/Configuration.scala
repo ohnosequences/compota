@@ -6,6 +6,8 @@ import ohnosequences.awstools.autoscaling._
 import ohnosequences.awstools.ec2.{InstanceSpecs, InstanceType}
 import ohnosequences.awstools.s3.ObjectAddress
 
+import scala.concurrent.duration.Duration
+
 object CompotaConfiguration {
 
   val defaultInstanceSpecs = InstanceSpecs(
@@ -18,18 +20,18 @@ object CompotaConfiguration {
   )
 }
 
-case class CompotaConfiguration(
-                                  metadataBuilder: NisperonMetadataBuilder,
-                                  email: String,
-                                  managerGroupConfiguration: GroupConfiguration = SingleGroup(InstanceType.t1_micro, OnDemand),
-                                  metamanagerGroupConfiguration: GroupConfiguration = SingleGroup(InstanceType.m1_medium, OnDemand),
-                                  timeout: Int = 3600 * 24,
-                                  password: String,
-                                  autoTermination: Boolean = true,
-                                  removeAllQueues: Boolean = false,
-                                  errorThreshold: Int = 10,
-                                  workingDir: String = "/media/ephemeral0",
-                                  defaultInstanceSpecs: InstanceSpecs = CompotaConfiguration.defaultInstanceSpecs) {
+class CompotaConfiguration(
+                                  val metadataBuilder: NisperonMetadataBuilder,
+                                  val email: String,
+                                  val managerGroupConfiguration: GroupConfiguration = SingleGroup(InstanceType.t1_micro, OnDemand),
+                                  val metamanagerGroupConfiguration: GroupConfiguration = SingleGroup(InstanceType.m1_medium, OnDemand),
+                                  val timeout: Duration,
+                                  val password: String,
+                                  val autoTermination: Boolean = true,
+                                  val removeAllQueues: Boolean = false,
+                                  val errorThreshold: Int = 10,
+                                  val workingDir: String = "/media/ephemeral0",
+                                  val defaultInstanceSpecs: InstanceSpecs = CompotaConfiguration.defaultInstanceSpecs) {
 
   def controlTopic: String = Naming.name(this, "controlTopic")
 
@@ -43,7 +45,7 @@ case class CompotaConfiguration(
 
   def metamanagerGroup = Naming.name(this, "metamanager")
 
-  def bucket = Naming.s3name(this)
+  def bucket = Naming.s3name(id)
 
   def results = ObjectAddress(bucket, "results")
 

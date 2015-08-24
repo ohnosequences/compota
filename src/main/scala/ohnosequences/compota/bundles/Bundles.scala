@@ -5,7 +5,7 @@ import ohnosequences.compota._
 import ohnosequences.awstools.regions.Region._
 import ohnosequences.statika.aws.amazonLinuxAMIs.amzn_ami_64bit
 import ohnosequences.statika.aws.api.Virtualization
-import ohnosequences.statika.bundles.{Compatible, AnyArtifactMetadata, AnyBundle, AnyModule}
+import ohnosequences.statika.bundles._
 
 
 trait AnyInstructionsBundle extends AnyModule {
@@ -28,7 +28,8 @@ abstract class WorkerBundle[I <: AnyInstructionsBundle](val instructionsBundle: 
   override val bundleDependencies: List[AnyBundle] = instructionsBundle.bundleDependencies
 }
 
-abstract class WorkerCompatible[WB <: AnyWorkerBundle](workerBundle: WB, metadata: AnyArtifactMetadata) extends Compatible(
+abstract class WorkerCompatible[WB <: AnyWorkerBundle](workerBundle: WB, metadata: AnyArtifactMetadata, compotaClassName: String)
+  extends CompatibleWithPrefix(compotaClassName)(
   amzn_ami_64bit(Ireland, Virtualization.HVM)(1),
   workerBundle,
   metadata
@@ -38,7 +39,8 @@ abstract class ManagerBundle extends AnyBundle {
   override val bundleDependencies: List[AnyBundle] = List()
 }
 
-abstract class ManagerCompatible[MB <: ManagerBundle](managerBundle: MB, metadata: AnyArtifactMetadata) extends Compatible(
+abstract class ManagerCompatible[MB <: ManagerBundle](managerBundle: MB, metadata: AnyArtifactMetadata, compotaClassName: String)
+  extends CompatibleWithPrefix(compotaClassName)(
   amzn_ami_64bit(Ireland, Virtualization.HVM)(1),
   managerBundle,
   metadata
@@ -48,8 +50,16 @@ abstract class MetaManagerBundle extends AnyBundle {
   override val bundleDependencies: List[AnyBundle] = List()
 }
 
-abstract class MetaManagerCompatible[MMB <: MetaManagerBundle](metaManagerBundle: MMB, metadata: AnyArtifactMetadata) extends Compatible(
+abstract class MetaManagerCompatible[MMB <: MetaManagerBundle](metaManagerBundle: MMB, metadata: AnyArtifactMetadata, compota: Compota)
+  extends CompatibleWithPrefix(compota.getClass.getCanonicalName.replace("$", ""))(
   amzn_ami_64bit(Ireland, Virtualization.HVM)(1),
   metaManagerBundle,
   metadata
-)
+) {
+
+  def test(): Unit = {
+    println("getCanonicalName: " + compota.getClass.getCanonicalName)
+    println("toString: " + compota.toString)
+  }
+
+}

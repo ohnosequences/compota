@@ -14,15 +14,20 @@ import ohnosequences.statika.instructions.Results
 
 import com.amazonaws.services.autoscaling.model.UpdateAutoScalingGroupRequest
 
-import scala.collection.mutable
 import scala.util.Success
 
 import java.io.{PrintWriter, File}
 
 
-abstract class Compota {
+abstract class Compota { compota =>
 
-  val nisperos = mutable.HashMap[String, NisperoAux]()
+  def nisperos: List[NisperoAux]
+
+  def nisperoNames: Map[String, NisperoAux] = {
+    nisperos.map { nispero =>
+      nispero.nisperoConfiguration.name -> nispero
+    }.toMap
+  }
 
   val compotaConfiguration: CompotaConfiguration
 
@@ -59,10 +64,10 @@ abstract class Compota {
 
   //in secs
   def launchTime: Long = {
-    if (nisperos.values.isEmpty) {
+    if (nisperos.isEmpty) {
       0
     } else {
-      val groupName = nisperos.values.head.nisperoConfiguration.managerGroupName
+      val groupName = nisperos.head.nisperoConfiguration.managerGroupName
       aws.as.getCreatedTime(groupName).map(_.getTime) match {
         case Some(timestamp) => (System.currentTimeMillis() - timestamp) / 1000
         case None => 0
@@ -72,18 +77,33 @@ abstract class Compota {
 
 
   class NisperoWithDefaults[I, O, IQ <: MonoidQueue[I], OQ <: MonoidQueue[O]](
-                                                                               inputQueue: IQ, outputQueue: OQ, instructions: Instructions[I, O], nisperoConfiguration: NisperoConfiguration
-                                                                               ) extends Nispero[I, O, IQ, OQ](aws, inputQueue, outputQueue, instructions, nisperoConfiguration)
+    inputQueue: IQ,
+    outputQueue: OQ,
+    instructions: Instructions[I, O],
+    nisperoConfiguration: NisperoConfiguration) extends Nispero[I, O, IQ, OQ](
+    aws,
+    inputQueue,
+    outputQueue,
+    instructions,
+    nisperoConfiguration,
+    compota.getClass.getCanonicalName.replace("$", "")) { nispero =>
+
+    //override val compotaClassName: String = compota.getClass.getCanonicalName.replace("$", "") + "." + nispero.getClass.getName.replace("$", "")
 
 
-  def nispero[I, O, IQ <: MonoidQueue[I], OQ <: MonoidQueue[O]](
-                                                                 inputQueue: IQ, outputQueue: OQ, instructions: Instructions[I, O], nisperoConfiguration: NisperoConfiguration
-                                                                 ): Nispero[I, O, IQ, OQ] = {
+    //nisperos.put(nisperoConfiguration.name, this)
 
-    val r = new NisperoWithDefaults(inputQueue, outputQueue, instructions, nisperoConfiguration)
-    nisperos.put(nisperoConfiguration.name, r)
-    r
   }
+
+
+//  def nispero[I, O, IQ <: MonoidQueue[I], OQ <: MonoidQueue[O]](
+//                                                                 inputQueue: IQ, outputQueue: OQ, instructions: Instructions[I, O], nisperoConfiguration: NisperoConfiguration
+//                                                                 ): Nispero[I, O, IQ, OQ] = {
+//
+//    val r = new NisperoWithDefaults(inputQueue, outputQueue, instructions, nisperoConfiguration)
+//    nisperos.put(nisperoConfiguration.name, r)
+//    r
+//  }
 
   def undeployActions(force: Boolean): Option[String]
 
@@ -106,7 +126,7 @@ abstract class Compota {
   }
 
   def checkQueues(): Either[MonoidQueueAux, List[MonoidQueueAux]] = {
-    val graph = new NisperoGraph(nisperos)
+    val graph = new NisperoGraph(nisperoNames)
     graph.checkQueues()
   }
 
@@ -119,7 +139,7 @@ abstract class Compota {
 
   def checkTasks(verbose: Boolean): Boolean = true
 
-  object metaManagerBundle extends MetaManagerBundle {
+  case object metaManagerBundle extends MetaManagerBundle {
 
     override def install: Results = {
 
@@ -128,19 +148,20 @@ abstract class Compota {
 
   }
 
-  object metaManagerCompatible extends MetaManagerCompatible(
+  case object metaManagerCompatible extends MetaManagerCompatible(
     metaManagerBundle,
-    compotaConfiguration.metadataBuilder.build("meta", "meta")
+    compotaConfiguration.metadataBuilder.build("meta", "meta"),
+    compota
   )
 
   def main(args: Array[String]) {
 
     args.toList match {
-      case "meta" :: "meta" :: Nil => new MetaManager(Compota.this).run()
+     // case "meta" :: "meta" :: Nil => new MetaManager(Compota.this).run()
 
-      case "manager" :: nisperoId :: Nil => nisperos(nisperoId).installManager()
+    //  case "manager" :: nisperoId :: Nil => nisperoNames(nisperoId).installManager()
 
-      case "worker" :: nisperoId :: Nil => nisperos(nisperoId).installWorker()
+    //  case "worker" :: nisperoId :: Nil => nisperoNames(nisperoId).installWorker()
 
       case "run" :: Nil => {
 
@@ -163,7 +184,7 @@ abstract class Compota {
         logger.info("creating bucket " + compotaConfiguration.bucket)
         aws.s3.createBucket(compotaConfiguration.bucket)
 
-        nisperos.foreach {
+        nisperoNames.foreach {
           case (id, nispero) =>
             logger.info("deploying nispero " + id)
             nispero.deploy()
@@ -194,7 +215,7 @@ abstract class Compota {
       }
 
       case "graph" :: Nil => {
-        logger.info(new NisperoGraph(nisperos).graph.toString())
+        logger.info(new NisperoGraph(nisperoNames).graph.toString())
       }
 
       case "add" :: "tasks" :: Nil => {
@@ -209,7 +230,7 @@ abstract class Compota {
 
         aws.as.deleteAutoScalingGroup(compotaConfiguration.metamanagerGroup)
         aws.sns.createTopic(compotaConfiguration.controlTopic).delete()
-        nisperos.foreach {
+        nisperoNames.foreach {
           case (id, nispero) =>
 
             aws.as.deleteAutoScalingGroup(nispero.nisperoConfiguration.managerGroupName)
@@ -221,7 +242,7 @@ abstract class Compota {
       }
 
       case "list" :: Nil => {
-        nisperos.foreach {
+        nisperoNames.foreach {
           case (id, nispero) => println(id + " -> " + nispero.nisperoConfiguration.workersGroupName)
         }
       }
@@ -235,7 +256,7 @@ abstract class Compota {
       case "dot" :: "dot" :: Nil => {
         val dotFile = new StringBuilder()
         dotFile.append("digraph compota {\n")
-        nisperos.foreach {
+        nisperoNames.foreach {
           case (id: String, nispero: NisperoAux) =>
             val i = nispero.inputQueue.name
             val o = nispero.outputQueue.name
@@ -252,13 +273,41 @@ abstract class Compota {
         "dot -Tcmapx -onisperon.map -Tpng -onisperon.png compota.dot".!
       }
 
-      case nispero :: "size" :: cons if nisperos.contains(nispero) => {
-        val n = nisperos(nispero)
+      case nispero :: "size" :: cons if nisperoNames.contains(nispero) => {
+        val n = nisperoNames(nispero)
         aws.as.as.updateAutoScalingGroup(new UpdateAutoScalingGroupRequest()
           .withAutoScalingGroupName(n.nisperoConfiguration.workersGroupName)
           .withDesiredCapacity(args(2).toInt)
         )
-        nisperos(nispero)
+        nisperoNames(nispero)
+      }
+
+      case "userScript" :: "manager" :: Nil => {
+        val env = metaManagerCompatible.environment
+        val envOps = AmazonLinuxAMIOps(metaManagerCompatible)
+        val userData = envOps.userScript
+        println(userData)
+        metaManagerCompatible.test()
+        //println("getCanonicalName: " + metaManagerCompatible.getClass.getCanonicalName)
+        //println("toString: " + metaManagerCompatible.toString)
+        //val nispero = nisperos(nisperoName)
+        //nispero.installWorker()
+      }
+
+      case "userScript" :: "worker" :: nisperoName :: Nil => {
+        val nispero = nisperoNames(nisperoName)
+        val env = nispero.workerCompatible.environment
+        val envOps = AmazonLinuxAMIOps(nispero.workerCompatible)
+        val userData = envOps.userScript
+        println(userData)
+      }
+
+      case "userScript" :: "manager" :: nisperoName :: Nil => {
+        val nispero = nisperoNames(nisperoName)
+        val env = nispero.managerCompatible.environment
+        val envOps = AmazonLinuxAMIOps(nispero.managerCompatible)
+        val userData = envOps.userScript
+        println(userData)
       }
 
       case otherArgs => additionalHandler(otherArgs)

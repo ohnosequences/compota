@@ -94,7 +94,7 @@ class MetaManager(nisperon: Compota) {
                         case Left(queue) => logger.info(queue.name + " isn't empty")
                       }
                     } else {
-                      nisperon.nisperos.values.foreach { nispero =>
+                      nisperon.nisperos.foreach { nispero =>
                         Compota.unsafeAction("deleting queue " + nispero.inputQueue.name, nispero.inputQueue.delete(), logger)
                         Compota.unsafeAction("deleting queue " + nispero.outputQueue.name, nispero.outputQueue.delete(), logger)
                       }
